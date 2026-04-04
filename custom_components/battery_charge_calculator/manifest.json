@@ -1,0 +1,11 @@
+{
+    "codeowners": ["@rjn368"],
+    "config_flow": true,
+    "dependencies": ["http", "mqtt", "websocket_api"],
+    "documentation": "",
+    "domain": "battery_charge_calculator",
+    "iot_class": "cloud_polling",
+    "name": "Battery Charge Calculator",
+    "requirements": ["scipy"],
+    "version": "0.1.0"
+}

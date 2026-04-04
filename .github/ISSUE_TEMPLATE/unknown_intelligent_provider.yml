@@ -1,0 +1,13 @@
+name: Unknown intelligent provider
+description: You have been notified of an unknown intelligent provider within HA and want to help resolve the issue.
+labels: ["enhancement"]
+assignees:
+  - rjn368
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider name
+      description: Please provide the name of the provider as presented in the raised repair notice
+    validations:
+      required: true

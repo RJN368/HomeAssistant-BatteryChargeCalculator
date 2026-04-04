@@ -1,0 +1,38 @@
+services:
+  mosquitto:
+    networks:
+      ha-network:
+        ipv4_address: 172.19.0.2
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+
+  givtcp:
+    image: britkat/giv_tcp-ma:latest
+    container_name: givtcp
+    depends_on:
+      - mosquitto
+    ports:
+      - "6350:6350"   # matches your log (gunico      docker network create my-shared-networkrn listening on 6350)
+      - "8099:8099"
+    volumes:
+      - ./config/GivTCP/:/config/GivTCP/
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      # Optional (recommended): stop HA discovery spam while you’re testing
+      # - HA_AUTO_D=False
+    networks:
+      ha-network:
+        ipv4_address: 172.19.0.3
+
+networks:
+  ha-network:
+    external: true
+
+volumes:
+  mosquitto_data:

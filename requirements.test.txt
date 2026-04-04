@@ -1,0 +1,14 @@
+pytest
+pytest-asyncio
+pytest-cov
+pytest-socket
+mock
+homeassistant
+pydantic
+psutil-home-assistant
+sqlalchemy
+fnvhash
+fnv_hash_fast
+scipy
+numpy
+pandas
