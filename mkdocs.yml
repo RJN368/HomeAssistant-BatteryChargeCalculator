@@ -1,9 +1,14 @@
-site_name: Home Assistant Octopus Energy
-repo_url: https://github.com/rjn368/homeassistant-batterychargecalculator
+site_name: Home Assistant Battery Charge Calculator
+repo_url: https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator
+site_url: https://rjn368.github.io/HomeAsssitant-BatteryChargeCalculator/
 docs_dir: _docs
 
 nav:
   - Home: index.md
+  - Setup: setup.md
+  - Sensors: sensors.md
+  - How It Works: how-it-works.md
+  - FAQ: faq.md
 
 # extra:
 #   version:

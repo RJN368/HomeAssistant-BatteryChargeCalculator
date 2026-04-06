@@ -118,9 +118,12 @@ class GeneticEvaluator:
         timeslot.cost = 0
 
         if action == "charge":
-            charge_amount = min(
-                self.max_charge_per_slot,
-                self.max_battery_capacity - battery + net_demand,
+            charge_amount = max(
+                0.0,
+                min(
+                    self.max_charge_per_slot,
+                    self.max_battery_capacity - battery + net_demand,
+                ),
             )
 
             overflow = (
@@ -135,6 +138,16 @@ class GeneticEvaluator:
 
             if overflow > 0:
                 timeslot.cost = timeslot.cost + (timeslot.import_price * (overflow))
+
+            # When solar exceeds demand the surplus fills the battery first;
+            # anything that still can't fit is exported to the grid.
+            if net_demand < 0:
+                solar_surplus = -net_demand
+                remaining_headroom = self.max_battery_capacity - battery
+                solar_to_battery = min(solar_surplus, max(0.0, remaining_headroom))
+                solar_exported = solar_surplus - solar_to_battery
+                battery = min(battery + solar_to_battery, self.max_battery_capacity)
+                timeslot.cost -= timeslot.export_price * solar_exported
 
         elif action == "export":
             discharge_amount = min(self.max_discharge - net_demand, battery)
@@ -226,11 +239,50 @@ class GeneticEvaluator:
         optimal_schedule = population[0]
         optimal_cost = self.evaluate_schedule(optimal_schedule)
 
-        self._logging.info(
-            "Final best cost: %s, Schedule: %s", optimal_cost, optimal_schedule
-        )
+        self._log_schedule(optimal_cost)
 
         return self.timeslots, optimal_cost
+
+    def _log_schedule(self, optimal_cost) -> None:
+        """Log the calculated charge/discharge plan as a readable table."""
+        if not self.timeslots:
+            self._logging.info("Schedule calculated: no timeslots")
+            return
+
+        lines = [
+            f"Charge/discharge plan (total cost: £{optimal_cost:.4f}):",
+            "  %-18s %-12s %8s %8s %8s %8s %8s %9s %12s %12s"
+            % (
+                "Time",
+                "Action",
+                "Batt kWh",
+                "Agile p",
+                "Export p",
+                "Demand",
+                "Solar",
+                "Slot £",
+                "Import Price £",
+                "Export Price £",
+            ),
+            "  " + "-" * 113,
+        ]
+        for slot in self.timeslots:
+            lines.append(
+                "  %-18s %-12s %8.2f %8.2f %8.2f %8.2f %8.2f %9.4f %12.4f %12.4f"
+                % (
+                    slot.start_datetime.strftime("%d/%m %H:%M"),
+                    slot.charge_option or "—",
+                    slot.initial_power,
+                    slot.import_price,
+                    slot.export_price,
+                    slot.demand,
+                    slot.solar,
+                    slot.cost,
+                    slot.import_price,
+                    slot.export_price,
+                )
+            )
+        self._logging.info("\n".join(lines))
 
     def create_ideal_schedule(self):
         """Create a schedule based around charge/discharge options."""

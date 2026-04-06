@@ -4,7 +4,7 @@ Fetches current import and export tariff rates and standing charges
 for the account, regardless of tariff type.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 
@@ -35,6 +35,69 @@ def _active_agreement(agreements: list[dict]) -> dict | None:
         if valid_from <= now and (valid_to is None or valid_to > now):
             return agreement
     return None
+
+
+def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
+    """Expand rate bands into a contiguous 30-minute slot grid.
+
+    Works for both Agile (already 30-min slots) and TOU tariffs like
+    Intelligent Go where each rate covers a multi-hour band that repeats
+    daily (e.g. 10p 23:30-05:30, 32p 05:30-23:30).
+    """
+    if not raw_rates:
+        return []
+
+    now = datetime.now(UTC)
+    # Round down to the current 30-min boundary
+    slot_start = now.replace(
+        minute=0 if now.minute < 30 else 30, second=0, microsecond=0
+    )
+    end_time = slot_start + timedelta(days=days)
+
+    slots: list[dict] = []
+    current = slot_start
+    last_value = raw_rates[0]["value_inc_vat"]
+
+    while current < end_time:
+        # Find a rate whose window directly covers this slot
+        rate_value = next(
+            (r["value_inc_vat"] for r in raw_rates if r["start"] <= current < r["end"]),
+            None,
+        )
+
+        if rate_value is None:
+            # For daily-repeating TOU tariffs (e.g. Intelligent Go), the API
+            # only returns today's bands. Match by time-of-day instead.
+            current_tod = current.hour * 60 + current.minute
+            for r in raw_rates:
+                r_start_tod = r["start"].hour * 60 + r["start"].minute
+                r_end_tod = r["end"].hour * 60 + r["end"].minute
+                if r_end_tod > r_start_tod:
+                    # Normal window (e.g. 05:30 → 23:30)
+                    if r_start_tod <= current_tod < r_end_tod:
+                        rate_value = r["value_inc_vat"]
+                        break
+                else:
+                    # Overnight window crossing midnight (e.g. 23:30 → 05:30)
+                    if current_tod >= r_start_tod or current_tod < r_end_tod:
+                        rate_value = r["value_inc_vat"]
+                        break
+
+        if rate_value is None:
+            rate_value = last_value
+        else:
+            last_value = rate_value
+
+        slots.append(
+            {
+                "start": current,
+                "end": current + timedelta(minutes=30),
+                "value_inc_vat": rate_value,
+            }
+        )
+        current += timedelta(minutes=30)
+
+    return slots
 
 
 class OctopusAgileRatesClient:
@@ -127,11 +190,21 @@ class OctopusAgileRatesClient:
         async with session.get(url, auth=self._auth()) as resp:
             resp.raise_for_status()
             data = await resp.json()
-            return [
-                {
-                    "start": datetime.fromisoformat(r["valid_from"]),
-                    "end": datetime.fromisoformat(r["valid_to"]),
-                    "value_inc_vat": float(r["value_inc_vat"]) / 100,
-                }
-                for r in sorted(data["results"], key=lambda r: r["valid_from"])
-            ]
+            _far_future = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
+            raw_rates = sorted(
+                [
+                    {
+                        "start": datetime.fromisoformat(r["valid_from"]),
+                        "end": (
+                            datetime.fromisoformat(r["valid_to"])
+                            if r.get("valid_to")
+                            else _far_future
+                        ),
+                        "value_inc_vat": float(r["value_inc_vat"]) / 100,
+                    }
+                    for r in data["results"]
+                    if r.get("valid_from")
+                ],
+                key=lambda r: r["start"],
+            )
+            return _expand_to_30min_slots(raw_rates, days)

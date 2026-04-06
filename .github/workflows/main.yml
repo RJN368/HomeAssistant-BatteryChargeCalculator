@@ -136,31 +136,3 @@ jobs:
           from_branch: main
           target_branch: beta
           github_token: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          fetch-depth: 0
-      - name: asdf_install
-        uses: asdf-vm/actions/install@v4
-      - name: Install dependencies
-        run: npm ci
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release
-      - name: Merge main into develop
-        if: ${{ github.repository_owner == 'RJN368' && github.ref == 'refs/heads/main' }}
-        uses: devmasx/merge-branch@master
-        with:
-          type: now
-          message: "chore: Merged main into develop"
-          from_branch: main
-          target_branch: develop
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Merge main into beta
-        if: ${{ github.repository_owner == 'RJN368' && github.ref == 'refs/heads/beta' }}
-        uses: devmasx/merge-branch@master
-        with:
-          type: now
-          message: "chore: Merged main into beta"
-          from_branch: main
-          target_branch: beta
-          github_token: ${{ secrets.GITHUB_TOKEN }}

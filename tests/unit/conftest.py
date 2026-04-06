@@ -16,6 +16,7 @@ import pytest
 # Inject homeassistant stub modules before any integration code is loaded
 # ---------------------------------------------------------------------------
 
+
 def _stub(name: str) -> types.ModuleType:
     mod = types.ModuleType(name)
     sys.modules[name] = mod
@@ -31,6 +32,7 @@ def _install_ha_stubs() -> None:
     ha.config_entries = _stub("homeassistant.config_entries")
     ha.core = _stub("homeassistant.core")
     ha.exceptions = _stub("homeassistant.exceptions")
+    ha.exceptions.ConfigEntryNotReady = Exception
     ha.const = _stub("homeassistant.const")
 
     # homeassistant.components.*
@@ -44,6 +46,8 @@ def _install_ha_stubs() -> None:
     mqtt = _stub("homeassistant.components.mqtt")
     mqtt.async_publish = AsyncMock()
     mqtt.async_subscribe = AsyncMock(return_value=MagicMock())
+    mqtt.subscribe = MagicMock(return_value=MagicMock())
+    mqtt.async_wait_for_mqtt_client = AsyncMock(return_value=True)
 
     # homeassistant.helpers.*
     helpers = _stub("homeassistant.helpers")
@@ -82,6 +86,7 @@ def _install_ha_stubs() -> None:
 
     class _ConfigFlow:
         VERSION = 1
+
         def __init_subclass__(cls, domain=None, **kwargs):
             super().__init_subclass__(**kwargs)
 
@@ -116,6 +121,11 @@ def _install_ha_stubs() -> None:
             self.name = name
             self.update_interval = update_interval
             self.data = None
+            self._debounced_refresh = MagicMock()
+
+        async def async_refresh(self):
+            async with self._debounced_refresh.async_lock:
+                pass
 
         async def async_shutdown(self):
             pass
@@ -158,13 +168,15 @@ def _install_ha_stubs() -> None:
     )
 
     # async_get_clientsession stub
-    sys.modules[
-        "homeassistant.helpers.aiohttp_client"
-    ].async_get_clientsession = lambda hass: MagicMock()
+    sys.modules["homeassistant.helpers.aiohttp_client"].async_get_clientsession = (
+        lambda hass: MagicMock()
+    )
 
     # device_registry stub
     dr_mock = MagicMock()
-    sys.modules["homeassistant.helpers.device_registry"].async_get = lambda hass: dr_mock
+    sys.modules["homeassistant.helpers.device_registry"].async_get = (
+        lambda hass: dr_mock
+    )
 
 
 _install_ha_stubs()
@@ -194,4 +206,3 @@ def mock_config_entry():
         "simulate_only": True,
     }
     return entry
-

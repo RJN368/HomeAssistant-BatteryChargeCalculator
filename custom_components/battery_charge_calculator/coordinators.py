@@ -99,7 +99,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 "forecast", []
             )
 
-            battery_kw: float = await self.givenergy.get_inverter_soc_kwh(self.hass)
+            battery_kw = await self.givenergy.get_inverter_soc_kwh(self.hass)
+
+            if battery_kw is None:
+                _LOGGER.warning("SOC not yet available from MQTT — skipping planning cycle")
+                return
 
             time_end = all_octopus_rates[-1]["end"]
 
@@ -174,6 +178,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 )
 
             self.timeslots, self.totalcost = evaluator.evaluate()
+
             try:
                 await self.async_refresh()
             except RuntimeError as err:

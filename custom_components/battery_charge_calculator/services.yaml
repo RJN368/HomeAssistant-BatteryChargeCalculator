@@ -1,0 +1,3 @@
+trigger_planning:
+  name: Trigger planning
+  description: Run a full battery charge planning cycle immediately, without waiting for the next hourly trigger.

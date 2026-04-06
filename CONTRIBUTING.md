@@ -1,38 +1,52 @@
 
 
-## asdf
+# Contributing to Home Assistant Battery Charge Calculator
 
-We use `asdf` to manage plugins. 
+Thank you for your interest in contributing! This addon optimizes battery charge/discharge/export schedules using Octopus Energy rates, weather data, solar gain, and GivEnergy integration.
 
-```bash
-asdf plugin-add nodejs
-asdf plugin-add python
-sudo apt update & sudo apt upgrade
-sudo apt install libffi-dev libncurses5-dev zlib1g zlib1g-dev libssl-dev libreadline-dev libbz2-dev libsqlite3-dev liblzma-dev
-```
+## How to Contribute
 
-## Python
+- Bug fixes, new features, and improvements are welcome!
+- Areas for contribution include:
+	- Scheduling and optimization algorithms
+	- Weather/load/solar data integration
+	- GivEnergy API integration
+	- Documentation and examples
 
-We use pip to manage dependencies. These are needed in order to run tests
+## Development Setup
 
-```bash
-pip install -r requirements.test.txt
-```
+1. Clone the repository
+2. (Optional) Set up a Python virtual environment
+3. Install dependencies:
 
-## Tests
+	 ```bash
+	 pip install -r requirements.test.txt
+	 ```
 
-### Unit Tests
+## Running Tests
 
-Unit tests are written utilising `pytest`. To run them
-
-```bash
-python -m pytest tests/unit
-```
-
-### Integration Tests
-
-Integration tests are written utilising `pytest`. To run them
+Tests use `pytest`. To run all tests:
 
 ```bash
-API_KEY=<<OCTOPUS_API_KEY>> python -m pytest tests/integration
+python -m pytest tests
 ```
+
+Some tests may require valid Octopus Energy API credentials. Set the following environment variable if needed:
+
+```bash
+export OCTOPUS_API_KEY=your_api_key_here
+```
+
+## Code Style
+
+- Follow the Home Assistant core guidelines (PEP8, type hints, async best practices)
+- Run `ruff` and `pylint` before submitting a PR
+
+## Submitting Changes
+
+1. Fork the repository and create your branch
+2. Make your changes with clear commit messages
+3. Ensure all tests pass
+4. Open a pull request with a description of your changes
+
+Thank you for helping improve the Battery Charge Calculator!
