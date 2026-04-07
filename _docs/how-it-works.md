@@ -50,4 +50,10 @@ If **Simulate Only** mode is enabled in the integration settings, the schedule i
 
 ## 5. Schedule refresh
 
-The optimisation runs automatically each day and also re-runs when conditions change (e.g. new rate data becomes available). The coordinator manages debounced updates to avoid excessive recalculations.
+The integration checks every hour whether the current plan should be replaced. Checking happens on a fixed hourly schedule, but the plan is **only recalculated** when at least one of the following conditions is true:
+
+- **No plan exists yet** — a fresh plan is always generated on startup.
+- **Battery level has drifted** — the actual battery state of charge (read from GivTCP via MQTT) differs from the level that was projected by the plan by more than **10 % of the battery's maximum capacity**. A larger-than-expected deviation means real-world conditions (solar generation, heating demand, etc.) have diverged from the forecast, and a new plan is likely to perform better.
+- **Plan is nearly exhausted** — fewer than **2 hours** remain on the current plan. Because Octopus Agile rates for the following period may now be available, re-planning ensures the schedule extends far enough into the future.
+
+When none of these conditions is met, the existing plan is left in place and the inverter continues to follow it unchanged. This avoids unnecessary recalculations and prevents the inverter schedule from being disrupted while conditions are still on track.

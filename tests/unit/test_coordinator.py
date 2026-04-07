@@ -51,9 +51,7 @@ def _make_coordinator(simulate=True):
         patch(
             "custom_components.battery_charge_calculator.coordinators.OctopusAgileRatesClient"
         ),
-        patch(
-            "custom_components.battery_charge_calculator.coordinators.givenergy"
-        ),
+        patch("custom_components.battery_charge_calculator.coordinators.givenergy"),
         patch(
             "custom_components.battery_charge_calculator.coordinators.power_calculator"
         ),
@@ -72,6 +70,7 @@ def _make_coordinator(simulate=True):
 # ---------------------------------------------------------------------------
 # ceil_dt
 # ---------------------------------------------------------------------------
+
 
 class TestCeilDt:
     def test_rounds_up_to_next_30_min(self):
@@ -96,6 +95,7 @@ class TestCeilDt:
 # ---------------------------------------------------------------------------
 # current_active_slot
 # ---------------------------------------------------------------------------
+
 
 class TestCurrentActiveSlot:
     def test_returns_none_when_no_timeslots(self):
@@ -150,6 +150,7 @@ class TestCurrentActiveSlot:
 # ---------------------------------------------------------------------------
 # _async_update_data — charge/export/discharge dispatch
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncUpdateData:
     @pytest.mark.asyncio
@@ -247,6 +248,7 @@ class TestAsyncUpdateData:
 # find_in_dataset
 # ---------------------------------------------------------------------------
 
+
 class TestFindInDataset:
     def setup_method(self):
         self.coord = _make_coordinator()
@@ -269,3 +271,172 @@ class TestFindInDataset:
     def test_empty_dataset_returns_lastvalue(self):
         result = self.coord.find_in_dataset([], "default", "val", lambda x: True)
         assert result == "default"
+
+
+# ---------------------------------------------------------------------------
+# _should_replan
+# ---------------------------------------------------------------------------
+
+
+class TestShouldReplan:
+    """Tests for BatteryChargeCoordinator._should_replan."""
+
+    def _make_future_slot(
+        self, coord, hours_from_now: float, initial_power: float = 5.0
+    ):
+        """Return a timeslot that starts `hours_from_now` hours in the future."""
+        dt = datetime.now(tz=timezone.utc) + timedelta(hours=hours_from_now)
+        slot = _make_timeslot(dt=dt)
+        slot.initial_power = initial_power
+        return slot
+
+    def _make_active_slot(self, coord, initial_power: float = 5.0):
+        """Return a timeslot that is currently active (started 5 minutes ago)."""
+        dt = datetime.now(tz=timezone.utc) - timedelta(minutes=5)
+        slot = _make_timeslot(dt=dt)
+        slot.initial_power = initial_power
+        return slot
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_no_timeslots(self):
+        coord = _make_coordinator()
+        coord.timeslots = []
+        result = await coord._should_replan()
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_timeslots_is_none(self):
+        coord = _make_coordinator()
+        coord.timeslots = None
+        result = await coord._should_replan()
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_fewer_than_2h_remaining(self):
+        """Last slot ends in 1.5 hours — below the 2-hour threshold."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        # Last slot started 1 hour ago; it's 30 min long, so plan ends in -30 min
+        # Use a slot ending in 1.5 hours: start = now + 1h, end = now + 1.5h
+        last_slot = self._make_future_slot(coord, hours_from_now=1.0)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
+        result = await coord._should_replan()
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_more_than_2h_remaining_and_battery_on_track(self):
+        """Last slot ends in 4 hours, battery exactly on projection — no replan."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)  # ends in 4h
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
+        result = await coord._should_replan()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_battery_deviation_exceeds_10_percent(self):
+        """Actual = 3.6 kWh, projected = 5.0 kWh → deviation 16 % > 10 %."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        # 5.0 - 3.6 = 1.4 kWh → 1.4 / 9.0 ≈ 15.6 %
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
+        result = await coord._should_replan()
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_battery_deviation_within_10_percent(self):
+        """Actual = 5.8 kWh, projected = 5.0 kWh → deviation 8.9 % < 10 %."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        # 5.8 - 5.0 = 0.8 kWh → 0.8 / 9.0 ≈ 8.9 %
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.8)
+        result = await coord._should_replan()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_just_below_10_percent_boundary(self):
+        """Deviation of just under 10 % does NOT trigger replan."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        # 0.89 / 9.0 ≈ 9.9 %, safely below the > 10 % threshold
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.89)
+        result = await coord._should_replan()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_soc_unavailable(self):
+        """When SOC is None the check is inconclusive — do not disturb the plan."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=None)
+        result = await coord._should_replan()
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_no_active_slot_despite_timeslots(self):
+        """All slots are in the past — no active slot, so replan."""
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        past_slot = _make_timeslot(
+            dt=datetime.now(tz=timezone.utc) - timedelta(hours=3)
+        )
+        past_slot.initial_power = 5.0
+        # Last slot ends far in the future so the plan-end check doesn't fire first
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        coord.timeslots = [past_slot, last_slot]
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
+        result = await coord._should_replan()
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
+# _conditional_replan
+# ---------------------------------------------------------------------------
+
+
+class TestConditionalReplan:
+    """Tests for BatteryChargeCoordinator._conditional_replan."""
+
+    @pytest.mark.asyncio
+    async def test_calls_octopus_listener_when_should_replan(self):
+        coord = _make_coordinator()
+        coord.timeslots = []  # no plan → _should_replan returns True
+        coord.octopus_state_change_listener = AsyncMock()
+
+        await coord._conditional_replan()
+
+        coord.octopus_state_change_listener.assert_called_once_with(None)
+
+    @pytest.mark.asyncio
+    async def test_skips_replan_when_plan_is_valid(self):
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        now = datetime.now(tz=timezone.utc)
+        # Active slot with matching battery, plan ends in 4 hours
+        active_slot = _make_timeslot(dt=now - timedelta(minutes=5))
+        active_slot.initial_power = 5.0
+        last_slot = _make_timeslot(dt=now + timedelta(hours=3, minutes=30))
+        last_slot.initial_power = 5.0
+        coord.timeslots = [active_slot, last_slot]
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
+        coord.octopus_state_change_listener = AsyncMock()
+
+        await coord._conditional_replan()
+
+        coord.octopus_state_change_listener.assert_not_called()

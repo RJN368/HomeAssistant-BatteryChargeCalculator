@@ -51,8 +51,69 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
     @callback
     def _handle_planning_timer(self, now: datetime) -> None:
-        """Trigger a new planning cycle every hour."""
-        self.hass.async_create_task(self.octopus_state_change_listener(None))
+        """Trigger a conditional re-planning check every hour."""
+        self.hass.async_create_task(self._conditional_replan())
+
+    async def _conditional_replan(self) -> None:
+        """Re-plan only when the current plan is no longer trustworthy.
+
+        Re-planning is skipped unless at least one of the following is true:
+        - No plan currently exists.
+        - The actual battery level deviates from the projected level by more
+          than 10 % of maximum battery capacity.
+        - Fewer than 2 hours remain on the current plan.
+        """
+        if await self._should_replan():
+            await self.octopus_state_change_listener(None)
+
+    async def _should_replan(self) -> bool:
+        """Return True when conditions warrant replacing the current plan."""
+        if not self.timeslots:
+            _LOGGER.debug("No existing plan — re-planning required")
+            return True
+
+        # Trigger re-plan when the plan is nearly exhausted.
+        last_slot = self.timeslots[-1]
+        plan_end = last_slot.start_datetime + timedelta(minutes=30)
+        now = datetime.now(tz=self.tz)
+        time_remaining = plan_end - now
+        if time_remaining <= timedelta(hours=2):
+            _LOGGER.info(
+                "Fewer than 2 hours remain on the current plan (%s) — re-planning",
+                time_remaining,
+            )
+            return True
+
+        # Trigger re-plan when the battery level has drifted too far from the
+        # projection embedded in the plan.
+        actual_battery_kw = await self.givenergy.get_inverter_soc_kwh(self.hass)
+        if actual_battery_kw is None:
+            _LOGGER.warning("Battery SOC unavailable — skipping re-plan check")
+            return False
+
+        active_slot = self.current_active_slot()
+        if active_slot is None:
+            _LOGGER.debug("No active timeslot found — re-planning required")
+            return True
+
+        projected_battery_kw = active_slot.initial_power
+        max_capacity_kwh = 9.0
+        deviation = abs(actual_battery_kw - projected_battery_kw) / max_capacity_kwh
+        if deviation > 0.10:
+            _LOGGER.info(
+                "Battery deviation %.1f %% (actual %.2f kWh vs projected %.2f kWh) — re-planning",
+                deviation * 100,
+                actual_battery_kw,
+                projected_battery_kw,
+            )
+            return True
+
+        _LOGGER.debug(
+            "Plan is still valid (battery deviation %.1f %%, %.1fh remaining) — skipping re-plan",
+            deviation * 100,
+            time_remaining.total_seconds() / 3600,
+        )
+        return False
 
     async def async_shutdown(self) -> None:
         """Cancel the hourly planning timer on shutdown."""
@@ -102,7 +163,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             battery_kw = await self.givenergy.get_inverter_soc_kwh(self.hass)
 
             if battery_kw is None:
-                _LOGGER.warning("SOC not yet available from MQTT — skipping planning cycle")
+                _LOGGER.warning(
+                    "SOC not yet available from MQTT — skipping planning cycle"
+                )
                 return
 
             time_end = all_octopus_rates[-1]["end"]
