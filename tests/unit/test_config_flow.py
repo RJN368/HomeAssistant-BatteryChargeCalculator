@@ -16,6 +16,7 @@ from custom_components.battery_charge_calculator.config_flow import (
 # get_schema helper
 # ---------------------------------------------------------------------------
 
+
 class TestGetSchema:
     def test_returns_schema_with_all_fields(self):
         schema = get_schema()
@@ -25,6 +26,32 @@ class TestGetSchema:
         assert any(const.OCTOPUS_ACCOUNT_NUMBER in k for k in keys)
         assert any(const.OCTOPUS_APIKEY in k for k in keys)
         assert any(const.SIMULATE_ONLY in k for k in keys)
+        assert any(const.INVERTER_SIZE_KW in k for k in keys)
+        assert any(const.INVERTER_EFFICIENCY in k for k in keys)
+
+    def test_inverter_fields_use_supplied_defaults(self):
+        schema = get_schema(
+            serialno="SN001",
+            apitoken="TOKEN",
+            octopus_account_number="A-1234",
+            octopus_api_key="KEY",
+            simulate=False,
+            inverter_size_kw=5.0,
+            inverter_efficiency=0.85,
+        )
+        result = schema(
+            {
+                const.GIVENERGY_SERIAL_NUMBER: "SN001",
+                const.GIVENERGY_API_TOKEN: "TOKEN",
+                const.OCTOPUS_ACCOUNT_NUMBER: "A-1234",
+                const.OCTOPUS_APIKEY: "KEY",
+                const.SIMULATE_ONLY: False,
+                const.INVERTER_SIZE_KW: 5.0,
+                const.INVERTER_EFFICIENCY: 0.85,
+            }
+        )
+        assert result[const.INVERTER_SIZE_KW] == 5.0
+        assert result[const.INVERTER_EFFICIENCY] == 0.85
 
     def test_defaults_populated(self):
         schema = get_schema(
@@ -42,6 +69,8 @@ class TestGetSchema:
                 const.OCTOPUS_ACCOUNT_NUMBER: "A-1234",
                 const.OCTOPUS_APIKEY: "KEY",
                 const.SIMULATE_ONLY: True,
+                const.INVERTER_SIZE_KW: const.DEFAULT_INVERTER_SIZE_KW,
+                const.INVERTER_EFFICIENCY: const.DEFAULT_INVERTER_EFFICIENCY,
             }
         )
         assert result[const.GIVENERGY_SERIAL_NUMBER] == "SN001"
@@ -50,6 +79,7 @@ class TestGetSchema:
     def test_schema_rejects_wrong_type_for_boolean(self):
         """simulate_only must be a boolean; a non-coercible string should fail."""
         import voluptuous as vol
+
         schema = get_schema()
         with pytest.raises((vol.Invalid, Exception)):
             schema(
@@ -67,6 +97,7 @@ class TestGetSchema:
 # BatteryChargCalculatorConfigFlow.async_step_user
 # ---------------------------------------------------------------------------
 
+
 class TestConfigFlowAsyncStepUser:
     def _make_flow(self, existing_entries=None):
         flow = BatteryChargCalculatorConfigFlow()
@@ -75,7 +106,9 @@ class TestConfigFlowAsyncStepUser:
         flow._async_current_entries = MagicMock(return_value=existing_entries or [])
         flow.async_set_unique_id = AsyncMock()
         flow._abort_if_unique_id_configured = MagicMock()
-        flow.async_show_form = MagicMock(return_value={"type": "form", "step_id": "user"})
+        flow.async_show_form = MagicMock(
+            return_value={"type": "form", "step_id": "user"}
+        )
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
         flow.async_abort = MagicMock(return_value={"type": "abort"})
         return flow
@@ -96,6 +129,8 @@ class TestConfigFlowAsyncStepUser:
             const.OCTOPUS_ACCOUNT_NUMBER: "A-ACCT",
             const.OCTOPUS_APIKEY: "OCTKEY",
             const.SIMULATE_ONLY: False,
+            const.INVERTER_SIZE_KW: 5.0,
+            const.INVERTER_EFFICIENCY: 0.9,
         }
         await flow.async_step_user(user_input=user_input)
         flow.async_create_entry.assert_called_once()
@@ -106,6 +141,8 @@ class TestConfigFlowAsyncStepUser:
         assert options[const.OCTOPUS_ACCOUNT_NUMBER] == "A-ACCT"
         assert options[const.OCTOPUS_APIKEY] == "OCTKEY"
         assert options[const.SIMULATE_ONLY] is False
+        assert options[const.INVERTER_SIZE_KW] == 5.0
+        assert options[const.INVERTER_EFFICIENCY] == 0.9
 
     @pytest.mark.asyncio
     async def test_unique_id_set_to_domain(self):
@@ -123,6 +160,7 @@ class TestConfigFlowAsyncStepUser:
 # ---------------------------------------------------------------------------
 # BatteryChargCalculatorFlowHandler (options flow)
 # ---------------------------------------------------------------------------
+
 
 class TestOptionsFlow:
     def _make_options_flow(self, existing_options=None):
@@ -156,12 +194,16 @@ class TestOptionsFlow:
             const.OCTOPUS_ACCOUNT_NUMBER: "A-NEW",
             const.OCTOPUS_APIKEY: "KEY_NEW",
             const.SIMULATE_ONLY: True,
+            const.INVERTER_SIZE_KW: 6.0,
+            const.INVERTER_EFFICIENCY: 0.95,
         }
         await handler.async_step_init(user_input=new_input)
         handler.async_create_entry.assert_called_once()
         saved_data = handler.async_create_entry.call_args[1]["data"]
         assert saved_data[const.GIVENERGY_SERIAL_NUMBER] == "SN_NEW"
         assert saved_data[const.SIMULATE_ONLY] is True
+        assert saved_data[const.INVERTER_SIZE_KW] == 6.0
+        assert saved_data[const.INVERTER_EFFICIENCY] == 0.95
 
     @pytest.mark.asyncio
     async def test_strips_legacy_keys(self):
@@ -183,6 +225,8 @@ class TestOptionsFlow:
             const.OCTOPUS_ACCOUNT_NUMBER: "A-NEW",
             const.OCTOPUS_APIKEY: "KEY",
             const.SIMULATE_ONLY: False,
+            const.INVERTER_SIZE_KW: const.DEFAULT_INVERTER_SIZE_KW,
+            const.INVERTER_EFFICIENCY: const.DEFAULT_INVERTER_EFFICIENCY,
         }
         await handler.async_step_init(user_input=new_input)
         saved_data = handler.async_create_entry.call_args[1]["data"]
@@ -201,6 +245,8 @@ class TestOptionsFlow:
             const.OCTOPUS_ACCOUNT_NUMBER: "A-NEW",
             const.OCTOPUS_APIKEY: "KEY",
             const.SIMULATE_ONLY: False,
+            const.INVERTER_SIZE_KW: const.DEFAULT_INVERTER_SIZE_KW,
+            const.INVERTER_EFFICIENCY: const.DEFAULT_INVERTER_EFFICIENCY,
         }
         result = await handler.async_step_init(user_input=new_input)
         handler.async_show_form.assert_called_once()

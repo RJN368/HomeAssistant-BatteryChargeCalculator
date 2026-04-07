@@ -82,14 +82,32 @@ class Timeslot:
 class GeneticEvaluator:
     """Genetic algorithm for optimizing battery charge/discharge schedule."""
 
-    def __init__(self, battery_start: float, standing_charge: float) -> None:
-        """Initialize the evaluator with battery start and standing charge."""
+    def __init__(
+        self,
+        battery_start: float,
+        standing_charge: float,
+        inverter_size_kw: float = 3.6,
+        inverter_efficiency: float = 0.9,
+    ) -> None:
+        """Initialize the evaluator with battery start and standing charge.
+
+        Args:
+            battery_start: Initial battery state of charge in kWh.
+            standing_charge: Standing charge in pence to include in cost.
+            inverter_size_kw: Inverter rated power in kW (default 3.6 kW).
+            inverter_efficiency: Inverter round-trip efficiency as a fraction
+                between 0 and 1 (default 0.9 = 90 %).
+
+        The maximum energy that can be imported or exported in a single 30-minute
+        slot is derived from these two parameters:
+            max_per_slot_kwh = (inverter_size_kw * inverter_efficiency) / 2
+        """
         self._logging = logging.getLogger(__name__)
 
         # Constants and inputs
         self.max_battery_capacity = 9
-        self.max_charge_per_slot = 1.44
-        self.max_discharge = 2
+        self.max_charge_per_slot = (inverter_size_kw * inverter_efficiency) / 2
+        self.max_discharge = (inverter_size_kw * inverter_efficiency) / 2
         self.population_size = 400
         self.generations = 700
         self.battery_start = battery_start

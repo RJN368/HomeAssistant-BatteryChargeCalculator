@@ -192,7 +192,14 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             max_range = (time_end - time_now).total_seconds() / 60
 
             evaluator = genetic_evaluator.GeneticEvaluator(
-                battery_kw, octopus_import_standing_charge_rate
+                battery_kw,
+                octopus_import_standing_charge_rate,
+                inverter_size_kw=self.config_entry.options.get(
+                    const.INVERTER_SIZE_KW, const.DEFAULT_INVERTER_SIZE_KW
+                ),
+                inverter_efficiency=self.config_entry.options.get(
+                    const.INVERTER_EFFICIENCY, const.DEFAULT_INVERTER_EFFICIENCY
+                ),
             )
 
             for index, value in enumerate(range(0, int(max_range), 30)):
