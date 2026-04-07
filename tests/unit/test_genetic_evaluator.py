@@ -100,5 +100,43 @@ class TestGeneticEvaluatorInverterParams(unittest.TestCase):
         )
 
 
+class TestGeneticEvaluatorBatteryCapacity(unittest.TestCase):
+    """Tests for battery capacity configuration."""
+
+    def test_default_capacity_is_9_kwh(self):
+        """When no battery_capacity_kwh is supplied the default is 9.0 kWh."""
+        evaluator = GeneticEvaluator(battery_start=5.0, standing_charge=0.1)
+        self.assertEqual(evaluator.max_battery_capacity, 9.0)
+
+    def test_custom_capacity_is_applied(self):
+        """Supplying battery_capacity_kwh sets max_battery_capacity accordingly."""
+        evaluator = GeneticEvaluator(
+            battery_start=5.0,
+            standing_charge=0.1,
+            battery_capacity_kwh=12.0,
+        )
+        self.assertEqual(evaluator.max_battery_capacity, 12.0)
+
+    def test_charge_does_not_exceed_custom_capacity(self):
+        """A charge action must not push the battery above the configured capacity."""
+        capacity = 6.0
+        evaluator = GeneticEvaluator(
+            battery_start=5.5,
+            standing_charge=0.1,
+            inverter_size_kw=5.0,
+            inverter_efficiency=0.9,
+            battery_capacity_kwh=capacity,
+        )
+        timeslot = Timeslot(
+            "2026-04-04T12:00:00",
+            import_price=0.10,
+            export_price=0.05,
+            demand_in=0.0,
+            solar_in=0.0,
+        )
+        battery_after = evaluator._evaluate_single_slot(timeslot, "charge", 5.5)
+        self.assertLessEqual(battery_after, capacity)
+
+
 if __name__ == "__main__":
     unittest.main()

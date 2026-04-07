@@ -28,6 +28,41 @@ class TestGetSchema:
         assert any(const.SIMULATE_ONLY in k for k in keys)
         assert any(const.INVERTER_SIZE_KW in k for k in keys)
         assert any(const.INVERTER_EFFICIENCY in k for k in keys)
+        assert any(const.BATTERY_CAPACITY_KWH in k for k in keys)
+
+    def test_battery_capacity_field_is_optional(self):
+        """battery_capacity_kwh is Optional — omitting it uses the default."""
+        schema = get_schema()
+        result = schema(
+            {
+                const.GIVENERGY_SERIAL_NUMBER: "SN",
+                const.GIVENERGY_API_TOKEN: "TOKEN",
+                const.OCTOPUS_ACCOUNT_NUMBER: "A-1234",
+                const.OCTOPUS_APIKEY: "KEY",
+                const.SIMULATE_ONLY: False,
+                const.INVERTER_SIZE_KW: const.DEFAULT_INVERTER_SIZE_KW,
+                const.INVERTER_EFFICIENCY: const.DEFAULT_INVERTER_EFFICIENCY,
+                # BATTERY_CAPACITY_KWH intentionally omitted
+            }
+        )
+        assert result[const.BATTERY_CAPACITY_KWH] == const.DEFAULT_BATTERY_CAPACITY_KWH
+
+    def test_battery_capacity_custom_value_accepted(self):
+        """A custom battery_capacity_kwh value is accepted and preserved."""
+        schema = get_schema()
+        result = schema(
+            {
+                const.GIVENERGY_SERIAL_NUMBER: "SN",
+                const.GIVENERGY_API_TOKEN: "TOKEN",
+                const.OCTOPUS_ACCOUNT_NUMBER: "A-1234",
+                const.OCTOPUS_APIKEY: "KEY",
+                const.SIMULATE_ONLY: False,
+                const.INVERTER_SIZE_KW: const.DEFAULT_INVERTER_SIZE_KW,
+                const.INVERTER_EFFICIENCY: const.DEFAULT_INVERTER_EFFICIENCY,
+                const.BATTERY_CAPACITY_KWH: 12.0,
+            }
+        )
+        assert result[const.BATTERY_CAPACITY_KWH] == 12.0
 
     def test_inverter_fields_use_supplied_defaults(self):
         schema = get_schema(

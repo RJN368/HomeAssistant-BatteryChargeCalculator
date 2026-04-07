@@ -88,6 +88,7 @@ class GeneticEvaluator:
         standing_charge: float,
         inverter_size_kw: float = 3.6,
         inverter_efficiency: float = 0.9,
+        battery_capacity_kwh: float = 9.0,
     ) -> None:
         """Initialize the evaluator with battery start and standing charge.
 
@@ -97,15 +98,16 @@ class GeneticEvaluator:
             inverter_size_kw: Inverter rated power in kW (default 3.6 kW).
             inverter_efficiency: Inverter round-trip efficiency as a fraction
                 between 0 and 1 (default 0.9 = 90 %).
+            battery_capacity_kwh: Usable battery capacity in kWh (default 9.0 kWh).
 
         The maximum energy that can be imported or exported in a single 30-minute
-        slot is derived from these two parameters:
+        slot is derived from the inverter parameters:
             max_per_slot_kwh = (inverter_size_kw * inverter_efficiency) / 2
         """
         self._logging = logging.getLogger(__name__)
 
         # Constants and inputs
-        self.max_battery_capacity = 9
+        self.max_battery_capacity = battery_capacity_kwh
         self.max_charge_per_slot = (inverter_size_kw * inverter_efficiency) / 2
         self.max_discharge = (inverter_size_kw * inverter_efficiency) / 2
         self.population_size = 400

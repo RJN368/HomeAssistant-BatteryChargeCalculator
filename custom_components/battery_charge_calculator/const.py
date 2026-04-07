@@ -10,9 +10,11 @@ OCTOPUS_EXPORT_MPN = "octopus_export_mpn"
 SIMULATE_ONLY = "simulate_only"
 INVERTER_SIZE_KW = "inverter_size_kw"
 INVERTER_EFFICIENCY = "inverter_efficiency"
+BATTERY_CAPACITY_KWH = "battery_capacity_kwh"
 
 DEFAULT_INVERTER_SIZE_KW = 3.6
 DEFAULT_INVERTER_EFFICIENCY = 0.9
+DEFAULT_BATTERY_CAPACITY_KWH = 9.0
 
 VERSION = "3.3.7"
 

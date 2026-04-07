@@ -18,6 +18,7 @@ def get_schema(
     simulate=False,
     inverter_size_kw=const.DEFAULT_INVERTER_SIZE_KW,
     inverter_efficiency=const.DEFAULT_INVERTER_EFFICIENCY,
+    battery_capacity_kwh=const.DEFAULT_BATTERY_CAPACITY_KWH,
 ):
     return vol.Schema(
         {
@@ -33,6 +34,9 @@ def get_schema(
             ): const.cv_float,
             vol.Required(
                 const.INVERTER_EFFICIENCY, default=inverter_efficiency
+            ): const.cv_float,
+            vol.Optional(
+                const.BATTERY_CAPACITY_KWH, default=battery_capacity_kwh
             ): const.cv_float,
         }
     )
@@ -67,6 +71,9 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                     const.SIMULATE_ONLY: user_input[const.SIMULATE_ONLY],
                     const.INVERTER_SIZE_KW: user_input[const.INVERTER_SIZE_KW],
                     const.INVERTER_EFFICIENCY: user_input[const.INVERTER_EFFICIENCY],
+                    const.BATTERY_CAPACITY_KWH: user_input.get(
+                        const.BATTERY_CAPACITY_KWH, const.DEFAULT_BATTERY_CAPACITY_KWH
+                    ),
                 },
             )
 
@@ -105,6 +112,9 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         inverter_efficiency = self._config_entry.options.get(
             const.INVERTER_EFFICIENCY, const.DEFAULT_INVERTER_EFFICIENCY
         )
+        battery_capacity_kwh = self._config_entry.options.get(
+            const.BATTERY_CAPACITY_KWH, const.DEFAULT_BATTERY_CAPACITY_KWH
+        )
 
         if user_input is not None:
             try:
@@ -121,14 +131,18 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 simulate = user_input[const.SIMULATE_ONLY]
                 inverter_size_kw = user_input[const.INVERTER_SIZE_KW]
                 inverter_efficiency = user_input[const.INVERTER_EFFICIENCY]
+                battery_capacity_kwh = user_input.get(
+                    const.BATTERY_CAPACITY_KWH, const.DEFAULT_BATTERY_CAPACITY_KWH
+                )
 
                 all_config_data[const.GIVENERGY_SERIAL_NUMBER] = serial_number
                 all_config_data[const.GIVENERGY_API_TOKEN] = api_token
                 all_config_data[const.OCTOPUS_ACCOUNT_NUMBER] = octopus_account_number
                 all_config_data[const.OCTOPUS_APIKEY] = octopus_api_key
-                all_config_data[const.SIMULATE_ONLY] = simulate
                 all_config_data[const.INVERTER_SIZE_KW] = inverter_size_kw
                 all_config_data[const.INVERTER_EFFICIENCY] = inverter_efficiency
+                all_config_data[const.BATTERY_CAPACITY_KWH] = battery_capacity_kwh
+                all_config_data[const.SIMULATE_ONLY] = simulate
 
                 self.hass.config_entries.async_update_entry(
                     self._config_entry,
@@ -148,9 +162,10 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 api_token,
                 octopus_account_number,
                 octopus_api_key,
-                simulate,
                 inverter_size_kw,
                 inverter_efficiency,
+                battery_capacity_kwh,
+                simulate,
             ),
             errors=errors,
         )

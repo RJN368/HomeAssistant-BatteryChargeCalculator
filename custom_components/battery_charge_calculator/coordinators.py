@@ -33,6 +33,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             entry.options[const.OCTOPUS_ACCOUNT_NUMBER],
         )
         self.givenergy = givenergy.GivEnergyMqttController(self.config_entry)
+        self.battery_capacity_kwh = const.DEFAULT_BATTERY_CAPACITY_KWH
 
         super().__init__(
             hass, _LOGGER, name=const.DOMAIN, update_interval=timedelta(minutes=1)
@@ -97,8 +98,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             return True
 
         projected_battery_kw = active_slot.initial_power
-        max_capacity_kwh = 9.0
-        deviation = abs(actual_battery_kw - projected_battery_kw) / max_capacity_kwh
+        deviation = (
+            abs(actual_battery_kw - projected_battery_kw) / self.battery_capacity_kwh
+        )
         if deviation > 0.10:
             _LOGGER.info(
                 "Battery deviation %.1f %% (actual %.2f kWh vs projected %.2f kWh) — re-planning",
@@ -191,6 +193,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
             max_range = (time_end - time_now).total_seconds() / 60
 
+            self.battery_capacity_kwh = self.config_entry.options.get(
+                const.BATTERY_CAPACITY_KWH, const.DEFAULT_BATTERY_CAPACITY_KWH
+            )
             evaluator = genetic_evaluator.GeneticEvaluator(
                 battery_kw,
                 octopus_import_standing_charge_rate,
@@ -200,6 +205,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 inverter_efficiency=self.config_entry.options.get(
                     const.INVERTER_EFFICIENCY, const.DEFAULT_INVERTER_EFFICIENCY
                 ),
+                battery_capacity_kwh=self.battery_capacity_kwh,
             )
 
             for index, value in enumerate(range(0, int(max_range), 30)):

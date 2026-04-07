@@ -342,6 +342,7 @@ class TestShouldReplan:
         """Actual = 3.6 kWh, projected = 5.0 kWh → deviation 16 % > 10 %."""
         coord = _make_coordinator()
         coord.tz = timezone.utc
+        coord.battery_capacity_kwh = 9.0
         last_slot = self._make_future_slot(coord, hours_from_now=3.5)
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
@@ -355,6 +356,7 @@ class TestShouldReplan:
         """Actual = 5.8 kWh, projected = 5.0 kWh → deviation 8.9 % < 10 %."""
         coord = _make_coordinator()
         coord.tz = timezone.utc
+        coord.battery_capacity_kwh = 9.0
         last_slot = self._make_future_slot(coord, hours_from_now=3.5)
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
@@ -368,6 +370,7 @@ class TestShouldReplan:
         """Deviation of just under 10 % does NOT trigger replan."""
         coord = _make_coordinator()
         coord.tz = timezone.utc
+        coord.battery_capacity_kwh = 9.0
         last_slot = self._make_future_slot(coord, hours_from_now=3.5)
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
@@ -375,6 +378,47 @@ class TestShouldReplan:
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.89)
         result = await coord._should_replan()
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_uses_configured_battery_capacity_for_deviation(self):
+        """A custom battery capacity changes the deviation threshold.
+
+        With a 12 kWh battery, the same 1.4 kWh discrepancy is only ~11.7 %
+        (still above the 10 % threshold), whereas 0.8 kWh would be ~6.7 %.
+        """
+        coord = _make_coordinator()
+        coord.tz = timezone.utc
+        coord.battery_capacity_kwh = 12.0
+        last_slot = self._make_future_slot(coord, hours_from_now=3.5)
+        active_slot = self._make_active_slot(coord, initial_power=5.0)
+        coord.timeslots = [active_slot, last_slot]
+        # 1.4 kWh deviation on a 12 kWh battery ≈ 11.7 % → still triggers replan
+        coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
+        result = await coord._should_replan()
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_larger_battery_capacity_means_more_tolerance(self):
+        """A deviation that triggers replan on a 9 kWh battery does not on a 20 kWh battery."""
+        # 1.4 kWh on 9 kWh = 15.6 % → triggers
+        coord_small = _make_coordinator()
+        coord_small.tz = timezone.utc
+        coord_small.battery_capacity_kwh = 9.0
+        active = self._make_active_slot(coord_small, initial_power=5.0)
+        last = self._make_future_slot(coord_small, hours_from_now=3.5)
+        coord_small.timeslots = [active, last]
+        coord_small.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
+        assert await coord_small._should_replan() is True
+
+        # 1.4 kWh on 20 kWh = 7.0 % → does not trigger
+        coord_large = _make_coordinator()
+        coord_large.tz = timezone.utc
+        coord_large.battery_capacity_kwh = 20.0
+        active2 = self._make_active_slot(coord_large, initial_power=5.0)
+        last2 = self._make_future_slot(coord_large, hours_from_now=3.5)
+        coord_large.timeslots = [active2, last2]
+        coord_large.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
+        assert await coord_large._should_replan() is False
 
     @pytest.mark.asyncio
     async def test_returns_false_when_soc_unavailable(self):
