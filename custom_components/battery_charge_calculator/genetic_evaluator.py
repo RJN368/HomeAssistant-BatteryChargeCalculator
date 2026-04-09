@@ -11,8 +11,6 @@ import random
 class Timeslot:
     """A single timeslot for battery scheduling, holding all relevant data and results."""
 
-    CHARGE_GAIN_30MINS = 1.65
-
     def __init__(
         self, start_datetime, import_price, export_price, demand_in, solar_in
     ) -> None:
