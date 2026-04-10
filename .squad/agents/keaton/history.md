@@ -34,3 +34,23 @@
 - **Config flow**: Dropdown for consumption source; read-only note that credentials are already configured; Open-Meteo described as automatic/free. No new credential fields.
 - **Open-Meteo rate limits**: 90-day fetch = 1 API call; 52 retrains/year = 52 calls. Well within free tier (10k/day). No caching layer needed.
 - **D-13 Q8 resolved**: auto-entity-detection question closed. New open questions raised: GivEnergy field mapping confirmation, "both" mode feature vs validation-only use of Octopus, HA Recorder temp fallback preference.
+
+### 2026-04-10 — Robert's answers processed; all open D-13 questions closed; D-16 and D-17 added
+
+**Robert's answers applied:**
+- Q7 (EV exclusion): binary sensor approach rejected; auto-detection from power data statistical analysis required. Delegated to Hockney as D-17.
+- Q8 (GivEnergy timestamps): defensive UTC handling — assume UTC, detect and convert if timezone offset present.
+- Q9 ("both" mode): Octopus as additional feature column (#16) in the ML model, not validation-only.
+- Q10/Q11 (Open-Meteo rates, HA fallback): confirmed acceptable; no caching layer needed.
+
+**Architect-recommended defaults applied (Robert did not answer Q1–Q6):**
+- **D-4 closed**: `hass.config.path("battery_charge_calculator_model.pkl")` — config dir survives HACS updates; `custom_components/` gets wiped.
+- **D-6 closed**: `HistGradientBoostingRegressor` primary + `Ridge` cold-start fallback. Native NaN handling is critical for API failure scenarios; Ridge fallback covers the ramp-up period below 500 clean samples.
+- **D-7 closed**: Hockney's full 15-feature vector adopted + `octopus_import_kwh` as feature #16 when `ML_CONSUMPTION_SOURCE == "both"`. Circular time encodings prevent midnight/weekend discontinuities.
+- **D-8 blend weight closed**: Hockney's 0→1 ramp (`w = min(1.0, (N_clean - 500) / 2000)`). Gradual trust-building is safer than fixed 0.3 for a home energy system.
+- **D-9 closed**: Monthly retrain + daily RMSE health check triggers immediate retrain if 7-day RMSE > 1.5× training RMSE. Protects SD card; trigger catches structural changes.
+- **D-10 closed**: Hockney's quality-based gate (N_clean ≥ 500 AND temp_range ≥ 5°C). Quality matters more than raw count.
+
+**New decisions added:**
+- **D-16**: Optionality and graceful degradation architecture — ML is opt-in (`ML_ENABLED=False`); every failure mode silently falls back to pure physics; no ML failure may crash the integration or leak orphaned entities.
+- **D-17**: EV charging auto-detection — statistical detection of sustained high-power blocks from the training data time series; zero user config required; specification delegated to Hockney via inbox.

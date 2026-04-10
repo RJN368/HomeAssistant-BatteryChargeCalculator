@@ -28,3 +28,32 @@
 - The residual the ML model learns is therefore: occupancy patterns, appliance cycles, thermal mass lag, systematic physics calibration error.
 
 **Files written:** `.squad/decisions/inbox/hockney-ml-model-selection.md`
+
+---
+
+### 2026-04-10 — EV and Large-Load Charging Block Auto-Detection
+
+**Task:** Specify a zero-config algorithm to detect and exclude EV/large-load charging blocks from ML training data. Extension of D-12 anomaly detection.
+
+**Algorithm chosen: Hybrid D** — residual magnitude + persistence gate + absolute floor.
+
+**Core logic:**
+- Compute `residual = actual - physics_kwh` per slot (when physics is available).
+- Slot is a **candidate** if: `residual > max(4.0 × IQR(residual), 1.0 kWh)` **AND** `actual > 1.5 kWh/slot`.
+- Apply **persistence gate**: only flag runs of ≥ 3 consecutive candidate slots (≥ 90 min continuous load).
+- Apply **±1 buffer slot** around each detected run to catch ramp-up/down.
+- **Cold start (no physics)**: fall back to absolute threshold `max(98th percentile, 2.5 kWh/slot)`.
+
+**Threshold reasoning:**
+- `LARGE_LOAD_FLOOR_KWH = 1.5`: no residential charger runs sustainably below ~3 kW; eliminates appliance variance.
+- `RESIDUAL_IQR_MULTIPLIER = 4.0`: typical physics residual IQR ≈ 0.25–0.40 kWh; EV residual ≈ 3.0–3.5 kWh → ratio 8–14×. Cold-snap heating residuals ≤ 2× IQR. Gap is clean above multiplier 4.0.
+- `MIN_RUN_SLOTS = 3`: eliminates kettles, ovens, brief spikes; EV sessions are always ≥ 90 min.
+- `COLD_START_FLOOR_KWH = 2.5`: conservative; misses 3 kW slow charger until first retrain, acceptable tradeoff.
+
+**Key engineering decisions:**
+- Algorithm is O(N); runs in < 10 ms on Pi 4 for 90-day window (4,320 slots). Safe for executor thread.
+- Detected blocks stored in `MLModelStatusSensor` attributes: `ev_blocks_detected`, `ev_excluded_slots`, `ev_excluded_fraction`, `ev_blocks` (list, capped at 20 entries).
+- Cannot distinguish simultaneous heating + EV — err on side of exclusion (correct behaviour; physics handles the temperature-explained portion).
+- DHW boost cycles (1–2 h) are shorter than EV sessions but could be caught; noted as D-12 open question for Robert.
+
+**Files written:** `.squad/decisions/inbox/hockney-ev-detection.md`
