@@ -1,0 +1,263 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Battery Charge Calculator – Connection & Inverter",
+                "description": "Enter your GivEnergy and Octopus Energy API credentials, then configure your inverter and battery.",
+                "data": {
+                    "givenergy_api_serial_number": "GivEnergy inverter serial number",
+                    "givenergy_api_token": "GivEnergy API token",
+                    "octopus_account_number": "Octopus Energy account number",
+                    "octopus_api_key": "Octopus Energy API key",
+                    "simulate_only": "Simulate only (do not send charge commands)",
+                    "inverter_size_kw": "Inverter size (kW)",
+                    "inverter_efficiency": "Inverter efficiency (0–1, e.g. 0.9 = 90%)",
+                    "battery_capacity_kwh": "Battery capacity (kWh)",
+                    "base_load_kwh_30min": "Base household load per 30-min slot (kWh)"
+                },
+                "data_description": {
+                    "inverter_size_kw": "Maximum continuous power output of the inverter in kilowatts (e.g. 3.6).",
+                    "inverter_efficiency": "Round-trip efficiency as a decimal. 0.9 means 10% losses.",
+                    "battery_capacity_kwh": "Usable capacity of the battery pack in kilowatt-hours.",
+                    "base_load_kwh_30min": "Average non-heating electricity consumption per 30-minute slot in kWh (e.g. 0.25 = 500 W continuous). Leave at default if unsure."
+                }
+            },
+            "heating": {
+                "title": "Heating Configuration – Type",
+                "description": "Choose how heating demand is calculated.",
+                "data": {
+                    "heating_type": "Heating model"
+                },
+                "data_description": {
+                    "heating_type": "'none' = no electric heating; 'interpolation' = custom (temp, kWh) curve; 'electric' = heat loss model (direct electric or heat pump)."
+                }
+            },
+            "heating_interpolation": {
+                "title": "Heating Configuration – Custom Curve",
+                "description": "Provide measured (outdoor temperature, energy use) pairs. The calculator will fit a curve through them.",
+                "data": {
+                    "heating_known_points": "Known (temperature °C, energy kWh per 30-min slot) pairs – JSON array"
+                },
+                "data_description": {
+                    "heating_known_points": "JSON array of [temperature_°C, kWh_per_30min] pairs, e.g. [[-6, 0.75], [0, 0.55], [6, 0.30], [15, 0.0]]. Energy values are kWh consumed in a single 30-minute slot."
+                }
+            },
+            "heating_electric": {
+                "title": "Heating Configuration – Heat Pump / Direct Electric",
+                "description": "Configure the heating system efficiency. Heat loss is entered on the next screen.",
+                "data": {
+                    "heating_cop": "Rated COP (Coefficient of Performance)",
+                    "heating_indoor_temp": "Target indoor temperature (°C)",
+                    "heating_flow_temp": "Heating system flow temperature (°C)"
+                },
+                "data_description": {
+                    "heating_cop": "COP at the A7 standard test condition (outdoor 7 °C). Use 1.0 for direct electric resistance heating. Typical air-source heat pump COP: 2.5–4.0.",
+                    "heating_indoor_temp": "The temperature you want to maintain inside the building in degrees Celsius (e.g. 21).",
+                    "heating_flow_temp": "Temperature of water delivered to radiators or underfloor heating in °C. Typical values: 45–55 °C for radiators, 35–40 °C for underfloor. Used to calculate how COP varies with outdoor temperature."
+                }
+            },
+            "heat_loss_method": {
+                "title": "Heating Configuration – Heat Loss Method",
+                "description": "Choose how to supply the building's heat loss coefficient.",
+                "data": {
+                    "heat_loss_method": "Heat loss input method"
+                },
+                "data_description": {
+                    "heat_loss_method": "'known' = enter the W/°C value directly; 'report' = enter the total Watts from a heat loss report plus the design temperatures used; 'estimate' = the calculator will estimate it from your building's properties."
+                }
+            },
+            "heat_loss_report": {
+                "title": "Heating Configuration – Heat Loss Report Values",
+                "description": "Enter the figures directly from your heat loss survey report. The W/°C coefficient is derived automatically.",
+                "data": {
+                    "heat_loss_report_watts": "Total building heat loss from report (W)",
+                    "heat_loss_report_outdoor_temp": "Outdoor design temperature used in report (°C)",
+                    "heat_loss_report_indoor_temp": "Average indoor design temperature used in report (°C)"
+                },
+                "data_description": {
+                    "heat_loss_report_watts": "The 'Total (kW)' figure from the report summary, converted to Watts (multiply kW × 1000). E.g. 8.3 kW → 8300 W.",
+                    "heat_loss_report_outdoor_temp": "The external design temperature stated in the report assumptions (e.g. -3.2 °C). This is the coldest outdoor temperature the system was sized for.",
+                    "heat_loss_report_indoor_temp": "The average indoor target temperature across all rooms (e.g. 20 °C). Use a weighted average if rooms differ significantly."
+                }
+            },
+            "heat_loss_known": {
+                "title": "Heating Configuration – Heat Loss Value",
+                "description": "Enter the total fabric and ventilation heat loss of the building.",
+                "data": {
+                    "heating_heat_loss": "Building heat loss (W/°C)"
+                },
+                "data_description": {
+                    "heating_heat_loss": "Watts of heat lost per degree Celsius of temperature difference between inside and outside (W/°C). A typical semi-detached house is 100–200 W/°C. You can find this on a heat loss survey report."
+                }
+            },
+            "building_estimate": {
+                "title": "Heating Configuration – Building Properties",
+                "description": "The calculator will estimate your building's heat loss from these properties.",
+                "data": {
+                    "building_floor_area": "Total heated floor area (m²)",
+                    "building_age": "Construction era",
+                    "building_wall_type": "Wall construction",
+                    "building_glazing": "Glazing type"
+                },
+                "data_description": {
+                    "building_floor_area": "Sum of all heated floor areas in square metres (e.g. 85 for a typical 3-bed semi).",
+                    "building_age": "Approximate period the building was constructed. Older buildings have higher heat loss.",
+                    "building_wall_type": "Primary external wall construction. Affects the U-value used in the estimate.",
+                    "building_glazing": "Type of glazing on the majority of windows."
+                }
+            }
+        }
+    },
+    "errors": {
+        "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Battery Charge Calculator – Connection & Inverter",
+                "description": "Update your GivEnergy and Octopus Energy API credentials, inverter, or battery settings.",
+                "data": {
+                    "givenergy_api_serial_number": "GivEnergy inverter serial number",
+                    "givenergy_api_token": "GivEnergy API token",
+                    "octopus_account_number": "Octopus Energy account number",
+                    "octopus_api_key": "Octopus Energy API key",
+                    "simulate_only": "Simulate only (do not send charge commands)",
+                    "inverter_size_kw": "Inverter size (kW)",
+                    "inverter_efficiency": "Inverter efficiency (0–1, e.g. 0.9 = 90%)",
+                    "battery_capacity_kwh": "Battery capacity (kWh)",
+                    "base_load_kwh_30min": "Base household load per 30-min slot (kWh)"
+                },
+                "data_description": {
+                    "inverter_size_kw": "Maximum continuous power output of the inverter in kilowatts (e.g. 3.6).",
+                    "inverter_efficiency": "Round-trip efficiency as a decimal. 0.9 means 10% losses.",
+                    "battery_capacity_kwh": "Usable capacity of the battery pack in kilowatt-hours.",
+                    "base_load_kwh_30min": "Average non-heating electricity consumption per 30-minute slot in kWh (e.g. 0.25 = 500 W continuous). Leave at default if unsure."
+                }
+            },
+            "heating": {
+                "title": "Heating Configuration – Type",
+                "description": "Choose how heating demand is calculated.",
+                "data": {
+                    "heating_type": "Heating model"
+                },
+                "data_description": {
+                    "heating_type": "'none' = no electric heating; 'interpolation' = custom (temp, kWh) curve; 'electric' = heat loss model (direct electric or heat pump)."
+                }
+            },
+            "heating_interpolation": {
+                "title": "Heating Configuration – Custom Curve",
+                "description": "Provide measured (outdoor temperature, energy use) pairs. The calculator will fit a curve through them.",
+                "data": {
+                    "heating_known_points": "Known (temperature °C, energy kWh per 30-min slot) pairs – JSON array"
+                },
+                "data_description": {
+                    "heating_known_points": "JSON array of [temperature_°C, kWh_per_30min] pairs, e.g. [[-6, 0.75], [0, 0.55], [6, 0.30], [15, 0.0]]. Energy values are kWh consumed in a single 30-minute slot."
+                }
+            },
+            "heating_electric": {
+                "title": "Heating Configuration – Heat Pump / Direct Electric",
+                "description": "Configure the heating system efficiency. Heat loss is entered on the next screen.",
+                "data": {
+                    "heating_cop": "Rated COP (Coefficient of Performance)",
+                    "heating_indoor_temp": "Target indoor temperature (°C)",
+                    "heating_flow_temp": "Heating system flow temperature (°C)"
+                },
+                "data_description": {
+                    "heating_cop": "COP at the A7 standard test condition (outdoor 7 °C). Use 1.0 for direct electric resistance heating. Typical air-source heat pump COP: 2.5–4.0.",
+                    "heating_indoor_temp": "The temperature you want to maintain inside the building in degrees Celsius (e.g. 21).",
+                    "heating_flow_temp": "Temperature of water delivered to radiators or underfloor heating in °C. Typical values: 45–55 °C for radiators, 35–40 °C for underfloor. Used to calculate how COP varies with outdoor temperature."
+                }
+            },
+            "heat_loss_method": {
+                "title": "Heating Configuration – Heat Loss Method",
+                "description": "Choose how to supply the building's heat loss coefficient.",
+                "data": {
+                    "heat_loss_method": "Heat loss input method"
+                },
+                "data_description": {
+                    "heat_loss_method": "'known' = enter the W/°C value directly; 'report' = enter the total Watts from a heat loss report plus the design temperatures used; 'estimate' = the calculator will estimate it from your building's properties."
+                }
+            },
+            "heat_loss_report": {
+                "title": "Heating Configuration – Heat Loss Report Values",
+                "description": "Enter the figures directly from your heat loss survey report. The W/°C coefficient is derived automatically.",
+                "data": {
+                    "heat_loss_report_watts": "Total building heat loss from report (W)",
+                    "heat_loss_report_outdoor_temp": "Outdoor design temperature used in report (°C)",
+                    "heat_loss_report_indoor_temp": "Average indoor design temperature used in report (°C)"
+                },
+                "data_description": {
+                    "heat_loss_report_watts": "The 'Total (kW)' figure from the report summary, converted to Watts (multiply kW × 1000). E.g. 8.3 kW → 8300 W.",
+                    "heat_loss_report_outdoor_temp": "The external design temperature stated in the report assumptions (e.g. -3.2 °C). This is the coldest outdoor temperature the system was sized for.",
+                    "heat_loss_report_indoor_temp": "The average indoor target temperature across all rooms (e.g. 20 °C). Use a weighted average if rooms differ significantly."
+                }
+            },
+            "heat_loss_known": {
+                "title": "Heating Configuration – Heat Loss Value",
+                "description": "Enter the total fabric and ventilation heat loss of the building.",
+                "data": {
+                    "heating_heat_loss": "Building heat loss (W/°C)"
+                },
+                "data_description": {
+                    "heating_heat_loss": "Watts of heat lost per degree Celsius of temperature difference between inside and outside (W/°C). A typical semi-detached house is 100–200 W/°C. You can find this on a heat loss survey report."
+                }
+            },
+            "building_estimate": {
+                "title": "Heating Configuration – Building Properties",
+                "description": "The calculator will estimate your building's heat loss from these properties.",
+                "data": {
+                    "building_floor_area": "Total heated floor area (m²)",
+                    "building_age": "Construction era",
+                    "building_wall_type": "Wall construction",
+                    "building_glazing": "Glazing type"
+                },
+                "data_description": {
+                    "building_floor_area": "Sum of all heated floor areas in square metres (e.g. 85 for a typical 3-bed semi).",
+                    "building_age": "Approximate period the building was constructed. Older buildings have higher heat loss.",
+                    "building_wall_type": "Primary external wall construction. Affects the U-value used in the estimate.",
+                    "building_glazing": "Type of glazing on the majority of windows."
+                }
+            }
+        }
+    },
+    "selector": {
+        "heating_type": {
+            "options": {
+                "none": "No electric heating",
+                "interpolation": "Custom curve (measured data points)",
+                "electric": "Electric / heat pump (heat loss model)"
+            }
+        },
+        "heat_loss_method": {
+            "options": {
+                "known": "I know the W/\u00b0C value",
+                "report": "I have a heat loss survey report",
+                "estimate": "Estimate from building properties"
+            }
+        },
+        "building_age": {
+            "options": {
+                "pre_1930": "Pre-1930 (Victorian / Edwardian)",
+                "1930_1975": "1930\u20131975",
+                "1975_2000": "1975\u20132000",
+                "post_2000": "Post-2000"
+            }
+        },
+        "building_wall_type": {
+            "options": {
+                "solid_uninsulated": "Solid wall, uninsulated",
+                "solid_insulated": "Solid wall, insulated",
+                "cavity_uninsulated": "Cavity wall, uninsulated",
+                "cavity_insulated": "Cavity wall, insulated",
+                "modern_insulated": "Modern (well-insulated)"
+            }
+        },
+        "building_glazing": {
+            "options": {
+                "single": "Single-glazed",
+                "double": "Double-glazed",
+                "triple": "Triple-glazed"
+            }
+        }
+    }
+}

@@ -61,6 +61,25 @@ def _install_ha_stubs() -> None:
     dr = _stub("homeassistant.helpers.device_registry")
     _stub("homeassistant.helpers.entity_registry")
 
+    # homeassistant.helpers.selector stubs (for SelectSelector / SelectSelectorConfig)
+    selector = _stub("homeassistant.helpers.selector")
+
+    class SelectSelectorConfig:
+        def __init__(self, options=None, translation_key=None, **kwargs):
+            self.options = options or []
+            self.translation_key = translation_key
+
+    class SelectSelector:
+        def __init__(self, config=None):
+            self.config = config
+
+        # Make voluptuous treat it as a passthrough validator
+        def __call__(self, value):
+            return value
+
+    selector.SelectSelector = SelectSelector
+    selector.SelectSelectorConfig = SelectSelectorConfig
+
     # homeassistant.util.*
     _stub("homeassistant.util")
     dt_util = _stub("homeassistant.util.dt")

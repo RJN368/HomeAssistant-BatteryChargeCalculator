@@ -1,5 +1,6 @@
 """The Scheduler Integration."""
 
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -24,7 +25,43 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.id = entry.entry_id
         self.hass = hass
         self.tz = dt_util.get_time_zone(self.hass.config.time_zone)
-        self.power_calculator = power_calculator.PowerCalulator()
+
+        # Build PowerCalulator from config
+        heating_type = entry.options.get(const.HEATING_TYPE, const.DEFAULT_HEATING_TYPE)
+        cop = entry.options.get(const.HEATING_COP, const.DEFAULT_HEATING_COP)
+        heat_loss_raw = entry.options.get(
+            const.HEATING_HEAT_LOSS, const.DEFAULT_HEATING_HEAT_LOSS
+        )
+        heat_loss = float(heat_loss_raw) if heat_loss_raw else None
+        if heat_loss == 0.0:
+            heat_loss = None
+        indoor_temp = entry.options.get(
+            const.HEATING_INDOOR_TEMP, const.DEFAULT_HEATING_INDOOR_TEMP
+        )
+        known_points_str = entry.options.get(
+            const.HEATING_KNOWN_POINTS, const.DEFAULT_HEATING_KNOWN_POINTS
+        )
+        known_points = json.loads(known_points_str) if known_points_str else None
+
+        base_load_raw = entry.options.get(const.BASE_LOAD_KWH_30MIN)
+        base_load = float(base_load_raw) if base_load_raw is not None else None
+
+        flow_temp_raw = entry.options.get(const.HEATING_FLOW_TEMP)
+        flow_temp = (
+            float(flow_temp_raw)
+            if flow_temp_raw is not None
+            else const.DEFAULT_HEATING_FLOW_TEMP
+        )
+
+        self.power_calculator = power_calculator.PowerCalulator(
+            heating_type=heating_type,
+            cop=cop,
+            heat_loss=heat_loss,
+            indoor_temp=indoor_temp,
+            heating_flow_temp=flow_temp,
+            known_points=known_points,
+            base_load_kwh_30min=base_load,
+        )
         self.timeslots = []
         self.totalcost = 0
         self.end_of_day_cost = 0
