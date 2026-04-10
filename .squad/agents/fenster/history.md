@@ -19,3 +19,14 @@
 - **joblib** ships standalone (not via `sklearn.externals`). Import as `import joblib`.
 - **Weekly training trigger:** use `async_track_time_interval` with `timedelta(weeks=1)` + `async_create_task` — same pattern as the existing hourly planning timer in `coordinators.py`.
 - **ML sensors must be optional:** use `vol.Optional` in config_flow so existing installations without ML configured are not broken.
+
+### 2026-04-10 — External API Client Patterns (ML Training Data Sources)
+
+- **Session ownership:** always pass `aiohttp.ClientSession` into fetch functions (same pattern as `OctopusAgileRatesClient`). The coordinator owns the session lifetime; sources are stateless per-call.
+- **GivEnergy Cloud REST:** `Authorization: Bearer {token}` header. Endpoint `GET /inverter/{serial}/energy/data?start_time=YYYY-MM-DD&end_time=YYYY-MM-DD&grouping=2`. Chunk into ≤30-day windows. Response field `consumption` = total house load kWh/slot (the correct ML target). Timezone of returned timestamps is unverified — may need `tz_localize("Europe/London").tz_convert("UTC")` if naive-local.
+- **Octopus Consumption API:** same `aiohttp.BasicAuth(api_key, "")` as rate-fetch client. Endpoint requires both MPAN (`OCTOPUS_MPN`) and meter serial (`OCTOPUS_METER_SERIAL` — new const). Paginated via `next` cursor (full URL). 90-day single request is safe; no chunking needed.
+- **Open-Meteo Archive:** no auth. Always use `timezone=UTC` (not `timezone=auto`) to avoid DST ambiguity. Returns hourly data — upsample to 30-min via `resample("30min").interpolate(method="time")`. Latitude/longitude from `hass.config` — no user config needed.
+- **Uniform error handling:** 429 → read `Retry-After` header, sleep, retry once; 4xx → log + return `None`; 5xx → log + return `None`; network error → log + return `None`. Always use `aiohttp.ClientTimeout(total=30)` (60 for Open-Meteo which can be slow).
+- **Uniform return type:** `pd.Series(float64)` with UTC `DatetimeIndex` at `"30min"` freq, name = `"consumption_kwh"` or `"temperature_c"`. `None` = fetch failure; empty Series = no data for range.
+- **Base Protocol:** use `typing.Protocol` (not ABC) with `@runtime_checkable`. Methods: `source_name: str` property + `async fetch(session, start: date, end: date) -> pd.Series | None`.
+- **Only one new const:** `OCTOPUS_METER_SERIAL = "octopus_meter_serial"`. `manifest.json` needs no changes — aiohttp is HA core.
