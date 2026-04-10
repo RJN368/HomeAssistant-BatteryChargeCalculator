@@ -234,6 +234,14 @@ Training proceeds only if: N_clean ≥ 500, valid_fraction_per_day ≥ 0.6, temp
 10. **Open-Meteo rate limits**: ✅ No caching layer needed. 52 retrains/year × 1 call = 52 calls/year; well within 10,000/day free tier.
 11. **HA entity fallback for temperature**: ✅ Open-Meteo failure falls back to HA Recorder entity (`ML_TEMP_ENTITY_ID`). If both fail, training proceeds with `outdoor_temp = NaN`; HistGBR handles natively. See D-15.
 
+**Post-close-out questions (raised 2026-04-10, resolved with Robert's confirmed answers):**
+
+**Q2 — "both" mode at inference time:** ✅ **CLOSED.** Robert confirmed: use GivEnergy-only signal at prediction time. Octopus data is for TRAINING only. `build_inference_row()` always sets `octopus_import_kwh = np.nan`; no `slot_import_means` proxy; no circular dependency. See D-18 revised inference spec.
+
+**Q3 — EV blocks: show user notification?** ✅ **CLOSED.** Robert confirmed: YES. Implementation in D-17 revised: HA persistent notification via `notification_id = "bcc_ev_exclusion"` (replaces on each retrain). See D-17 for full spec.
+
+**Q4 — GivEnergy API timestamp handling:** ✅ **CLOSED (supersedes item 8 above).** Robert confirmed: fix at source. Always normalise to UTC at ingestion inside `GivEnergyHistorySource`. Silent correction — NO log warnings. `_parse_givenergy_timestamp(raw)` in `givenergy_history.py`: `ts.tz_localize("UTC")` for naive timestamps, `ts.tz_convert("UTC")` for tz-aware.
+
 ---
 
 ### D-14: External API client shared design
@@ -331,60 +339,212 @@ else:
 
 ---
 
-### D-17: EV charging auto-detection
+### D-17: EV charging auto-detection — Revised (Temperature-Correlation Discriminator)
 
 *Added 2026-04-10 — source: Keaton (requirement), Hockney (algorithm spec)*
-*Status: ✅ CLOSED — algorithm specified*
+*Revised 2026-04-10 — Hockney: temperature-correlation discriminator added; original Hybrid-D superseded*
+*Status: ✅ CLOSED — revised algorithm*
 
-**Decision:** Statistical auto-detection of EV / large-load charging blocks. No binary sensor, no user configuration. Fully parameter-free from user perspective (all thresholds are internal constants with documented derivation).
+**Decision:** Statistical auto-detection of EV / large-load charging blocks with temperature-correlation discriminator to prevent heat pump false positives. No binary sensor, no user configuration. Fully parameter-free from user perspective.
 
-**Algorithm: Hybrid D (Residual Magnitude + Persistence + Absolute Floor)**
+**Problem addressed by revision:** The original Hybrid-D algorithm misclassifies heat pump electrical consumption as EV charging when the physics model is uncalibrated (`heating_type = "none"`, poorly-fitted Lorenz curve, or incorrect COP/heat_loss values) — the expected state for new installs. Physical key difference: heat pump electrical draw is strongly anti-correlated with outdoor temperature; an EV charger is temperature-independent.
 
-Call `detect_ev_blocks(power_kwh, physics_kwh)` in `build_training_df()` **after** D-12 hard exclusions and **before** residual z-score fencing.
+**Algorithm: Hybrid-D with Temperature-Correlation Discriminator**
 
-**Inputs:** `power_kwh` (UTC 30-min float Series), `physics_kwh` (same index, or `None` at cold start)
+Call `detect_ev_blocks(power_kwh, physics_kwh, outdoor_temp_c)` in `build_training_df()` **after** D-12 hard exclusions and **before** residual z-score fencing.
 
-**Outputs:** `exclusion_mask` (bool Series, True = exclude), `ev_blocks` (list of detected run dicts)
+**Function signature:**
+```python
+def detect_ev_blocks(
+    power_kwh: pd.Series,          # UTC 30-min actual consumption
+    physics_kwh: pd.Series | None, # same index, or None at cold start
+    outdoor_temp_c: pd.Series | None = None,  # same index, or None if unavailable
+) -> tuple[pd.Series, list[dict]]:
+    """
+    Detect and flag EV / large-load charging blocks for exclusion from ML training.
+
+    Returns:
+        exclusion_mask: bool Series (True = exclude)
+        ev_blocks:      list of detected run dicts for MLModelStatusSensor
+    """
+```
 
 **Internal constants:**
 ```python
-LARGE_LOAD_FLOOR_KWH     = 1.5   # kWh/slot  (~3 kW sustained) — minimum to flag
-RESIDUAL_IQR_MULTIPLIER  = 4.0   # residual > 4×IQR AND > RESIDUAL_ABS_MIN
-RESIDUAL_ABS_MIN_KWH     = 1.0   # kWh/slot minimum residual
-MIN_RUN_SLOTS            = 3     # ≥ 90 consecutive minutes to qualify as EV
-BUFFER_SLOTS             = 1     # ±1 buffer slot around each detected run
-COLD_START_PERCENTILE    = 98    # used when physics_kwh is None
-COLD_START_FLOOR_KWH     = 2.5   # kWh/slot (~5 kW) cold-start absolute floor
+# Original Hybrid-D constants (unchanged)
+LARGE_LOAD_FLOOR_KWH     = 1.5    # kWh/slot (~3 kW sustained) — minimum to flag
+RESIDUAL_IQR_MULTIPLIER  = 4.0    # residual > 4 × IQR
+RESIDUAL_ABS_MIN_KWH     = 1.0    # kWh/slot minimum residual
+MIN_RUN_SLOTS            = 3      # ≥ 90 consecutive minutes to qualify
+BUFFER_SLOTS             = 1      # ±1 buffer slot around each detected run
+COLD_START_PERCENTILE    = 98     # used when physics_kwh is None and outdoor_temp is None
+COLD_START_FLOOR_KWH     = 2.5    # kWh/slot cold-start absolute floor
+
+# NEW: temperature-correlation discriminator constants
+TEMP_CORRELATION_UPPER   = -0.4   # stronger anti-correlation → heating → DO NOT exclude
+TEMP_CORRELATION_LOWER   = -0.2   # weaker anti-correlation → ambiguous band
+TEMP_CONTEXT_SLOTS       = 6      # ±6 slots (±3 hours) context window for Pearson r
+TEMP_RANGE_MIN_C         = 3.0    # minimum temperature span in block to count as heating evidence
+CV_EV_THRESHOLD          = 0.20   # low CV = flat sustained = EV-like
+
+# NEW: cold-start physics proxy constant
+PROXY_HEAT_LOSS_W_PER_C  = 100.0  # conservative proxy: 100 W/°C of ΔT from 20°C setpoint
+PROXY_SETPOINT_C         = 20.0   # assumed internal setpoint for proxy estimate
 ```
 
-**Derivation of RESIDUAL_IQR_MULTIPLIER = 4.0:** A 7 kW EV charger adds ~3.0–3.5 kWh/slot residual against a typical IQR of ±0.25–0.40 kWh → ratio 8–14. A cold-snap heating residual is ±0.3–0.8 kWh → ratio 1–3. The gap above 4.0 cleanly separates EV from heating. Conservative (under-excludes rather than over-excludes).
+**Stage 2 full algorithm:**
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Stage 2: detect_ev_blocks(power_kwh, physics_kwh, outdoor_temp_c)       │
+│                                                                          │
+│  2a. CANDIDATE BLOCK DETECTION                                           │
+│      (unchanged from original D-17 Hybrid-D)                            │
+│                                                                          │
+│      Case A — physics available AND outdoor_temp available:             │
+│        residual = power_kwh - physics_kwh                               │
+│        iqr = IQR(residual)                                               │
+│        candidate = (residual > max(4.0 × iqr, 1.0)) AND                 │
+│                    (power_kwh > 1.5)                                     │
+│                                                                          │
+│      Case B — physics_kwh is None BUT outdoor_temp available:           │
+│        proxy_physics = PROXY_HEAT_LOSS_W_PER_C × max(0,                 │
+│                          PROXY_SETPOINT_C - outdoor_temp_c) / 1000 / 2  │
+│        Use proxy_physics in place of physics_kwh for residual calc      │
+│        → ev_detection_mode = "proxy_physics_cold_start"                 │
+│                                                                          │
+│      Case C — both physics_kwh and outdoor_temp are None:               │
+│        candidate = power_kwh > max(                                      │
+│                      percentile(power_kwh, 98), 2.5 kWh)               │
+│        → ev_detection_mode = "temporal_cv_fallback"                     │
+│        → skip to step 2c (CV discriminator)                             │
+│                                                                          │
+│      Apply MIN_RUN_SLOTS persistence gate → run-length filter           │
+│      Produce: candidate_runs (list of [start_idx, end_idx] pairs)       │
+│                                                                          │
+│  2b. TEMPERATURE-CORRELATION DISCRIMINATOR (Cases A and B only)         │
+│      For each candidate run:                                             │
+│        window = [run_start - TEMP_CONTEXT_SLOTS,                        │
+│                  run_end   + TEMP_CONTEXT_SLOTS]  (clipped to series)   │
+│        r = pearsonr(power_kwh[window], outdoor_temp_c[window])          │
+│                                                                          │
+│        if r < TEMP_CORRELATION_UPPER (i.e. r < −0.4):                  │
+│          → strongly anti-correlated → HEATING LOAD                      │
+│          → REMOVE from candidate list (do not exclude from training)    │
+│                                                                          │
+│        elif |r| < 0.2 OR r > 0:                                         │
+│          → uncorrelated or positive correlation → EV / appliance        │
+│          → KEEP in candidate list (will be excluded)                    │
+│                                                                          │
+│        else (−0.4 ≤ r < −0.2):                                          │
+│          → AMBIGUOUS → proceed to step 2c secondary discriminator       │
+│                                                                          │
+│  2c. SECONDARY DISCRIMINATOR (ambiguous blocks + Case C CV fallback)    │
+│                                                                          │
+│      For ambiguous temperature blocks (−0.4 ≤ r < −0.2):               │
+│        temp_span = max(outdoor_temp_c[run]) - min(outdoor_temp_c[run])  │
+│        if temp_span ≥ TEMP_RANGE_MIN_C (3.0°C):                         │
+│          → meaningful thermal variation in block → HEATING              │
+│          → REMOVE from candidate list                                    │
+│                                                                          │
+│        elif mean power within 20% of proxy physics at mean block temp:  │
+│          → consistent with physics estimate → HEATING                   │
+│          → REMOVE from candidate list                                    │
+│                                                                          │
+│        else:                                                             │
+│          → KEEP in candidate list (exclude from training)               │
+│                                                                          │
+│      For Case C (CV fallback, no temp data):                            │
+│        cv = std(power_kwh[run]) / mean(power_kwh[run])                  │
+│        if cv < CV_EV_THRESHOLD (0.20):                                  │
+│          → flat sustained load → KEEP (exclude)                         │
+│        else:                                                             │
+│          → variable load → likely heating → REMOVE                      │
+│                                                                          │
+│  2d. BUFFER SLOTS                                                        │
+│      Apply ±BUFFER_SLOTS (±1 slot) around each surviving candidate run  │
+│      Build and return exclusion_mask + ev_blocks metadata               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 **Integration in `data_pipeline.py`:**
 ```python
-# Stage 2: EV / large-load block exclusion (D-12 extension)
-ev_exclusion, ev_blocks = detect_ev_blocks(
-    power_kwh   = df["actual_kwh"],
-    physics_kwh = df["physics_kwh"] if physics_available else None,
+# Stage 1: Hard exclusions (D-12 steps 1–2)
+#   - zero/NaN readings where physics predicts > 0.2 kWh
+#   - gaps > 15 min around HA restarts
+#   - flat-line frozen sensor detection
+
+# Stage 2: EV / large-load block exclusion (D-17 revised)
+ev_exclusion_mask, ev_blocks = detect_ev_blocks(
+    power_kwh      = df["actual_kwh"],
+    physics_kwh    = df["physics_kwh"] if physics_available else None,
+    outdoor_temp_c = df["outdoor_temp_c"] if "outdoor_temp_c" in df.columns else None,
 )
-df = df[~ev_exclusion]
+df = df[~ev_exclusion_mask]
+
+# Capture stats for MLModelStatusSensor
+ev_stats = {
+    "ev_detection_mode":    _infer_detection_mode(physics_available, outdoor_temp_available),
+    "ev_excluded_slots":    int(ev_exclusion_mask.sum()),
+    "ev_excluded_fraction": float(ev_exclusion_mask.mean()),
+    "ev_blocks_detected":   len(ev_blocks),
+    "ev_blocks":            ev_blocks[:20],  # cap at 20 most recent
+}
+
+# Stage 3: Residual z-score fencing (D-12 step 3, |z| > 3.5)
+# Stage 4: Per-slot IQR fallback (D-12 step 4, 3× fence)
+# Stage 5: Flat-line freeze exclusion (D-12 step 5)
 ```
 
-**MLModelStatusSensor attribute extensions (D-11 + D-17):**
+**HA Persistent Notification:**
 ```python
-"ev_detection_mode":    "residual_iqr" | "cold_start_absolute",
+if ev_stats["ev_blocks_detected"] >= 1:
+    await hass.services.async_call(
+        "persistent_notification",
+        "create",
+        {
+            "title": "Battery Charge Calculator — ML Training",
+            "message": (
+                f"Excluded {ev_stats['ev_excluded_slots']} slots across "
+                f"{ev_stats['ev_blocks_detected']} large-load blocks from ML "
+                f"training data. These are likely EV charging sessions. "
+                f"See the ML Model Status sensor for details."
+            ),
+            "notification_id": "bcc_ev_exclusion",
+        },
+    )
+```
+
+`notification_id = "bcc_ev_exclusion"` ensures the notification replaces the previous one on each retrain rather than stacking.
+
+**MLModelStatusSensor attribute extensions (D-11 + revised D-17):**
+```python
+"ev_detection_mode":    str,   # one of: "residual_iqr" | "proxy_physics_cold_start" |
+                               #         "temporal_cv_fallback"
 "ev_excluded_slots":    int,
 "ev_excluded_fraction": float,
 "ev_blocks_detected":   int,
-"ev_blocks":            list[dict],   # capped at 20 most recent; sorted desc
+"ev_blocks": [                 # list of dicts, capped at 20, sorted by start desc
+    {
+        "start":     str,    # ISO-8601 UTC start of block
+        "end":       str,    # ISO-8601 UTC end of block
+        "slots":     int,    # number of 30-min slots in block (incl. buffer)
+        "mean_kwh":  float,
+        "peak_kwh":  float,
+        "r_temp":    float | None,  # Pearson r with outdoor_temp in context window
+        "cv":        float | None,  # coefficient of variation (CV fallback only)
+        "reason":    str,    # "ev_iqr_residual" | "ev_proxy_residual" |
+                             # "ev_no_temp_cv" | "ev_ambiguous_secondary"
+    }
+]
 ```
 
 **D-12 extension (appended to D-12 §5):**
-> 6. **EV / large-load block exclusion (Hybrid D, Hockney 2026-04-10):** Before residual z-score fencing, run `detect_ev_blocks(power_kwh, physics_kwh)`. Flags runs of ≥3 consecutive slots where `residual > max(4.0×IQR_residual, 1.0 kWh)` AND `actual > 1.5 kWh/slot`. Cold-start path: flags slots above `max(98th percentile, 2.5 kWh)`. Applies ±1 buffer slot. Detected blocks logged to `MLModelStatusSensor`.
+> 6. **EV / large-load block exclusion (Hybrid-D with Temperature Discriminator, Hockney 2026-04-10 revised):** Before residual z-score fencing, run `detect_ev_blocks(power_kwh, physics_kwh, outdoor_temp_c)`. Identifies runs of ≥3 consecutive slots with large residuals, then applies temperature-correlation discriminator (r < −0.4 → heating → preserved; ambiguous band uses thermal variation and proxy-physics secondary check; Case C CV < 0.20 when no temp data). Detected blocks logged to `MLModelStatusSensor`; HA persistent notification raised per retrain cycle when blocks found.
 
-**Open questions for Robert:**
-1. **DHW/immersion heater distinction**: EV sessions ≥3 h; DHW typically 1–2 h (2–4 slots). Add `MAX_RUN_SLOTS` upper bound to exempt DHW from exclusion? Low complexity, but adds edge-case handling. Deferred to Robert's call.
-2. **Persistent audit log**: write `ev_blocks` to `<config_dir>/bcc_ev_exclusions.json` for post-retrain audit? Low effort. Robert to confirm.
-3. **22 kW rapid charger**: 11 kWh/slot reliably caught by cold-start path. No special treatment needed. ✅ Closed.
+**Closed open questions:**
+1. **DHW/immersion heater distinction** (previously deferred): ✅ **CLOSED.** Temperature-correlation discriminator handles this correctly. Scheduled hot-water loads are calendar/tariff-driven, not weather-driven; Pearson r near zero → correctly excluded. `MAX_RUN_SLOTS` not needed.
+2. **Persistent audit log** (previously deferred): ✅ **CLOSED.** Robert confirmed blocks shown via HA persistent notification (see above). No separate JSON file; sensor attributes provide auditability.
+3. **22 kW rapid charger**: ✅ **CLOSED.** 11 kWh/slot reliably caught by absolute floor path. No special treatment needed.
 
 ---
 
@@ -395,7 +555,9 @@ df = df[~ev_exclusion]
 
 **`OCTOPUS_METER_SERIAL` constant** (already listed in D-8, usage confirmed here): place after `OCTOPUS_EXPORT_MPN` in `const.py`. Field is optional; surfaces only in `step_ml_settings` options step when `ML_CONSUMPTION_SOURCE` includes `"octopus"` or `"both"`.
 
-**Auto-discovery:** At config flow time, attempt to auto-populate from Octopus API `GET /v1/electricity-meter-points/{mpan}/meters/`. Pre-fill the field with discovered value; user may override. On any failure, fall back to manual entry. If meter_serial absent at fetch time: log warning, return `None`, skip gracefully — no crash.
+**Auto-discovery (✅ Q1 CLOSED — Robert confirmed: auto-populate):** At `step_ml_settings`, call `_fetch_meter_serial()` against Octopus API (executor job) at render time. Pre-fill the `vol_schema` text field with the discovered value; field remains `vol.Optional(str)` — user may override. On any API failure (network, auth, no meters returned), fall back to empty text field. No crash; no blocking.
+
+**Multiple meters (✅ Q2 CLOSED — Robert confirmed: pick latest by `installation_date`):** If `GET /v1/electricity-meter-points/{mpan}/meters/` returns more than one device, sort descending by `installation_date`; select index 0. Devices with missing/null `installation_date` treated as epoch (1970-01-01) so they lose to any device with a real date. No fallback to first-in-list to avoid selecting a decommissioned meter.
 
 **"both" mode — feature construction:**
 ```
@@ -407,9 +569,27 @@ ML_CONSUMPTION_SOURCE == "both":
 
 **DST / UTC normalisation (required):** all Series must be UTC before join. `_normalise_to_utc()` handles tz-naive (assume Europe/London, localize → UTC), tz-aware Europe/London (convert → UTC), and deduplicates DST fall-back duplicates (keep first).
 
-**Inference-time `octopus_import_kwh` proxy:** use per-`slot_index` mean from training data, computed once at train time, persisted in `model_metadata["slot_import_means"]`.
+**Inference-time `octopus_import_kwh`:** always `NaN` when mode is `"both"`. `HistGradientBoostingRegressor` handles NaN natively; a column that is always NaN at inference contributes zero information. `build_inference_row()` sets `octopus_import_kwh = np.nan` unconditionally. No stored proxy values, no circular dependency. `slot_import_means` **removed**.
 
-**Model compatibility guard:** if `model_metadata["trained_with_octopus_feature"]` differs from whether Octopus is currently available, **invalidate loaded model and force retrain**. Feature column schema is authoritative in `model_metadata["feature_columns"]`.
+**`model_metadata` schema (revised):**
+```python
+model_metadata = {
+    "feature_columns": [...],              # authoritative feature list
+    "trained_with_octopus_feature": bool,  # True iff "both" mode active at train time
+    "train_date": str,                     # ISO-8601
+    "n_clean_samples": int,
+    "train_rmse": float,
+    "blend_weight_at_train": float,
+}
+```
+`slot_import_means` is gone.
+
+**Model compatibility guard (simplified):** compare `model_metadata["feature_columns"]` against current feature columns. Schema drift occurs only on mode switch (`"givenergy"` ↔ `"both"`), not on per-inference missing values.
+```python
+def validate_model_compatibility(model_metadata: dict, current_feature_columns: list[str]) -> bool:
+    """Return True if the loaded model is compatible with the current feature schema."""
+    return model_metadata.get("feature_columns") == current_feature_columns
+```
 
 **Cross-file changes:**
 
@@ -418,15 +598,15 @@ ML_CONSUMPTION_SOURCE == "both":
 | `const.py` | `OCTOPUS_METER_SERIAL` (already in D-8) |
 | `config_flow.py` | `async_step_ml_octopus_serial` + `_ml_octopus_serial_schema()` + `_fetch_meter_serial()` |
 | `ml/sources/octopus_history.py` | Guard on empty `meter_serial`; return `None` + log warning |
-| `ml/data_pipeline.py` | `build_feature_matrix()` with conditional `octopus_import_kwh`; `_normalise_to_utc()` helper |
-| `ml/model_trainer.py` | Compute + persist `slot_import_means`; inject at inference; `validate_model_compatibility()` |
+| `ml/data_pipeline.py` | `build_feature_matrix()` with conditional `octopus_import_kwh`; `_normalise_to_utc()` helper; `build_inference_row()` sets `octopus_import_kwh = np.nan` unconditionally |
+| `ml/model_trainer.py` | Remove `_compute_slot_import_means()`; remove `slot_import_means` from `model_metadata`; `predict()` passes `NaN` for `octopus_import_kwh`; `validate_model_compatibility()` uses list comparison only |
 | `ml/model_persistence.py` | Persist `model_metadata` alongside `.pkl` (companion `.json` or embedded in joblib artifact) |
 | `sensors/ml_model_status.py` | Expose `consumption_signal_quality` (D-15) |
 
-**Open questions for Robert:**
-1. **Auto-fill UX**: auto-populate `OCTOPUS_METER_SERIAL` into editable text field (recommended) or show a "Discover" button?
-2. **Multiple meters**: if `GET .../meters/` returns more than one, pick first or pick latest `installation_date`? Recommendation: latest by `installation_date`.
-3. **Export meter feature (v2)**: `octopus_export_kwh` would sharpen the solar proxy. Deferred; `OCTOPUS_EXPORT_MPN` already in `const.py`.
+**All open questions closed:**
+- **Q1 Auto-fill UX**: ✅ Auto-populate from API discovery at render time. See auto-discovery section above.
+- **Q2 Multiple meters**: ✅ Pick latest by `installation_date`. See auto-discovery section above.
+- **Q3 Export meter (v2)**: ✅ Deferred. `OCTOPUS_EXPORT_MPN` already in `const.py`. No further action in current scope.
 
 ---
 

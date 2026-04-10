@@ -57,3 +57,58 @@
 - DHW boost cycles (1–2 h) are shorter than EV sessions but could be caught; noted as D-12 open question for Robert.
 
 **Files written:** `.squad/decisions/inbox/hockney-ev-detection.md`
+
+---
+
+### 2026-04-10 — D-17 Revised: Temperature-Correlation Discriminator for EV vs Heat Pump
+
+**Task:** Revise the D-17 Hybrid-D algorithm to prevent heat pump loads from being falsely excluded as EV charging, particularly when the physics model is uncalibrated or absent.
+
+**Root cause of original failure:** The residual approach only distinguishes EV from heat pump if the physics model *correctly* predicts the heat pump draw. When `heating_type = "none"`, or COP / heat_loss parameters are wrong, the entire heat pump load appears as residual and gets flagged identically to an EV. This is a common state for new installs.
+
+**Key physical insight used:**
+- Heat pump draw is strongly anti-correlated with outdoor temperature (r ≈ −0.7 to −0.9 over a winter day spanning ≥5°C).
+- EV charger draw is temperature-independent (r ≈ 0 ± 0.1 over any multi-hour window).
+- This correlation is a reliable physical discriminator that does not require a calibrated physics model.
+
+**Revised algorithm adds three discriminator gates after candidate detection:**
+
+1. **Temperature-correlation gate (step 2b):** Compute Pearson r between `power_kwh` and `outdoor_temp_c` over a ±6-slot (±3h) context window around each candidate run.
+   - `r < −0.4` → strongly anti-correlated → heating load → **do not exclude**
+   - `|r| < 0.2` or `r > 0` → temperature-independent → EV/appliance → **exclude**
+   - `−0.4 ≤ r < −0.2` → ambiguous → proceed to secondary discriminator
+
+2. **Ambiguous block secondary discriminator (step 2c):** For ambiguous blocks:
+   - Temperature span ≥ 3°C within block → meaningful thermal variation → heating → **do not exclude**
+   - Mean consumption within 20% of proxy physics estimate → consistent with heating → **do not exclude**
+   - Otherwise → **exclude**
+
+3. **CV fallback (step 2c, cold start with no temperature data):** When neither physics nor temperature is available, use coefficient of variation within the block. CV < 0.20 (flat sustained load) → EV-like → **exclude**. CV ≥ 0.20 (variable) → likely heating → **do not exclude**.
+
+**Cold-start with temperature but no physics:** Compute a proxy physics estimate using 100 W/°C heat loss and a 20°C setpoint assumption. Use as physics_kwh proxy for the residual calculation before applying the correlation gate. Better than falling back to pure percentile threshold.
+
+**Threshold derivation summary:**
+- Heat pump at −2°C to +8°C winter range: r ≈ −0.70 to −0.90. Worst-case mild night (4°C span): r ≈ −0.45. Safety margin of 0.05–0.5 below the −0.4 threshold.
+- EV at 3.3 kW constant: r ≈ 0 ± 0.10. The gap to −0.2 is reliable.
+- CV for EV: 0.03–0.15. CV for heating: 0.25–0.50 (thermostat cycling, defrost). CV_EV_THRESHOLD = 0.20 sits cleanly in the gap.
+
+**Open questions resolved:**
+- **Q1 (DHW/immersion heater):** CLOSED. Temperature-correlation discriminator handles this — immersion heaters are scheduled, temperature-independent loads (r ≈ 0). They will be correctly excluded from training, same as EV. No MAX_RUN_SLOTS parameter needed.
+- **Q2 (Audit notification):** CLOSED. Robert confirmed: raise HA persistent notification via `persistent_notification.create` with `notification_id = "bcc_ev_exclusion"` (replaces on retrain). EV blocks also written to MLModelStatusSensor attributes.
+
+**New constants added:**
+```python
+TEMP_CORRELATION_UPPER   = -0.4
+TEMP_CORRELATION_LOWER   = -0.2
+TEMP_CONTEXT_SLOTS       = 6
+TEMP_RANGE_MIN_C         = 3.0
+CV_EV_THRESHOLD          = 0.20
+PROXY_HEAT_LOSS_W_PER_C  = 100.0
+PROXY_SETPOINT_C         = 20.0
+```
+
+**New `ev_blocks` dict fields:** `r_temp` (Pearson r in context window), `cv` (CV fallback mode), `reason` (classification reason string).
+
+**New `ev_detection_mode` values:** `"proxy_physics_cold_start"` (temp available, no physics), `"temporal_cv_fallback"` (neither available). Existing `"residual_iqr"` unchanged.
+
+**Files written:** `.squad/decisions/inbox/hockney-d17-revised.md`

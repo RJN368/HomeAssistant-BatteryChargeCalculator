@@ -54,3 +54,22 @@
 **New decisions added:**
 - **D-16**: Optionality and graceful degradation architecture — ML is opt-in (`ML_ENABLED=False`); every failure mode silently falls back to pure physics; no ML failure may crash the integration or leak orphaned entities.
 - **D-17**: EV charging auto-detection — statistical detection of sustained high-power blocks from the training data time series; zero user config required; specification delegated to Hockney via inbox.
+
+### 2026-04-10 — D-18 final closes + inference simplification (Robert's answers)
+
+**D-18 open questions closed:**
+- **Q1 (meter serial auto-fill UX)**: Auto-populate `OCTOPUS_METER_SERIAL` from Octopus API discovery at config flow render time. Pre-fill editable text field with discovered value; user may override. No "Discover" button — seamless. Any failure falls back to empty manual entry.
+- **Q2 (multiple meters)**: When `/v1/electricity-meter-points/{mpan}/meters/` returns multiple meters, select the one with the latest `installation_date`. Missing `installation_date` treated as epoch (loses to any real date).
+- **Q3 (export meter v2)**: Deferred confirmed. `OCTOPUS_EXPORT_MPN` stays in `const.py`; no scope change now.
+
+**D-18 inference spec — REVISED: slot_import_means removed:**
+- Previous spec: inject per-`slot_index` means of `octopus_import_kwh` from training data as an inference-time proxy. This introduced stale-data risk, circular dependency, and compatibility complexity.
+- **New spec**: at inference time, `octopus_import_kwh = NaN` always (for "both" mode). HistGBR handles NaN natively. No stored means; no lookup; no proxy injection.
+- `slot_import_means` **removed from `model_metadata`**. Model compatibility guard simplified to single `feature_columns` list comparison. Force retrain only on schema change (mode switch), not on per-inference missing data.
+
+**D-13 remaining questions closed (Robert's answers):**
+- **Q2 ("both" mode at inference)**: GivEnergy-only signal path at prediction time. Octopus is training-only. Drives the D-18 inference revision above.
+- **Q3 (EV blocks notification)**: HA persistent notification raised when `n_ev_blocks_excluded > 0` during any training cycle. Notification ID includes retrain timestamp; one per retrain.
+- **Q4 (GivEnergy timestamps)**: FIX AT SOURCE. `_parse_givenergy_timestamp()` in `GivEnergyHistorySource` silently normalises to UTC. Zero log warnings for timezone conversion. Supersedes the earlier "defensive UTC handling + log warning" directive from D-13 Q8.
+
+**Net result**: "both" mode inference path is now exactly as simple as "givenergy" mode at runtime. The Octopus column exists in the feature schema and is always `NaN` at prediction time; HistGBR's native NaN handling means zero branching code needed.
