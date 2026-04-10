@@ -172,6 +172,55 @@ def _building_estimate_schema(
     )
 
 
+def _ml_settings_schema(
+    ml_enabled: bool = False,
+    consumption_source: str = const.DEFAULT_ML_CONSUMPTION_SOURCE,
+    temp_source: str = const.DEFAULT_ML_TEMP_SOURCE,
+    octopus_mpan: str = "",
+    octopus_meter_serial: str = const.DEFAULT_OCTOPUS_METER_SERIAL,
+    lookback_days: int = const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+) -> vol.Schema:
+    """Schema for the ML power estimation settings step.
+
+    All fields are optional — ML is disabled by default (D-16).
+    The octopus_mpan and octopus_meter_serial fields are only used when
+    consumption_source is 'octopus' or 'both'.
+    """
+    return vol.Schema(
+        {
+            vol.Optional(const.ML_ENABLED, default=ml_enabled): cv.boolean,
+            vol.Optional(
+                const.ML_CONSUMPTION_SOURCE, default=consumption_source
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        const.ML_CONSUMPTION_SOURCE_GIVENERGY,
+                        const.ML_CONSUMPTION_SOURCE_OCTOPUS,
+                        const.ML_CONSUMPTION_SOURCE_BOTH,
+                    ],
+                    translation_key="ml_consumption_source",
+                )
+            ),
+            vol.Optional(const.ML_TEMP_SOURCE, default=temp_source): SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        const.ML_TEMP_SOURCE_OPENMETEO,
+                        const.ML_TEMP_SOURCE_HA_ENTITY,
+                    ],
+                    translation_key="ml_temp_source",
+                )
+            ),
+            vol.Optional(const.OCTOPUS_MPN, default=octopus_mpan): cv.string,
+            vol.Optional(
+                const.OCTOPUS_METER_SERIAL, default=octopus_meter_serial
+            ): cv.string,
+            vol.Optional(
+                const.ML_TRAINING_LOOKBACK_DAYS, default=lookback_days
+            ): vol.All(vol.Coerce(int), vol.Range(min=14, max=730)),
+        }
+    )
+
+
 def estimate_heat_loss(
     floor_area: float, age: str, wall_type: str, glazing: str
 ) -> float:
@@ -236,7 +285,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             heating_type = user_input[const.HEATING_TYPE]
             self._heating_data[const.HEATING_TYPE] = heating_type
             if heating_type == const.HEATING_TYPE_NONE:
-                return self._create_entry()
+                return await self.async_step_ml_settings()
             if heating_type == const.HEATING_TYPE_INTERPOLATION:
                 return await self.async_step_heating_interpolation()
             return await self.async_step_heating_electric()
@@ -252,7 +301,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             self._heating_data[const.HEATING_KNOWN_POINTS] = user_input.get(
                 const.HEATING_KNOWN_POINTS, const.DEFAULT_HEATING_KNOWN_POINTS
             )
-            return self._create_entry()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heating_interpolation",
@@ -318,7 +367,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                     const.HEAT_LOSS_REPORT_INDOOR_TEMP: indoor,
                 }
             )
-            return self._create_entry()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heat_loss_report",
@@ -331,7 +380,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             self._heating_data[const.HEATING_HEAT_LOSS] = float(
                 user_input[const.HEATING_HEAT_LOSS]
             )
-            return self._create_entry()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heat_loss_known",
@@ -368,11 +417,63 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                     const.BUILDING_GLAZING: glazing,
                 }
             )
-            return self._create_entry()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="building_estimate",
             data_schema=_building_estimate_schema(),
+        )
+
+    async def async_step_ml_settings(self, user_input=None):
+        """ML power estimation settings step.
+
+        Configures the optional ML feature. All fields default to off/defaults
+        so existing users are unaffected when this step is introduced (D-16).
+        """
+        if user_input is not None:
+            # Update both _heating_data and options to ensure persistence
+            ml_settings = {
+                const.ML_ENABLED: user_input.get(const.ML_ENABLED, False),
+                const.ML_CONSUMPTION_SOURCE: user_input.get(
+                    const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
+                ),
+                const.ML_TEMP_SOURCE: user_input.get(
+                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
+                ),
+                const.OCTOPUS_MPN: user_input.get(const.OCTOPUS_MPN, ""),
+                const.OCTOPUS_METER_SERIAL: user_input.get(
+                    const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
+                ),
+                const.ML_TRAINING_LOOKBACK_DAYS: user_input.get(
+                    const.ML_TRAINING_LOOKBACK_DAYS,
+                    const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            }
+            self._heating_data.update(ml_settings)
+            # Also update self.options to ensure persistence if options flow is used later
+            if hasattr(self, "options"):
+                self.options.update(ml_settings)
+            return self._create_entry()
+
+        return self.async_show_form(
+            step_id="ml_settings",
+            data_schema=_ml_settings_schema(
+                ml_enabled=self._heating_data.get(const.ML_ENABLED, False),
+                consumption_source=self._heating_data.get(
+                    const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
+                ),
+                temp_source=self._heating_data.get(
+                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
+                ),
+                octopus_mpan=self._heating_data.get(const.OCTOPUS_MPN, ""),
+                octopus_meter_serial=self._heating_data.get(
+                    const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
+                ),
+                lookback_days=self._heating_data.get(
+                    const.ML_TRAINING_LOOKBACK_DAYS,
+                    const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            ),
         )
 
     def _create_entry(self):
@@ -476,7 +577,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
             heating_type = user_input[const.HEATING_TYPE]
             self.options[const.HEATING_TYPE] = heating_type
             if heating_type == const.HEATING_TYPE_NONE:
-                return self._save_and_exit()
+                return await self.async_step_ml_settings()
             if heating_type == const.HEATING_TYPE_INTERPOLATION:
                 return await self.async_step_heating_interpolation()
             return await self.async_step_heating_electric()
@@ -496,7 +597,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
             self.options[const.HEATING_KNOWN_POINTS] = user_input.get(
                 const.HEATING_KNOWN_POINTS, const.DEFAULT_HEATING_KNOWN_POINTS
             )
-            return self._save_and_exit()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heating_interpolation",
@@ -581,7 +682,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     const.HEAT_LOSS_REPORT_INDOOR_TEMP: indoor,
                 }
             )
-            return self._save_and_exit()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heat_loss_report",
@@ -607,7 +708,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
             self.options[const.HEATING_HEAT_LOSS] = float(
                 user_input[const.HEATING_HEAT_LOSS]
             )
-            return self._save_and_exit()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="heat_loss_known",
@@ -644,7 +745,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     const.BUILDING_GLAZING: glazing,
                 }
             )
-            return self._save_and_exit()
+            return await self.async_step_ml_settings()
 
         return self.async_show_form(
             step_id="building_estimate",
@@ -658,6 +759,55 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 ),
                 glazing=self.options.get(
                     const.BUILDING_GLAZING, const.DEFAULT_BUILDING_GLAZING
+                ),
+            ),
+        )
+
+    async def async_step_ml_settings(self, user_input=None):
+        """ML power estimation settings step.
+
+        Configures the optional ML feature. All fields default to off/defaults
+        so existing users are unaffected when this step is introduced (D-16).
+        """
+        if user_input is not None:
+            self.options.update(
+                {
+                    const.ML_ENABLED: user_input.get(const.ML_ENABLED, False),
+                    const.ML_CONSUMPTION_SOURCE: user_input.get(
+                        const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
+                    ),
+                    const.ML_TEMP_SOURCE: user_input.get(
+                        const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
+                    ),
+                    const.OCTOPUS_MPN: user_input.get(const.OCTOPUS_MPN, ""),
+                    const.OCTOPUS_METER_SERIAL: user_input.get(
+                        const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
+                    ),
+                    const.ML_TRAINING_LOOKBACK_DAYS: user_input.get(
+                        const.ML_TRAINING_LOOKBACK_DAYS,
+                        const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                    ),
+                }
+            )
+            return self._save_and_exit()
+
+        return self.async_show_form(
+            step_id="ml_settings",
+            data_schema=_ml_settings_schema(
+                ml_enabled=self.options.get(const.ML_ENABLED, False),
+                consumption_source=self.options.get(
+                    const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
+                ),
+                temp_source=self.options.get(
+                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
+                ),
+                octopus_mpan=self.options.get(const.OCTOPUS_MPN, ""),
+                octopus_meter_serial=self.options.get(
+                    const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
+                ),
+                lookback_days=self.options.get(
+                    const.ML_TRAINING_LOOKBACK_DAYS,
+                    const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),
             ),
         )

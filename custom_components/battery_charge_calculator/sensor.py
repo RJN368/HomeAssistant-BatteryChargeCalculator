@@ -10,10 +10,14 @@ from homeassistant.core import HomeAssistant
 
 from . import const
 from .sensors import (
+    AnnualForecastSensor,
     BatteryProjectionSensor,
     BatterySocSensor,
     CostPredictionSensor,
+    DailyPowerForecastSensor,
     EstimatedPowerDemandSensor,
+    MLModelStatusSensor,
+    MLPowerSurfaceSensor,
     TimeSlotSensor,
 )
 
@@ -23,12 +27,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Battery Charge Calculator sensor devices."""
     coordinator = hass.data[const.DOMAIN][config_entry.entry_id]
-    async_add_entities(
-        [
-            TimeSlotSensor(hass, coordinator),
-            BatteryProjectionSensor(hass, coordinator),
-            CostPredictionSensor(hass, coordinator),
-            BatterySocSensor(hass, coordinator),
-            EstimatedPowerDemandSensor(hass, coordinator),
-        ]
-    )
+    entities = [
+        TimeSlotSensor(hass, coordinator),
+        BatteryProjectionSensor(hass, coordinator),
+        CostPredictionSensor(hass, coordinator),
+        BatterySocSensor(hass, coordinator),
+        EstimatedPowerDemandSensor(hass, coordinator),
+        DailyPowerForecastSensor(hass, coordinator),
+    ]
+    if config_entry.options.get(const.ML_ENABLED, False):
+        entities.append(MLModelStatusSensor(hass, coordinator))
+        entities.append(AnnualForecastSensor(hass, coordinator))
+        entities.append(MLPowerSurfaceSensor(hass, coordinator))
+    async_add_entities(entities)

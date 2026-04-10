@@ -73,3 +73,28 @@
 - **Q4 (GivEnergy timestamps)**: FIX AT SOURCE. `_parse_givenergy_timestamp()` in `GivEnergyHistorySource` silently normalises to UTC. Zero log warnings for timezone conversion. Supersedes the earlier "defensive UTC handling + log warning" directive from D-13 Q8.
 
 **Net result**: "both" mode inference path is now exactly as simple as "givenergy" mode at runtime. The Octopus column exists in the feature schema and is always `NaN` at prediction time; HistGBR's native NaN handling means zero branching code needed.
+
+### 2026-04-10 — ml/model_trainer.py and ml/model_persistence.py implemented
+
+**Files created:**
+- `custom_components/battery_charge_calculator/ml/model_trainer.py`
+- `custom_components/battery_charge_calculator/ml/model_persistence.py`
+
+**model_trainer.py — key implementation details:**
+- `TrainedModel` dataclass: holds fitted estimator, `model_type`, `feature_columns`, `trained_at` (UTC), `n_training_samples`, `training_rmse`, `blend_weight`, `trained_with_octopus_feature`, `slot_residual_std`.
+- `FEATURE_COLUMNS` (14 features) and `FEATURE_COLUMNS_WITH_OCTOPUS` (15 features) defined — must stay in sync with `data_pipeline.py`.
+- `train_power_model(df)`: validates columns → computes residual target (actual − physics) → selects feature schema → 85/15 train/val split → fits HistGBR (n ≥ 500) or Ridge+SimpleImputer pipeline (n < 500) → reports held-out RMSE → computes blend weight and per-dataset residual std → returns `TrainedModel`.
+- `compute_blend_weight(n_clean)`: linear ramp 0.0→1.0 over [500, 2500] using `np.clip` (D-8).
+- `predict_correction(model, features)`: selects feature columns in schema order → calls `estimator.predict()` → clamps output to `±(_BLEND_CORRECTION_CAP × training_rmse)` (D-1).
+- `check_model_compatibility(model, current_feature_columns)`: simple list equality; returns False on schema mismatch to force retrain on source mode switch (D-18).
+- All D-6 hyperparameters defined as module-level private constants with comments.
+- No homeassistant imports; pure sklearn / numpy / pandas.
+
+**model_persistence.py — key implementation details:**
+- `get_model_path(config_dir)`: returns `{config_dir}/battery_charge_calculator_model.pkl` (D-4).
+- `save_model(model, config_dir)`: atomic write via `tempfile.mkstemp` (same dir) → `joblib.dump(compress=3)` → `os.replace()` POSIX rename. Temp file cleaned up on any exception before re-raise.
+- `load_model(config_dir)`: returns `None` (no raise) for missing file, corrupt pickle, or wrong type. WARNING logged for unexpected failures; DEBUG for normal missing-file case.
+- `model_age_days(model)`: `(now_utc − model.trained_at).total_seconds() / 86400.0`.
+- `should_retrain(model, current_rmse_7day)`: returns True if model is None, age > 35 days, or 7-day RMSE > 1.5× training RMSE (D-9). RMSE trigger skipped when `current_rmse_7day is None` (startup path).
+- `_RETRAIN_RMSE_TRIGGER` imported from `model_trainer` to avoid duplication.
+- No homeassistant imports; pure Python + joblib.

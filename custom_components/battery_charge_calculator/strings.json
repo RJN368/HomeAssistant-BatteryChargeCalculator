@@ -105,6 +105,24 @@
                     "building_wall_type": "Primary external wall construction. Affects the U-value used in the estimate.",
                     "building_glazing": "Type of glazing on the majority of windows."
                 }
+            },
+            "ml_settings": {
+                "title": "ML Power Estimation",
+                "description": "Optional: enable the machine-learning power model. Historical consumption data is fetched from the source(s) below and used to train a personalised forecast model.",
+                "data": {
+                    "ml_enabled": "Enable ML power estimation",
+                    "ml_consumption_source": "Historical consumption source",
+                    "ml_temp_source": "Temperature data source",
+                    "octopus_mpn": "Octopus MPAN (Meter Point Administration Number)",
+                    "octopus_meter_serial": "Octopus electricity meter serial",
+                    "ml_training_lookback_days": "Training lookback period (days)"
+                },
+                "data_description": {
+                    "ml_consumption_source": "'GivEnergy' uses the inverter cloud API; 'Octopus' uses your smart meter half-hourly reads via the Octopus Energy API; 'Both' fetches from both and averages.",
+                    "octopus_mpn": "13-digit MPAN shown on your electricity bill or Octopus account page (e.g. 1012345678900). Required when source is Octopus or Both.",
+                    "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
+                    "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
+                }
             }
         }
     },
@@ -217,6 +235,24 @@
                     "building_wall_type": "Primary external wall construction. Affects the U-value used in the estimate.",
                     "building_glazing": "Type of glazing on the majority of windows."
                 }
+            },
+            "ml_settings": {
+                "title": "ML Power Estimation",
+                "description": "Optional: enable the machine-learning power model. Historical consumption data is fetched from the source(s) below and used to train a personalised forecast model.",
+                "data": {
+                    "ml_enabled": "Enable ML power estimation",
+                    "ml_consumption_source": "Historical consumption source",
+                    "ml_temp_source": "Temperature data source",
+                    "octopus_mpn": "Octopus MPAN (Meter Point Administration Number)",
+                    "octopus_meter_serial": "Octopus electricity meter serial",
+                    "ml_training_lookback_days": "Training lookback period (days)"
+                },
+                "data_description": {
+                    "ml_consumption_source": "'GivEnergy' uses the inverter cloud API; 'Octopus' uses your smart meter half-hourly reads via the Octopus Energy API; 'Both' fetches from both and averages.",
+                    "octopus_mpn": "13-digit MPAN shown on your electricity bill or Octopus account page (e.g. 1012345678900). Required when source is Octopus or Both.",
+                    "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
+                    "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
+                }
             }
         }
     },
@@ -230,7 +266,7 @@
         },
         "heat_loss_method": {
             "options": {
-                "known": "I know the W/\u00b0C value",
+                "known": "I know the W/°C value",
                 "report": "I have a heat loss survey report",
                 "estimate": "Estimate from building properties"
             }
@@ -238,8 +274,8 @@
         "building_age": {
             "options": {
                 "pre_1930": "Pre-1930 (Victorian / Edwardian)",
-                "1930_1975": "1930\u20131975",
-                "1975_2000": "1975\u20132000",
+                "1930_1975": "1930–1975",
+                "1975_2000": "1975–2000",
                 "post_2000": "Post-2000"
             }
         },
@@ -257,6 +293,19 @@
                 "single": "Single-glazed",
                 "double": "Double-glazed",
                 "triple": "Triple-glazed"
+            }
+        },
+        "ml_consumption_source": {
+            "options": {
+                "givenergy": "GivEnergy (inverter cloud API)",
+                "octopus": "Octopus Energy (smart meter reads)",
+                "both": "Both (average)"
+            }
+        },
+        "ml_temp_source": {
+            "options": {
+                "openmeteo": "Open-Meteo (automatic, free)",
+                "ha_entity": "Home Assistant sensor entity"
             }
         }
     }

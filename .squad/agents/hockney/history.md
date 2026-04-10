@@ -112,3 +112,37 @@ PROXY_SETPOINT_C         = 20.0
 **New `ev_detection_mode` values:** `"proxy_physics_cold_start"` (temp available, no physics), `"temporal_cv_fallback"` (neither available). Existing `"residual_iqr"` unchanged.
 
 **Files written:** `.squad/decisions/inbox/hockney-d17-revised.md`
+
+---
+
+### 2026-04-10 — data_pipeline.py implementation
+
+**Task:** Create `custom_components/battery_charge_calculator/ml/data_pipeline.py` — pure-Python data pipeline implementing all 8 pipeline stages as specified in D-7, D-10, D-12, D-17 revised.
+
+**File created:** `custom_components/battery_charge_calculator/ml/data_pipeline.py`
+
+**Key implementation decisions:**
+
+- **Gap detection threshold:** `_GAP_THRESHOLD_MINUTES = 15` is the raw-source threshold; after resampling to 30-min, the resampled DataFrame gap check uses `pd.Timedelta(minutes=30)` (detect missing 30-min slots) not the 15-min constant. Using 15 min would falsely flag every normal 30-min step as a gap and remove all rows. This is a critical distinction — the 15-min constant describes the source-data gap size that causes a slot to go NaN (and then be dropna'd); the adjacency check in the aligned DataFrame looks for consecutive rows > 30 min apart.
+
+- **D-17 EV detection — three detection cases:**
+  - Case A: physics + temp → residual IQR candidate detection + Pearson r discriminator
+  - Case B: temp only, no physics → proxy physics (100 W/°C × max(0, 20°C − temp) / 2000) + Pearson r
+  - Case C: neither → 98th-percentile absolute threshold + CV discriminator (CV < 0.20 → exclude)
+  - When physics is available but temp is not: residual IQR detection + CV fallback (no r discriminator)
+
+- **Ambiguous band (−0.4 ≤ r < −0.2):** resolved by (1) temp_span ≥ 3°C in block → keep, (2) mean power within 20% of proxy physics at block mean temp → keep, else → exclude as `"ev_ambiguous_secondary"`.
+
+- **ev_blocks dict keys:** `start`, `end`, `n_slots`, `mean_kwh`, `peak_kwh`, `r_temp`, `cv`, `detection_mode`. Uses `n_slots` (from task docstring) and `detection_mode` (task spec); also includes D-17 extended fields (`peak_kwh`, `r_temp`, `cv`).
+
+- **Physics NaN column:** when `physics_series=None`, a NaN `physics_kwh` column is added to the returned DataFrame for consistent schema (HistGBR handles native NaN — D-6).
+
+- **Feature #14 `temp_delta_1slot_sq`:** included per D-7 (15-feature vector). Task's `_add_features` docstring omitted it but D-7 is authoritative and task says "all 15 features".
+
+- **Quality gate (D-10):** `n_clean < 500` OR `temp_range < 5°C` → raises `InsufficientDataError`. Both conditions checked independently with descriptive messages.
+
+**Smoke test results:**
+- 600-slot synthetic dataset → 597 rows clean (3 removed by z-score/IQR), all 16 columns present.
+- EV block (3.5 kWh/slot constant, 8 slots): 1 block detected, 10 slots excluded (8 + 2 buffer). ✓
+- Heat pump (anti-correlated with temp, no physics): 0 excluded slots. Temperature-correlation discriminator works correctly. ✓
+- Small dataset (100 slots): `InsufficientDataError` raised as expected. ✓

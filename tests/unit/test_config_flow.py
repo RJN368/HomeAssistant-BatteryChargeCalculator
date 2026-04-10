@@ -236,6 +236,12 @@ class TestConfigFlowHeatingSteps:
         flow.hass = MagicMock()
         flow.async_show_form = MagicMock(return_value={"type": "form"})
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        # The ML settings step is the final step before saving.  Tests that
+        # exercise earlier steps should treat it as a passthrough so the flow
+        # completes and async_create_entry is called.
+        flow.async_step_ml_settings = AsyncMock(
+            side_effect=lambda user_input=None: flow._create_entry()
+        )
         return flow
 
     @pytest.mark.asyncio
@@ -415,6 +421,14 @@ class TestOptionsFlow:
         handler.hass.config_entries.async_update_entry = MagicMock()
         handler.async_show_form = MagicMock(return_value={"type": "form"})
         handler.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+        # The ML settings step is the final step before saving.  Tests that
+        # exercise earlier steps (heating, heat-loss) should treat it as a
+        # passthrough so the flow completes and async_create_entry is called.
+        handler.async_step_ml_settings = AsyncMock(
+            side_effect=lambda user_input=None: handler.async_create_entry(
+                title="", data=handler.options
+            )
+        )
         return handler, config_entry
 
     @pytest.mark.asyncio

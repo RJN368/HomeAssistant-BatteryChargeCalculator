@@ -1,3 +1,7 @@
 trigger_planning:
   name: Trigger planning
   description: Run a full battery charge planning cycle immediately, without waiting for the next hourly trigger.
+
+trigger_ml_training:
+  name: Trigger ML training
+  description: Fetch historical consumption and temperature data then retrain the ML power estimation model immediately. ML must be enabled in the integration's configuration options.

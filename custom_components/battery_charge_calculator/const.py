@@ -92,6 +92,7 @@ BATTERY_SCHEDULE_DATA_ID = "battery_schedule"
 BATTERY_PROJECTION_SENSOR = "battery_charge_calculator.battery_projection_sensor"
 BATTERY_PROJECTION_SENSOR_NAME = "Battery Charge Projection"
 BATTERY_CHARGE_SENSOR = "battery_charge_calculator.battery_charge_slots_sensor"
+BATTERY_CHARGE_SENSOR_NAME = "Battery Charge Slots"
 CHARGE_COST_ESTIMATE_SENSOR = "battery_charge_calculator.cost_prediction_sensor"
 EST_POWER_DEMAND_SENSOR = "battery_charge_calculator.est_power_demand"
 EST_POWER_DEMAND_SENSOR_NAME = "Estimated Power Demand"
@@ -113,3 +114,48 @@ ATTR_START = "start"
 ATTR_STOP = "stop"
 ATTR_TIMESLOTS = "timeslots"
 ATTR_ENABLED = "enabled"
+
+# ─────────────────────────── ML Power Estimation ─────────────────────────────
+# Feature introduced 2026-04-10. All keys default to safe values so existing
+# config entries without ML settings continue to work unchanged (D-16).
+
+# Master switch — defaults to False so ML is never activated unexpectedly
+ML_ENABLED = "ml_enabled"
+DEFAULT_ML_ENABLED = False
+
+# Data source selection
+ML_CONSUMPTION_SOURCE = "ml_consumption_source"
+ML_TEMP_SOURCE = "ml_temp_source"
+ML_TEMP_ENTITY_ID = "ml_temp_entity_id"  # only used when ML_TEMP_SOURCE == "ha_entity"
+
+# Valid values for ML_CONSUMPTION_SOURCE
+ML_CONSUMPTION_SOURCE_GIVENERGY = "givenergy"
+ML_CONSUMPTION_SOURCE_OCTOPUS = "octopus"
+ML_CONSUMPTION_SOURCE_BOTH = "both"
+
+# Valid values for ML_TEMP_SOURCE
+ML_TEMP_SOURCE_OPENMETEO = "openmeteo"
+ML_TEMP_SOURCE_HA_ENTITY = "ha_entity"
+
+# Defaults
+DEFAULT_ML_CONSUMPTION_SOURCE = ML_CONSUMPTION_SOURCE_GIVENERGY
+DEFAULT_ML_TEMP_SOURCE = ML_TEMP_SOURCE_OPENMETEO
+
+# Octopus meter serial — optional, only needed for Octopus consumption source.
+# Distinct from MPAN. Found on the Octopus account page or auto-discovered.
+OCTOPUS_METER_SERIAL = "octopus_meter_serial"
+DEFAULT_OCTOPUS_METER_SERIAL = ""
+
+# Training configuration
+ML_TRAINING_LOOKBACK_DAYS = "ml_training_lookback_days"
+DEFAULT_ML_TRAINING_LOOKBACK_DAYS = 730  # days of historical data to fetch
+
+# Sensor identifiers
+ML_MODEL_STATUS_SENSOR = "battery_charge_calculator.ml_model_status"
+ML_MODEL_STATUS_SENSOR_NAME = "ML Power Model Status"
+ANNUAL_FORECAST_SENSOR = "battery_charge_calculator.annual_forecast"
+ANNUAL_FORECAST_SENSOR_NAME = "Annual Energy Forecast"
+DAILY_POWER_FORECAST_SENSOR = "battery_charge_calculator.daily_power_forecast"
+DAILY_POWER_FORECAST_SENSOR_NAME = "Daily Power Forecast"
+ML_POWER_SURFACE_SENSOR = "battery_charge_calculator.ml_power_surface"
+ML_POWER_SURFACE_SENSOR_NAME = "ML Power Surface"

@@ -23,6 +23,7 @@ class TimeSlotSensor(CoordinatorEntity, SelectEntity, RestoreSensor):
         self.hass = hass
         self._attr_unique_id = const.BATTERY_CHARGE_SENSOR
         self.entity_id = const.BATTERY_CHARGE_SENSOR
+        self._attr_name = const.BATTERY_CHARGE_SENSOR_NAME
 
     @property
     def current_option(self) -> str | None:

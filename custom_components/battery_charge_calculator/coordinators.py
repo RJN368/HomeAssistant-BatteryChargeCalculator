@@ -65,6 +65,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.timeslots = []
         self.totalcost = 0
         self.end_of_day_cost = 0
+        # Each entry: {"time": ISO string, "temp_c": float, "kwh": float}
+        self.daily_power_forecast: list[dict] = []
         self.agile_rates_client = OctopusAgileRatesClient(
             entry.options[const.OCTOPUS_APIKEY],
             entry.options[const.OCTOPUS_ACCOUNT_NUMBER],
@@ -77,14 +79,32 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         )
 
         self._timer_unsub = None
+        self._ml_retrain_unsub = None
+
+        # ML Power Estimator — only created when ML_ENABLED = True (D-16)
+        self.ml_estimator = None
+        if entry.options.get(const.ML_ENABLED, False):
+            from .ml.ml_power_estimator import MLPowerEstimator
+
+            self.ml_estimator = MLPowerEstimator(hass, entry)
+            # Inject the power calculator so estimator can build physics series
+            self.ml_estimator.set_physics_calculator(self.power_calculator)
 
     async def _async_setup(self) -> None:
         """Run once during async_config_entry_first_refresh to start planning."""
+        # Start ML estimator (loads or trains model in background — D-5/D-16)
+        if self.ml_estimator is not None:
+            await self.ml_estimator.async_start()
         await self.octopus_state_change_listener(None)
         self._timer_unsub = async_track_time_interval(
             self.hass,
             self._handle_planning_timer,
             timedelta(hours=1),
+        )
+        self._ml_retrain_unsub = async_track_time_interval(
+            self.hass,
+            lambda now: self.hass.async_create_task(self._async_maybe_retrain_ml()),
+            timedelta(days=30),
         )
 
     @callback
@@ -159,7 +179,17 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         if self._timer_unsub is not None:
             self._timer_unsub()
             self._timer_unsub = None
+        if self._ml_retrain_unsub is not None:
+            self._ml_retrain_unsub()
+            self._ml_retrain_unsub = None
+        if self.ml_estimator is not None:
+            await self.ml_estimator.async_shutdown()
         await super().async_shutdown()
+
+    async def _async_maybe_retrain_ml(self) -> None:
+        """Trigger ML retraining when the monthly schedule fires (D-9)."""
+        if self.ml_estimator is not None:
+            await self.ml_estimator.async_trigger_retrain()
 
     async def octopus_state_change_listener(self, event):
         _LOGGER.debug("octopus_state_change_listener")
@@ -245,6 +275,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 battery_capacity_kwh=self.battery_capacity_kwh,
             )
 
+            daily_forecast: list[dict] = []
+
             for index, value in enumerate(range(0, int(max_range), 30)):
                 current_time = time_now + timedelta(minutes=value)
 
@@ -285,12 +317,26 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 required_power = self.power_calculator.from_temp_and_time(
                     current_time, tempdata
                 )
+                # ML correction (D-1): blend physics estimate with ML residual correction
+                if self.ml_estimator and self.ml_estimator.is_ready:
+                    required_power = self.ml_estimator.predict(
+                        current_time, tempdata, required_power
+                    )
+
+                daily_forecast.append(
+                    {
+                        "time": current_time.isoformat(),
+                        "temp_c": round(tempdata, 1) if tempdata is not None else None,
+                        "kwh": round(required_power, 4),
+                    }
+                )
 
                 evaluator.add_data(
                     current_time, ratedata, export_ratedata, required_power, solardata
                 )
 
             self.timeslots, self.totalcost = evaluator.evaluate()
+            self.daily_power_forecast = daily_forecast
 
             try:
                 await self.async_refresh()
@@ -332,15 +378,15 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
     """Update the data"""
 
     async def _async_update_data(self):
-        _LOGGER.info("udpate data in entity")
+        _LOGGER.info("update data in entity (forcing plan refresh)")
+
+        # Always refresh the plan before returning timeslots
+        await self.octopus_state_change_listener(None)
 
         simulate = self.config_entry.options.get(const.SIMULATE_ONLY)
-
         active_slot = self.current_active_slot()
-
-        if active_slot != None:
+        if active_slot is not None:
             _LOGGER.info(active_slot.charge_option)
-
             if not simulate:
                 if active_slot.charge_option == "charge":
                     await self.givenergy.enableCharge(self.hass)

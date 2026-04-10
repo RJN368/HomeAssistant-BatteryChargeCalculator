@@ -193,3 +193,13 @@ class PowerCalulator:
             heating = 0
 
         return heating + base_consumption
+
+    def physics_estimate(self, current_time: datetime, tempdata: float) -> float:
+        """Return physics-based power estimate for a 30-min slot.
+
+        Identical to from_temp_and_time() — provided as a named alias so that
+        MLPowerEstimator can explicitly request the physics-only estimate when
+        building training data, making the distinction from ML-corrected
+        estimates clear at the call site.
+        """
+        return self.from_temp_and_time(current_time, tempdata)

@@ -55,6 +55,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         const.DOMAIN, "trigger_planning", handle_trigger_planning
     )
 
+    async def handle_trigger_ml_training(call):
+        """Service handler: trigger an immediate ML model retrain."""
+        _LOGGER.info("trigger_ml_training service called")
+        estimator = getattr(coordinator, "ml_estimator", None)
+        if estimator is None:
+            _LOGGER.warning(
+                "trigger_ml_training: ML is not enabled or not initialised — "
+                "enable ML in the integration options first"
+            )
+            return
+        await estimator.async_trigger_retrain()
+
+    hass.services.async_register(
+        const.DOMAIN, "trigger_ml_training", handle_trigger_ml_training
+    )
+
     await coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
