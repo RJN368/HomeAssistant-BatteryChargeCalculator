@@ -62,6 +62,21 @@ class MLModelStatusSensor(CoordinatorEntity, SensorEntity):
     def _update_attributes(self) -> None:
         """Sync sensor state and attributes from coordinator's ml_estimator."""
         estimator = getattr(self.coordinator, "ml_estimator", None)
+        sklearn_missing = getattr(self.coordinator, "ml_sklearn_missing", False)
+
+        if sklearn_missing:
+            self._attr_native_value = "sklearn_unavailable"
+            self._attr_extra_state_attributes = {
+                "ml_enabled": True,
+                "error_message": (
+                    "scikit-learn is not installed. ML features require scikit-learn, "
+                    "which cannot be installed on Python 3.14 in HA Core 2026.3+ "
+                    "(no binary wheels; source build requires Meson). "
+                    "See the integration README for details."
+                ),
+            }
+            return
+
         if estimator is None:
             self._attr_native_value = "disabled"
             self._attr_extra_state_attributes = {"ml_enabled": False}

@@ -83,12 +83,26 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         # ML Power Estimator — only created when ML_ENABLED = True (D-16)
         self.ml_estimator = None
+        self.ml_sklearn_missing = False  # True when sklearn not installed
         if entry.options.get(const.ML_ENABLED, False):
-            from .ml.ml_power_estimator import MLPowerEstimator
+            from .ml import SKLEARN_AVAILABLE
 
-            self.ml_estimator = MLPowerEstimator(hass, entry)
-            # Inject the power calculator so estimator can build physics series
-            self.ml_estimator.set_physics_calculator(self.power_calculator)
+            if not SKLEARN_AVAILABLE:
+                self.ml_sklearn_missing = True
+                _LOGGER.warning(
+                    "scikit-learn is not installed — ML power estimation is disabled. "
+                    "scikit-learn cannot be installed on Python 3.14 in HA Core 2026.3+ "
+                    "because no binary wheels are available and the source build requires "
+                    "Meson, which is absent from the HA environment. "
+                    "ML features will remain disabled until scikit-learn is available. "
+                    "See README for details."
+                )
+            else:
+                from .ml.ml_power_estimator import MLPowerEstimator
+
+                self.ml_estimator = MLPowerEstimator(hass, entry)
+                # Inject the power calculator so estimator can build physics series
+                self.ml_estimator.set_physics_calculator(self.power_calculator)
 
     async def _async_setup(self) -> None:
         """Run once during async_config_entry_first_refresh to start planning."""
