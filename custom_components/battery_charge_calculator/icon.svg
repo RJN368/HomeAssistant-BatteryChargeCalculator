@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Battery Charge Calculator icon.
+    A battery body (dark fill, cyan border) with a partially-charged green fill
+    level and a gold lightning bolt — representing smart, ML-powered battery
+    charge optimisation.
+
+    Colour palette
+      #0D1B2A  near-black background fill
+      #00ACC1  cyan border / terminal nub
+      #00C853  green charge-level fill (approx 55 % charged)
+      #FFD600  gold lightning bolt
+      #FF8F00  amber bolt stroke / shadow
+  -->
+
+  <!-- Battery body — dark background fill -->
+  <rect x="24" y="128" width="416" height="256" rx="48" ry="48"
+        fill="#0D1B2A"/>
+
+  <!-- Terminal nub — dark background fill -->
+  <rect x="440" y="192" width="56" height="128" rx="16" ry="16"
+        fill="#0D1B2A"/>
+
+  <!-- Charge level indicator (~55 % full, green glow) -->
+  <rect x="44" y="148" width="228" height="216" rx="28" ry="28"
+        fill="#00C853" opacity="0.40"/>
+
+  <!-- Battery body outline — cyan border -->
+  <rect x="24" y="128" width="416" height="256" rx="48" ry="48"
+        fill="none" stroke="#00ACC1" stroke-width="16"/>
+
+  <!-- Terminal nub — solid cyan -->
+  <rect x="440" y="192" width="56" height="128" rx="16" ry="16"
+        fill="#00ACC1"/>
+
+  <!--
+    Lightning bolt — centred inside the battery.
+    Path: top-point → lower-left → inner-notch-left → bottom-tip
+          → upper-right → inner-notch-right → close
+  -->
+  <path d="M 280,145 L 200,272 H 258 L 230,368 L 312,240 H 252 Z"
+        fill="#FFD600"
+        stroke="#FF8F00" stroke-width="8"
+        stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+    "services": {
+        "trigger_planning": "mdi:battery-sync",
+        "trigger_ml_training": "mdi:brain"
+    }
+}
