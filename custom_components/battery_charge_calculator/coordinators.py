@@ -405,6 +405,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                         if s["tempdata"] is not None
                         else None,
                         "kwh": round(required_power, 4),
+                        "physics_kwh": round(s["physics_kwh"], 4),
                     }
                 )
                 evaluator.add_data(

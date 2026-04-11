@@ -5,13 +5,15 @@ JSON-serialisable attribute list, suitable for graphing with Plotly Graph Card.
 
 Each slot carries:
 
-  ``time``   — ISO-8601 UTC datetime of the 30-min slot start
-  ``temp_c`` — outdoor temperature used for the estimate (°C), or ``null``
-  ``kwh``    — estimated total house consumption for the slot (kWh)
+  ``time``        — ISO-8601 UTC datetime of the 30-min slot start
+  ``temp_c``      — outdoor temperature used for the estimate (°C), or ``null``
+  ``kwh``         — final estimated consumption (ML-corrected when ML is active,
+                    otherwise same as ``physics_kwh``)
+  ``physics_kwh`` — physics-model-only prediction (heating model + base load)
 
-The sensor *state* is the total estimated kWh for the rest of today.
+The sensor *state* is the total estimated kWh for the planning window.
 
-Example Plotly Graph Card config::
+Example Plotly Graph Card config (ML vs physics comparison)::
 
     type: custom:plotly-graph
     title: Forecast power use today
@@ -26,31 +28,38 @@ Example Plotly Graph Card config::
       yaxis:
         title: kWh per 30-min slot
         rangemode: tozero
-      showlegend: true
-    config:
-      displayModeBar: false
-    data:
-      - type: bar
-        name: Estimated use (kWh)
-        x: $ex entities[0].attributes.slots.map(s => s.time)
-        y: $ex entities[0].attributes.slots.map(s => s.kwh)
-        marker:
-          color: steelblue
-          opacity: 0.7
-      - type: scatter
-        mode: lines+markers
-        name: Temperature (°C)
-        x: $ex entities[0].attributes.slots.map(s => s.time)
-        y: $ex entities[0].attributes.slots.filter(s => s.temp_c !== null).map(s => s.temp_c)
-        yaxis: y2
-        line:
-          color: orange
-    layout:
       yaxis2:
         title: Temperature (°C)
         overlaying: y
         side: right
         showgrid: false
+      showlegend: true
+    config:
+      displayModeBar: false
+    data:
+      - type: bar
+        name: ML estimate (kWh)
+        x: $ex entities[0].attributes.slots.map(s => s.time)
+        y: $ex entities[0].attributes.slots.map(s => s.kwh)
+        marker:
+          color: steelblue
+          opacity: 0.8
+      - type: bar
+        name: Physics only (kWh)
+        x: $ex entities[0].attributes.slots.map(s => s.time)
+        y: $ex entities[0].attributes.slots.map(s => s.physics_kwh)
+        marker:
+          color: orange
+          opacity: 0.5
+      - type: scatter
+        mode: lines
+        name: Temperature (°C)
+        x: $ex entities[0].attributes.slots.map(s => s.time)
+        y: $ex entities[0].attributes.slots.map(s => s.temp_c)
+        yaxis: y2
+        line:
+          color: tomato
+          dash: dot
 """
 
 from __future__ import annotations
@@ -88,10 +97,14 @@ class DailyPowerForecastSensor(CoordinatorEntity, SensorEntity):
     def _update_attributes(self) -> None:
         slots: list[dict] = getattr(self.coordinator, "daily_power_forecast", [])
         total = round(sum(s["kwh"] for s in slots), 3)
+        total_physics = round(sum(s.get("physics_kwh", s["kwh"]) for s in slots), 3)
         self._attr_native_value = total if slots else None
         self._attr_extra_state_attributes = {
             "slots": slots,
             "slot_count": len(slots),
+            "total_kwh": total,
+            "total_physics_kwh": total_physics,
+            "ml_adjustment_kwh": round(total - total_physics, 3) if slots else None,
         }
 
     @callback
