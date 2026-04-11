@@ -36,6 +36,52 @@ Yes. You can use the GivEnergy app or portal to override individual charge/disch
 
 ---
 
+## Machine Learning
+
+### Do I need the ML service?
+
+No. The ML service is entirely optional. Without it, the integration uses a physics-based demand model (heat loss + base load). The ML service improves accuracy of the demand forecast over time but is not required to use the integration.
+
+### What does the ML service actually do?
+
+It learns the difference between your home's real electricity consumption and the physics model's prediction, then applies that learned correction at forecast time. After enough data is collected (roughly 10 days), the model starts blending its correction into the demand estimate. With more than ~50 days of data, the ML correction carries full weight.
+
+See [Machine Learning](machine-learning.md) for a detailed explanation.
+
+### How long does training take?
+
+Training typically completes in under 2 minutes even with 25,000+ data points. The service fetches historical data from GivEnergy or Octopus, cleans it, and fits the model in a background thread. Progress is visible in the **ML Model Status** sensor — it changes from `training` to `ready` when done.
+
+### The ML Power Surface sensor shows "Surface data is missing"
+
+This means the trained model was loaded from disk but the power surface has not been computed yet. This normally resolves itself automatically on the next container restart (the surface is computed as part of startup migration). If it persists:
+
+1. Check the container logs for errors: `docker logs bcc-ml-service`
+2. Trigger a fresh retrain from **Developer Tools → Services → `battery_charge_calculator.trigger_ml_training`**
+
+### The ML Model Status shows `service_unreachable`
+
+1. Confirm the container is running: `docker ps | grep bcc-ml-service`
+2. Check the service URL in the integration settings — it must include the port, e.g. `https://192.168.1.50:8765`
+3. Verify the TLS fingerprint in the integration settings matches what the container printed on startup (`docker logs bcc-ml-service | grep fingerprint`)
+4. Ensure the machine running the container is reachable from Home Assistant on your LAN
+
+### Can I use both GivEnergy and Octopus as consumption sources?
+
+Yes. Setting `consumption_source = both` causes the training pipeline to use GivEnergy consumption as the primary series and Octopus grid import as an additional feature column. This gives the model more signal at the cost of requiring both data sources to be available.
+
+### How do I update the ML service?
+
+```bash
+git pull
+docker compose -f development/docker-compose.yml build bcc-ml-service
+docker compose -f development/docker-compose.yml up -d --force-recreate bcc-ml-service
+```
+
+The trained model and credentials in `./config/bcc-ml-data/` are preserved.
+
+---
+
 ## Credentials and security
 
 ### Where are my API keys stored?
@@ -49,6 +95,10 @@ Read-only access to your account is sufficient. The integration only reads rates
 ### Does the integration need a GivEnergy API token?
 
 No. The integration communicates with your GivEnergy inverter via **GivTCP over MQTT**. No GivEnergy API token is required. You only need your inverter serial number, which is used to construct the correct MQTT topics.
+
+### Is the connection to the ML service secure?
+
+Yes. The ML service uses HTTPS with a self-signed TLS certificate. Home Assistant verifies the certificate using its SHA-256 fingerprint (certificate pinning) rather than a certificate authority, which is secure on a local network without requiring a CA or domain name. All endpoints additionally require a Bearer token API key.
 
 ---
 

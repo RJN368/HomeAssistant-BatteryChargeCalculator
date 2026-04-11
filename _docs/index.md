@@ -9,13 +9,17 @@ The Battery Charge Calculator is a Home Assistant custom integration that automa
 3. **Adds your home's base load** and **solar gain** to build a full energy picture
 4. **Runs a genetic algorithm** to calculate the optimal battery charge, discharge, and export shape for the day
 5. **Automatically sends the schedule to GivEnergy** so your battery acts on it without manual intervention
+6. *(Optional)* **Learns from your real consumption history** using a machine-learning model that continuously improves power demand forecasts
 
 ## Requirements
 
 - A [GivEnergy](https://givenergy.co.uk) battery system with [GivTCP](https://github.com/GivEnergy/giv_tcp) and an MQTT broker configured
 - An [Octopus Energy](https://octopus.energy) account on an agile or time-of-use tariff (import and/or export)
 - Home Assistant with the integration installed
+- *(Optional)* Docker on the same network as Home Assistant, to run the ML service
 
 ## Quick start
 
 See the [Setup guide](setup.md) to connect your accounts and get started.
+
+To enable the machine-learning power forecasting feature, see [Machine Learning](machine-learning.md).

@@ -54,3 +54,84 @@ No API token is required. The integration communicates with your inverter via **
 
 1. Log in to [octopus.energy](https://octopus.energy)
 2. Go to **Account → API Access** to find your API key and account number
+
+---
+
+## ML Service setup (optional)
+
+The ML service is a standalone Docker container that learns your home's real consumption patterns and improves power demand forecasts over time. It is entirely optional — the integration works fully without it.
+
+### Prerequisites
+
+- Docker installed on a machine on the same local network as Home Assistant
+- The machine must be reachable by Home Assistant on your LAN (a Raspberry Pi, NAS, or the same host running HA all work)
+
+### Step 1 — Clone the repository and build the image
+
+On the machine where Docker is running:
+
+```bash
+git clone https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator.git
+cd HomeAsssitant-BatteryChargeCalculator/development
+docker compose build bcc-ml-service
+```
+
+### Step 2 — Create the Docker network (first time only)
+
+The service joins the same Docker network as your other HA-adjacent containers:
+
+```bash
+docker network create --subnet=172.19.0.0/24 ha-network
+```
+
+If the network already exists you can skip this step.
+
+### Step 3 — Start the service
+
+```bash
+docker compose up -d bcc-ml-service
+```
+
+### Step 4 — Retrieve the API key and TLS fingerprint
+
+On first start the service generates a random API key and a self-signed TLS certificate. Both are printed to the container log:
+
+```bash
+docker logs bcc-ml-service
+```
+
+Look for lines like:
+
+```
+[BCC ML Service] Generated API key: 3f8a2c…
+[BCC ML Service] TLS certificate SHA-256 fingerprint: 4A:3B:…
+```
+
+Copy both values — you will need them in the next step.
+
+### Step 5 — Enable ML in Home Assistant
+
+1. Go to **Settings → Devices & Services → Battery Charge Calculator → Configure**
+2. Scroll to the **Machine Learning** section and enable it
+3. Enter the service URL (e.g. `https://192.168.1.50:8765`)
+4. Paste the **API key** from the container log
+5. Paste the **TLS fingerprint** from the container log (enables secure certificate pinning without a CA)
+6. Click **Submit**
+
+Home Assistant will immediately connect to the service, send your configuration, and queue the first training run.
+
+!!! tip "Training takes a few minutes"
+    The first training run fetches up to 90 days of historical consumption data from GivEnergy or Octopus. Check progress in **Settings → Devices & Services → Battery Charge Calculator** — the **ML Model Status** sensor will show `ready` when training completes.
+
+### Updating the service
+
+When a new version is released, update and restart the container:
+
+```bash
+git pull
+docker compose build bcc-ml-service
+docker compose up -d --force-recreate bcc-ml-service
+```
+
+The trained model is stored in the `./config/bcc-ml-data/` bind-mount and is preserved across container restarts and rebuilds.
+

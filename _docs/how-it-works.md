@@ -25,6 +25,8 @@ If you have solar panels, the expected solar generation for the day is subtracte
 
 The result is a net demand profile — a half-hourly forecast of how much energy your home will need from the battery or grid at each point in the day.
 
+If the **ML service** is enabled and a trained model is available, the physics-based demand forecast is replaced by the ML model's blended prediction. See [Machine Learning](machine-learning.md) for details.
+
 ---
 
 ## 3. Run the genetic algorithm
@@ -57,3 +59,12 @@ The integration checks every hour whether the current plan should be replaced. C
 - **Plan is nearly exhausted** — fewer than **2 hours** remain on the current plan. Because Octopus Agile rates for the following period may now be available, re-planning ensures the schedule extends far enough into the future.
 
 When none of these conditions is met, the existing plan is left in place and the inverter continues to follow it unchanged. This avoids unnecessary recalculations and prevents the inverter schedule from being disrupted while conditions are still on track.
+
+---
+
+## 6. ML model refresh (optional)
+
+If the ML service is enabled, the integration triggers a model retrain every 30 days so the model keeps learning from your most recent consumption history. You can also trigger a retrain at any time from **Developer Tools → Services → `battery_charge_calculator.trigger_ml_training`**.
+
+See [Machine Learning](machine-learning.md) for a full explanation of how the model works.
+
