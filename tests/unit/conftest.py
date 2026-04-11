@@ -4,6 +4,7 @@ Stubs out all homeassistant imports so the tests can run without a full
 Home Assistant installation.
 """
 
+import os
 import sys
 import types
 from datetime import datetime, timezone
@@ -11,6 +12,15 @@ from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
+# ---------------------------------------------------------------------------
+# Add ml-service to sys.path so tests can import from app.ml.*
+# (ML code has moved from the HA integration into the standalone Docker service)
+# ---------------------------------------------------------------------------
+_ML_SERVICE_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "../../ml-service")
+)
+if _ML_SERVICE_DIR not in sys.path:
+    sys.path.insert(0, _ML_SERVICE_DIR)
 
 # ---------------------------------------------------------------------------
 # Inject homeassistant stub modules before any integration code is loaded

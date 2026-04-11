@@ -30,6 +30,25 @@ services:
       ha-network:
         ipv4_address: 172.19.0.3
 
+  bcc-ml-service:
+    build:
+      context: ../ml-service
+      dockerfile: Dockerfile
+    image: bcc-ml-service:latest
+    container_name: bcc-ml-service
+    ports:
+      - "8765:8765"
+      - "5678:5678"   # debugpy — remove in production
+    environment:
+      - DEBUG_PORT=5678
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./config/bcc-ml-data/:/data
+    networks:
+      ha-network:
+        ipv4_address: 172.19.0.5
+    restart: unless-stopped
+
 networks:
   ha-network:
     external: true

@@ -88,19 +88,21 @@ class MLPowerSurfaceSensor(CoordinatorEntity, SensorEntity):
         self._update_attributes()
 
     def _update_attributes(self) -> None:
-        """Pull the latest surface data from the ML estimator."""
-        estimator = getattr(self.coordinator, "ml_estimator", None)
-        model = getattr(estimator, "_model", None) if estimator else None
+        """Pull the latest surface data from the ML service client."""
+        ml_client = getattr(self.coordinator, "ml_client", None)
 
-        if not estimator or not getattr(estimator, "is_ready", False) or model is None:
+        if not ml_client or not ml_client.is_ready:
             self._attr_native_value = None
             self._attr_extra_state_attributes = {
                 "state": "unavailable",
-                "reason": "ML model not yet trained",
+                "reason": "ML model not yet trained"
+                if ml_client
+                else "ML service not configured",
             }
             return
 
-        surface: dict = getattr(model, "power_surface", {})
+        status = ml_client.get_status()
+        surface = status.get("power_surface")
         if not surface or not surface.get("z"):
             self._attr_native_value = None
             self._attr_extra_state_attributes = {
@@ -113,18 +115,16 @@ class MLPowerSurfaceSensor(CoordinatorEntity, SensorEntity):
             }
             return
 
-        from ..ml.model_trainer import compute_blend_weight  # local import, no HA deps
-
         n_temps = len(surface.get("temps", []))
         n_weeks = len(surface.get("weeks", []))
-        self._attr_native_value = n_temps * n_weeks  # stable non-null state
+        self._attr_native_value = n_temps * n_weeks
         self._attr_extra_state_attributes = {
             "temps": surface["temps"],
             "weeks": surface["weeks"],
             "z": surface["z"],
             "z_physics": surface.get("z_physics", []),
-            "blend_weight": round(compute_blend_weight(model.n_training_samples), 3),
-            "generated_at": model.trained_at.isoformat(),
+            "blend_weight": status.get("blend_weight"),
+            "generated_at": status.get("model_trained_at"),
         }
 
     @callback

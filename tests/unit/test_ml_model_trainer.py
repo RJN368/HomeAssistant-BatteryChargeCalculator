@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from custom_components.battery_charge_calculator.ml.model_trainer import (
+from app.ml.model_trainer import (
     FEATURE_COLUMNS,
     TrainedModel,
     check_model_compatibility,
@@ -17,7 +17,7 @@ from custom_components.battery_charge_calculator.ml.model_trainer import (
     predict_correction,
     train_power_model,
 )
-from custom_components.battery_charge_calculator.ml.model_persistence import (
+from app.ml.model_persistence import (
     get_model_path,
     load_model,
     model_age_days,

@@ -1,0 +1,15 @@
+services:
+  bcc-ml-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bcc-ml-service:latest
+    container_name: bcc-ml-service
+    ports:
+      - "8765:8765"
+    volumes:
+      - bcc-ml-data:/data
+    restart: unless-stopped
+
+volumes:
+  bcc-ml-data:

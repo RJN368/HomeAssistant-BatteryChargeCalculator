@@ -108,16 +108,21 @@
             },
             "ml_settings": {
                 "title": "ML Power Estimation",
-                "description": "Optional: enable the machine-learning power model. Historical consumption data is fetched from the source(s) below and used to train a personalised forecast model.",
+                "description": "Optional: enable the machine-learning power model. The ML service runs as a separate Docker container and handles training and inference. Enter the service URL and API key below.",
                 "data": {
                     "ml_enabled": "Enable ML power estimation",
+                    "ml_service_url": "ML service URL",
+                    "ml_service_api_key": "ML service API key",
+                    "ml_service_tls_fingerprint": "TLS certificate fingerprint (optional)",
                     "ml_consumption_source": "Historical consumption source",
-                    "ml_temp_source": "Temperature data source",
                     "octopus_mpn": "Octopus MPAN (Meter Point Administration Number)",
                     "octopus_meter_serial": "Octopus electricity meter serial",
                     "ml_training_lookback_days": "Training lookback period (days)"
                 },
                 "data_description": {
+                    "ml_service_url": "Full HTTPS URL of your BCC ML Service instance, e.g. https://192.168.1.50:8765",
+                    "ml_service_api_key": "API key printed to the service container log on first start.",
+                    "ml_service_tls_fingerprint": "SHA-256 fingerprint of the service TLS certificate (colon-delimited hex), printed on first start. Leave blank to use OS CA bundle.",
                     "ml_consumption_source": "'GivEnergy' uses the inverter cloud API; 'Octopus' uses your smart meter half-hourly reads via the Octopus Energy API; 'Both' fetches from both and averages.",
                     "octopus_mpn": "13-digit MPAN shown on your electricity bill or Octopus account page (e.g. 1012345678900). Required when source is Octopus or Both.",
                     "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
@@ -238,16 +243,21 @@
             },
             "ml_settings": {
                 "title": "ML Power Estimation",
-                "description": "Optional: enable the machine-learning power model. Historical consumption data is fetched from the source(s) below and used to train a personalised forecast model.",
+                "description": "Optional: enable the machine-learning power model. The ML service runs as a separate Docker container and handles training and inference. Enter the service URL and API key below.",
                 "data": {
                     "ml_enabled": "Enable ML power estimation",
+                    "ml_service_url": "ML service URL",
+                    "ml_service_api_key": "ML service API key",
+                    "ml_service_tls_fingerprint": "TLS certificate fingerprint (optional)",
                     "ml_consumption_source": "Historical consumption source",
-                    "ml_temp_source": "Temperature data source",
                     "octopus_mpn": "Octopus MPAN (Meter Point Administration Number)",
                     "octopus_meter_serial": "Octopus electricity meter serial",
                     "ml_training_lookback_days": "Training lookback period (days)"
                 },
                 "data_description": {
+                    "ml_service_url": "Full HTTPS URL of your BCC ML Service instance, e.g. https://192.168.1.50:8765",
+                    "ml_service_api_key": "API key printed to the service container log on first start.",
+                    "ml_service_tls_fingerprint": "SHA-256 fingerprint of the service TLS certificate (colon-delimited hex), printed on first start. Leave blank to use OS CA bundle.",
                     "ml_consumption_source": "'GivEnergy' uses the inverter cloud API; 'Octopus' uses your smart meter half-hourly reads via the Octopus Energy API; 'Both' fetches from both and averages.",
                     "octopus_mpn": "13-digit MPAN shown on your electricity bill or Octopus account page (e.g. 1012345678900). Required when source is Octopus or Both.",
                     "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
@@ -301,12 +311,7 @@
                 "octopus": "Octopus Energy (smart meter reads)",
                 "both": "Both (average)"
             }
-        },
-        "ml_temp_source": {
-            "options": {
-                "openmeteo": "Open-Meteo (automatic, free)",
-                "ha_entity": "Home Assistant sensor entity"
-            }
         }
     }
+}
 }

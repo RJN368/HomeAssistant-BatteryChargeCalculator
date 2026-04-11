@@ -174,21 +174,27 @@ def _building_estimate_schema(
 
 def _ml_settings_schema(
     ml_enabled: bool = False,
+    service_url: str = const.DEFAULT_ML_SERVICE_URL,
+    api_key: str = const.DEFAULT_ML_SERVICE_API_KEY,
+    tls_fingerprint: str = const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
     consumption_source: str = const.DEFAULT_ML_CONSUMPTION_SOURCE,
-    temp_source: str = const.DEFAULT_ML_TEMP_SOURCE,
     octopus_mpan: str = "",
     octopus_meter_serial: str = const.DEFAULT_OCTOPUS_METER_SERIAL,
     lookback_days: int = const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
 ) -> vol.Schema:
     """Schema for the ML power estimation settings step.
 
-    All fields are optional — ML is disabled by default (D-16).
-    The octopus_mpan and octopus_meter_serial fields are only used when
-    consumption_source is 'octopus' or 'both'.
+    Points to an external BCC ML Service instance.  All fields default to
+    safe values so existing config entries continue to work unchanged (D-16).
     """
     return vol.Schema(
         {
             vol.Optional(const.ML_ENABLED, default=ml_enabled): cv.boolean,
+            vol.Optional(const.ML_SERVICE_URL, default=service_url): cv.string,
+            vol.Optional(const.ML_SERVICE_API_KEY, default=api_key): cv.string,
+            vol.Optional(
+                const.ML_SERVICE_TLS_FINGERPRINT, default=tls_fingerprint
+            ): cv.string,
             vol.Optional(
                 const.ML_CONSUMPTION_SOURCE, default=consumption_source
             ): SelectSelector(
@@ -199,15 +205,6 @@ def _ml_settings_schema(
                         const.ML_CONSUMPTION_SOURCE_BOTH,
                     ],
                     translation_key="ml_consumption_source",
-                )
-            ),
-            vol.Optional(const.ML_TEMP_SOURCE, default=temp_source): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        const.ML_TEMP_SOURCE_OPENMETEO,
-                        const.ML_TEMP_SOURCE_HA_ENTITY,
-                    ],
-                    translation_key="ml_temp_source",
                 )
             ),
             vol.Optional(const.OCTOPUS_MPN, default=octopus_mpan): cv.string,
@@ -427,18 +424,25 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
     async def async_step_ml_settings(self, user_input=None):
         """ML power estimation settings step.
 
-        Configures the optional ML feature. All fields default to off/defaults
+        Configures the optional ML feature.  All fields default to off/defaults
         so existing users are unaffected when this step is introduced (D-16).
         """
         if user_input is not None:
             # Update both _heating_data and options to ensure persistence
             ml_settings = {
                 const.ML_ENABLED: user_input.get(const.ML_ENABLED, False),
+                const.ML_SERVICE_URL: user_input.get(
+                    const.ML_SERVICE_URL, const.DEFAULT_ML_SERVICE_URL
+                ),
+                const.ML_SERVICE_API_KEY: user_input.get(
+                    const.ML_SERVICE_API_KEY, const.DEFAULT_ML_SERVICE_API_KEY
+                ),
+                const.ML_SERVICE_TLS_FINGERPRINT: user_input.get(
+                    const.ML_SERVICE_TLS_FINGERPRINT,
+                    const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
+                ),
                 const.ML_CONSUMPTION_SOURCE: user_input.get(
                     const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
-                ),
-                const.ML_TEMP_SOURCE: user_input.get(
-                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
                 ),
                 const.OCTOPUS_MPN: user_input.get(const.OCTOPUS_MPN, ""),
                 const.OCTOPUS_METER_SERIAL: user_input.get(
@@ -459,11 +463,18 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             step_id="ml_settings",
             data_schema=_ml_settings_schema(
                 ml_enabled=self._heating_data.get(const.ML_ENABLED, False),
+                service_url=self._heating_data.get(
+                    const.ML_SERVICE_URL, const.DEFAULT_ML_SERVICE_URL
+                ),
+                api_key=self._heating_data.get(
+                    const.ML_SERVICE_API_KEY, const.DEFAULT_ML_SERVICE_API_KEY
+                ),
+                tls_fingerprint=self._heating_data.get(
+                    const.ML_SERVICE_TLS_FINGERPRINT,
+                    const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
+                ),
                 consumption_source=self._heating_data.get(
                     const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
-                ),
-                temp_source=self._heating_data.get(
-                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
                 ),
                 octopus_mpan=self._heating_data.get(const.OCTOPUS_MPN, ""),
                 octopus_meter_serial=self._heating_data.get(
@@ -766,18 +777,25 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
     async def async_step_ml_settings(self, user_input=None):
         """ML power estimation settings step.
 
-        Configures the optional ML feature. All fields default to off/defaults
+        Configures the optional ML feature.  All fields default to off/defaults
         so existing users are unaffected when this step is introduced (D-16).
         """
         if user_input is not None:
             self.options.update(
                 {
                     const.ML_ENABLED: user_input.get(const.ML_ENABLED, False),
+                    const.ML_SERVICE_URL: user_input.get(
+                        const.ML_SERVICE_URL, const.DEFAULT_ML_SERVICE_URL
+                    ),
+                    const.ML_SERVICE_API_KEY: user_input.get(
+                        const.ML_SERVICE_API_KEY, const.DEFAULT_ML_SERVICE_API_KEY
+                    ),
+                    const.ML_SERVICE_TLS_FINGERPRINT: user_input.get(
+                        const.ML_SERVICE_TLS_FINGERPRINT,
+                        const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
+                    ),
                     const.ML_CONSUMPTION_SOURCE: user_input.get(
                         const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
-                    ),
-                    const.ML_TEMP_SOURCE: user_input.get(
-                        const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
                     ),
                     const.OCTOPUS_MPN: user_input.get(const.OCTOPUS_MPN, ""),
                     const.OCTOPUS_METER_SERIAL: user_input.get(
@@ -795,11 +813,18 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
             step_id="ml_settings",
             data_schema=_ml_settings_schema(
                 ml_enabled=self.options.get(const.ML_ENABLED, False),
+                service_url=self.options.get(
+                    const.ML_SERVICE_URL, const.DEFAULT_ML_SERVICE_URL
+                ),
+                api_key=self.options.get(
+                    const.ML_SERVICE_API_KEY, const.DEFAULT_ML_SERVICE_API_KEY
+                ),
+                tls_fingerprint=self.options.get(
+                    const.ML_SERVICE_TLS_FINGERPRINT,
+                    const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
+                ),
                 consumption_source=self.options.get(
                     const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
-                ),
-                temp_source=self.options.get(
-                    const.ML_TEMP_SOURCE, const.DEFAULT_ML_TEMP_SOURCE
                 ),
                 octopus_mpan=self.options.get(const.OCTOPUS_MPN, ""),
                 octopus_meter_serial=self.options.get(

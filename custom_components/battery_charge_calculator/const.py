@@ -123,23 +123,27 @@ ATTR_ENABLED = "enabled"
 ML_ENABLED = "ml_enabled"
 DEFAULT_ML_ENABLED = False
 
+# ML Service connection
+ML_SERVICE_URL = "ml_service_url"
+ML_SERVICE_API_KEY = "ml_service_api_key"
+ML_SERVICE_TLS_FINGERPRINT = (
+    "ml_service_tls_fingerprint"  # optional; enables cert-pinning
+)
+
+DEFAULT_ML_SERVICE_URL = ""
+DEFAULT_ML_SERVICE_API_KEY = ""
+DEFAULT_ML_SERVICE_TLS_FINGERPRINT = ""
+
 # Data source selection
 ML_CONSUMPTION_SOURCE = "ml_consumption_source"
-ML_TEMP_SOURCE = "ml_temp_source"
-ML_TEMP_ENTITY_ID = "ml_temp_entity_id"  # only used when ML_TEMP_SOURCE == "ha_entity"
 
 # Valid values for ML_CONSUMPTION_SOURCE
 ML_CONSUMPTION_SOURCE_GIVENERGY = "givenergy"
 ML_CONSUMPTION_SOURCE_OCTOPUS = "octopus"
 ML_CONSUMPTION_SOURCE_BOTH = "both"
 
-# Valid values for ML_TEMP_SOURCE
-ML_TEMP_SOURCE_OPENMETEO = "openmeteo"
-ML_TEMP_SOURCE_HA_ENTITY = "ha_entity"
-
 # Defaults
 DEFAULT_ML_CONSUMPTION_SOURCE = ML_CONSUMPTION_SOURCE_GIVENERGY
-DEFAULT_ML_TEMP_SOURCE = ML_TEMP_SOURCE_OPENMETEO
 
 # Octopus meter serial — optional, only needed for Octopus consumption source.
 # Distinct from MPAN. Found on the Octopus account page or auto-discovered.

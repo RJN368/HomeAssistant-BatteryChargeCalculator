@@ -80,11 +80,10 @@ class AnnualForecastSensor(CoordinatorEntity, SensorEntity):
         return result
 
     def _update_attributes(self) -> None:
-        """Pull the latest forecast data from the coordinator's ml_estimator."""
-        estimator = getattr(self.coordinator, "ml_estimator", None)
-        model = getattr(estimator, "_model", None) if estimator else None
+        """Pull the latest forecast data from the coordinator's ml_client."""
+        ml_client = getattr(self.coordinator, "ml_client", None)
 
-        if not estimator or not getattr(estimator, "is_ready", False) or model is None:
+        if not ml_client or not ml_client.is_ready:
             self._attr_native_value = None
             self._attr_extra_state_attributes = {
                 "state": "unavailable",
@@ -92,7 +91,9 @@ class AnnualForecastSensor(CoordinatorEntity, SensorEntity):
             }
             return
 
-        doy_daily_kwh: list[float] | None = getattr(model, "doy_daily_kwh", None)
+        status = ml_client.get_status()
+        doy_daily_kwh: list[float] | None = status.get("doy_daily_kwh")
+        model = status  # use the status dict as a proxy for model fields
         if not doy_daily_kwh:
             # Model was trained before this field was introduced
             self._attr_native_value = None
@@ -110,9 +111,9 @@ class AnnualForecastSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_value = forecast[0]["kwh"] if forecast else None
         self._attr_extra_state_attributes = {
             "forecast": forecast,
-            "generated_at": model.trained_at.isoformat(),
-            "training_samples": model.n_training_samples,
-            "model_type": model.model_type,
+            "generated_at": model.get("model_trained_at"),
+            "training_samples": model.get("model_n_training_samples"),
+            "model_type": model.get("model_type"),
             "needs_retrain": False,
         }
 

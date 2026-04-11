@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from custom_components.battery_charge_calculator.ml.data_pipeline import (
+from app.ml.data_pipeline import (
     detect_ev_blocks,
 )
 

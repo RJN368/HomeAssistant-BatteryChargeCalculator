@@ -385,7 +385,9 @@ def predict_correction(
     return np.clip(raw, -cap, cap)
 
 
-def compute_power_surface(model: "TrainedModel", physics_calc: Any) -> dict:
+def compute_power_surface(
+    model: "TrainedModel", physics_calc: Any | None = None
+) -> dict:
     """Build the 3-D power surface for ``MLPowerSurfaceSensor``.
 
     Sweeps 52 representative weeks × 16 temperature points and computes the
@@ -448,7 +450,11 @@ def compute_power_surface(model: "TrainedModel", physics_calc: Any) -> dict:
             day_start = week_dt.replace(hour=0, minute=0, second=0, microsecond=0)
             for si in range(n_slots):
                 slot_dt = day_start + timedelta(minutes=si * 30)
-                physics_kwh = physics_calc.from_temp_and_time(slot_dt, temp)
+                physics_kwh = (
+                    physics_calc.from_temp_and_time(slot_dt, temp)
+                    if physics_calc is not None
+                    else 0.0
+                )
                 physics_matrix[wi, ti, si] = physics_kwh
 
                 hour = slot_dt.hour
@@ -507,7 +513,7 @@ def compute_power_surface(model: "TrainedModel", physics_calc: Any) -> dict:
         "temps": temps,
         "weeks": weeks,
         "z": z,
-        "z_physics": z_physics,
+        "z_physics": z_physics if physics_calc is not None else None,
     }
 
 

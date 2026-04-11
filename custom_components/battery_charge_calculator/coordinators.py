@@ -81,34 +81,71 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self._timer_unsub = None
         self._ml_retrain_unsub = None
 
-        # ML Power Estimator — only created when ML_ENABLED = True (D-16)
-        self.ml_estimator = None
-        self.ml_sklearn_missing = False  # True when sklearn not installed
+        # ML Service Client — thin HTTPS client to the external BCC ML Service (D-16)
+        self.ml_client = None
         if entry.options.get(const.ML_ENABLED, False):
-            from .ml import SKLEARN_AVAILABLE
+            service_url = entry.options.get(const.ML_SERVICE_URL, "")
+            api_key = entry.options.get(const.ML_SERVICE_API_KEY, "")
+            if service_url and api_key:
+                from .ml.ml_service_client import MLServiceClient
 
-            if not SKLEARN_AVAILABLE:
-                self.ml_sklearn_missing = True
-                _LOGGER.warning(
-                    "scikit-learn is not installed — ML power estimation is disabled. "
-                    "scikit-learn cannot be installed on Python 3.14 in HA Core 2026.3+ "
-                    "because no binary wheels are available and the source build requires "
-                    "Meson, which is absent from the HA environment. "
-                    "ML features will remain disabled until scikit-learn is available. "
-                    "See README for details."
+                self.ml_client = MLServiceClient(
+                    base_url=service_url,
+                    api_key=api_key,
+                    tls_fingerprint=entry.options.get(
+                        const.ML_SERVICE_TLS_FINGERPRINT, ""
+                    ),
+                    config=self._build_ml_service_config(entry, hass),
                 )
             else:
-                from .ml.ml_power_estimator import MLPowerEstimator
+                _LOGGER.warning(
+                    "ML enabled but ML_SERVICE_URL or ML_SERVICE_API_KEY is not set — "
+                    "ML power estimation disabled until the service is configured."
+                )
 
-                self.ml_estimator = MLPowerEstimator(hass, entry)
-                # Inject the power calculator so estimator can build physics series
-                self.ml_estimator.set_physics_calculator(self.power_calculator)
+    def _build_ml_service_config(self, entry, hass=None) -> dict:
+        """Build the config dict sent to POST /configure on the ML service."""
+        opts = entry.options
+        return {
+            "givenergy_api_key": opts.get(const.GIVENERGY_API_TOKEN, ""),
+            "givenergy_inverter_serial": opts.get(const.GIVENERGY_SERIAL_NUMBER, ""),
+            "octopus_api_key": opts.get(const.OCTOPUS_APIKEY, ""),
+            "octopus_account_id": opts.get(const.OCTOPUS_ACCOUNT_NUMBER, ""),
+            "octopus_mpan": opts.get(const.OCTOPUS_MPN, ""),
+            "octopus_meter_serial": opts.get(const.OCTOPUS_METER_SERIAL, ""),
+            "consumption_source": opts.get(
+                const.ML_CONSUMPTION_SOURCE, const.DEFAULT_ML_CONSUMPTION_SOURCE
+            ),
+            "training_lookback_days": int(
+                opts.get(
+                    const.ML_TRAINING_LOOKBACK_DAYS,
+                    const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                )
+            ),
+            "heating_type": opts.get(const.HEATING_TYPE, const.DEFAULT_HEATING_TYPE),
+            "cop": float(opts.get(const.HEATING_COP, const.DEFAULT_HEATING_COP)),
+            "heat_loss_w_per_k": float(
+                opts.get(const.HEATING_HEAT_LOSS, const.DEFAULT_HEATING_HEAT_LOSS)
+                or 0.0
+            ),
+            "indoor_temp_c": float(
+                opts.get(const.HEATING_INDOOR_TEMP, const.DEFAULT_HEATING_INDOOR_TEMP)
+            ),
+            "heating_flow_temp_c": float(
+                opts.get(const.HEATING_FLOW_TEMP, const.DEFAULT_HEATING_FLOW_TEMP)
+            ),
+            "latitude": (hass or self.hass).config.latitude,
+            "longitude": (hass or self.hass).config.longitude,
+        }
 
     async def _async_setup(self) -> None:
         """Run once during async_config_entry_first_refresh to start planning."""
-        # Start ML estimator (loads or trains model in background — D-5/D-16)
-        if self.ml_estimator is not None:
-            await self.ml_estimator.async_start()
+        # Connect to ML service (configure + load model status — D-16)
+        if self.ml_client is not None:
+            try:
+                await self.ml_client.async_start()
+            except Exception as exc:
+                _LOGGER.warning("ML service unreachable at startup: %s", exc)
         await self.octopus_state_change_listener(None)
         self._timer_unsub = async_track_time_interval(
             self.hass,
@@ -196,14 +233,12 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         if self._ml_retrain_unsub is not None:
             self._ml_retrain_unsub()
             self._ml_retrain_unsub = None
-        if self.ml_estimator is not None:
-            await self.ml_estimator.async_shutdown()
         await super().async_shutdown()
 
     async def _async_maybe_retrain_ml(self) -> None:
         """Trigger ML retraining when the monthly schedule fires (D-9)."""
-        if self.ml_estimator is not None:
-            await self.ml_estimator.async_trigger_retrain()
+        if self.ml_client is not None:
+            await self.ml_client.async_trigger_retrain()
 
     async def octopus_state_change_listener(self, event):
         _LOGGER.debug("octopus_state_change_listener")
@@ -289,8 +324,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 battery_capacity_kwh=self.battery_capacity_kwh,
             )
 
-            daily_forecast: list[dict] = []
-
+            # Pass 1 — collect per-slot data and physics estimates
+            slot_data: list[dict] = []
             for index, value in enumerate(range(0, int(max_range), 30)):
                 current_time = time_now + timedelta(minutes=value)
 
@@ -328,29 +363,64 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     == current_time.strftime("%d:%H"),
                 )
 
-                required_power = self.power_calculator.from_temp_and_time(
+                physics_kwh = self.power_calculator.from_temp_and_time(
                     current_time, tempdata
                 )
-                # ML correction (D-1): blend physics estimate with ML residual correction
-                if self.ml_estimator and self.ml_estimator.is_ready:
-                    required_power = self.ml_estimator.predict(
-                        current_time, tempdata, required_power
-                    )
-
-                daily_forecast.append(
+                slot_data.append(
                     {
-                        "time": current_time.isoformat(),
-                        "temp_c": round(tempdata, 1) if tempdata is not None else None,
-                        "kwh": round(required_power, 4),
+                        "current_time": current_time,
+                        "tempdata": tempdata,
+                        "ratedata": ratedata,
+                        "export_ratedata": export_ratedata,
+                        "solardata": solardata,
+                        "physics_kwh": physics_kwh,
                     }
                 )
 
+            # ML batch correction (D-1) — single HTTPS call to external service
+            ml_corrections: list[float] = []
+            if self.ml_client and self.ml_client.is_ready:
+                predict_inputs = [
+                    {
+                        "slot_time": s["current_time"].isoformat(),
+                        "temp_c": s["tempdata"],
+                        "physics_kwh": s["physics_kwh"],
+                    }
+                    for s in slot_data
+                ]
+                ml_corrections = await self.ml_client.async_predict_batch(
+                    predict_inputs
+                )
+
+            # Pass 2 — build forecast and evaluator with corrected values
+            daily_forecast: list[dict] = []
+            for i, s in enumerate(slot_data):
+                required_power = (
+                    ml_corrections[i] if i < len(ml_corrections) else s["physics_kwh"]
+                )
+                daily_forecast.append(
+                    {
+                        "time": s["current_time"].isoformat(),
+                        "temp_c": round(s["tempdata"], 1)
+                        if s["tempdata"] is not None
+                        else None,
+                        "kwh": round(required_power, 4),
+                    }
+                )
                 evaluator.add_data(
-                    current_time, ratedata, export_ratedata, required_power, solardata
+                    s["current_time"],
+                    s["ratedata"],
+                    s["export_ratedata"],
+                    required_power,
+                    s["solardata"],
                 )
 
             self.timeslots, self.totalcost = evaluator.evaluate()
             self.daily_power_forecast = daily_forecast
+
+            # Refresh ML service status for diagnostic sensors
+            if self.ml_client is not None:
+                await self.ml_client.async_refresh_status()
 
             try:
                 await self.async_refresh()

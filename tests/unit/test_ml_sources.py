@@ -13,17 +13,17 @@ import aiohttp
 import pandas as pd
 import pytest
 
-from custom_components.battery_charge_calculator.ml.sources.base import (
+from app.ml.sources.base import (
     HistoricalDataSource,
 )
-from custom_components.battery_charge_calculator.ml.sources.givenergy_history import (
+from app.ml.sources.givenergy_history import (
     GivEnergyHistorySource,
     _normalise_to_utc,
 )
-from custom_components.battery_charge_calculator.ml.sources.octopus_history import (
+from app.ml.sources.octopus_history import (
     OctopusHistorySource,
 )
-from custom_components.battery_charge_calculator.ml.sources.openmeteo_history import (
+from app.ml.sources.openmeteo_history import (
     OpenMeteoHistorySource,
 )
 
