@@ -66,15 +66,81 @@ The ML service is a standalone Docker container that learns your home's real con
 - Docker installed on a machine on the same local network as Home Assistant
 - The machine must be reachable by Home Assistant on your LAN (a Raspberry Pi, NAS, or the same host running HA all work)
 
-### Step 1 — Clone the repository and build the image
+### Step 1 — Get the container image onto your host
 
-On the machine where Docker is running:
+Each release automatically publishes a pre-built image to the GitHub Container Registry (GHCR). You can pull it directly, build from source, or transfer a locally-built image — whichever suits your setup.
+
+#### Option A — Pull from GHCR (recommended)
+
+The easiest option on any machine with internet access:
+
+```bash
+docker pull ghcr.io/rjn368/bcc-ml-service:latest
+```
+
+To pin to a specific release version (recommended for production):
+
+```bash
+docker pull ghcr.io/rjn368/bcc-ml-service:1.2.3
+```
+
+**Subsequent updates:**
+
+```bash
+docker pull ghcr.io/rjn368/bcc-ml-service:latest
+docker compose up -d --force-recreate bcc-ml-service
+```
+
+The trained model in the `bcc-ml-data` volume is preserved across updates.
+
+#### Option B — Build directly on the target machine
+
+Clone the repo onto the machine where Docker is running, then build there:
 
 ```bash
 git clone https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator.git
-cd HomeAsssitant-BatteryChargeCalculator/development
+cd HomeAsssitant-BatteryChargeCalculator/ml-service
 docker compose build bcc-ml-service
+docker compose up -d bcc-ml-service
 ```
+
+**Subsequent updates** — pull the latest code and rebuild in place:
+
+```bash
+cd HomeAsssitant-BatteryChargeCalculator/ml-service
+git pull
+docker compose build bcc-ml-service
+docker compose up -d --force-recreate bcc-ml-service
+```
+
+#### Option C — Build on your dev machine, ship as a tar file
+
+If the HA host has no internet access, build the image locally and transfer it.
+
+**Step-by-step via a file:**
+
+```bash
+# 1. Build on your dev machine
+cd ml-service
+docker compose build bcc-ml-service
+
+# 2. Export to a compressed tar
+docker save bcc-ml-service | gzip > bcc-ml-service.tar.gz
+
+# 3. Copy to the HA host
+scp bcc-ml-service.tar.gz user@ha-host:~
+
+# 4. On the HA host — load the image
+docker load < bcc-ml-service.tar.gz
+```
+
+**One-shot via SSH (no intermediate file):**
+
+```bash
+docker save bcc-ml-service | ssh user@ha-host docker load
+```
+
+After loading, copy `docker-compose.yml` to the HA host and continue from Step 2 below.
 
 ### Step 2 — Create the Docker network (first time only)
 
@@ -123,15 +189,5 @@ Home Assistant will immediately connect to the service, send your configuration,
 !!! tip "Training takes a few minutes"
     The first training run fetches up to 90 days of historical consumption data from GivEnergy or Octopus. Check progress in **Settings → Devices & Services → Battery Charge Calculator** — the **ML Model Status** sensor will show `ready` when training completes.
 
-### Updating the service
 
-When a new version is released, update and restart the container:
-
-```bash
-git pull
-docker compose build bcc-ml-service
-docker compose up -d --force-recreate bcc-ml-service
-```
-
-The trained model is stored in the `./config/bcc-ml-data/` bind-mount and is preserved across container restarts and rebuilds.
 
