@@ -9,6 +9,7 @@ nav:
   - Sensors: sensors.md
   - How It Works: how-it-works.md
   - Machine Learning: machine-learning.md
+  - Power Calculator: power_calculator-enhancement.md
   - FAQ: faq.md
 
 # extra:
