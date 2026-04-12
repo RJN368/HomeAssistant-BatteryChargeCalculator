@@ -1,0 +1,1065 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/setup/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../sensors/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Setup - Home Assistant Battery Charge Calculator</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#setup" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-header__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Home Assistant Battery Charge Calculator
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Setup
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-nav__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Home Assistant Battery Charge Calculator
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hacs-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      HACS (recommended)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      Manual
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-your-api-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting your API credentials
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting your API credentials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#givenergy" class="md-nav__link">
+    <span class="md-ellipsis">
+      GivEnergy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#octopus-energy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Octopus Energy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-service-setup-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Service setup (optional)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML Service setup (optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-get-the-container-image-onto-your-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1 — Get the container image onto your host
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — Get the container image onto your host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-pull-from-ghcr-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option A — Pull from GHCR (recommended)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-build-directly-on-the-target-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option B — Build directly on the target machine
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-c-build-on-your-dev-machine-ship-as-a-tar-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option C — Build on your dev machine, ship as a tar file
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-create-the-docker-network-first-time-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2 — Create the Docker network (first time only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-start-the-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3 — Start the service
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-retrieve-the-api-key-and-tls-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4 — Retrieve the API key and TLS fingerprint
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-enable-ml-in-home-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 5 — Enable ML in Home Assistant
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sensors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How It Works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../machine-learning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Machine Learning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power_calculator-enhancement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Power Calculator
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hacs-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      HACS (recommended)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      Manual
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-your-api-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting your API credentials
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting your API credentials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#givenergy" class="md-nav__link">
+    <span class="md-ellipsis">
+      GivEnergy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#octopus-energy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Octopus Energy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-service-setup-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Service setup (optional)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML Service setup (optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prerequisites
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-get-the-container-image-onto-your-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1 — Get the container image onto your host
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — Get the container image onto your host">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-pull-from-ghcr-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option A — Pull from GHCR (recommended)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-build-directly-on-the-target-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option B — Build directly on the target machine
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-c-build-on-your-dev-machine-ship-as-a-tar-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option C — Build on your dev machine, ship as a tar file
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-create-the-docker-network-first-time-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2 — Create the Docker network (first time only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-start-the-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3 — Start the service
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-retrieve-the-api-key-and-tls-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4 — Retrieve the API key and TLS fingerprint
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-enable-ml-in-home-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 5 — Enable ML in Home Assistant
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h1>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
+<h3 id="hacs-recommended">HACS (recommended)<a class="headerlink" href="#hacs-recommended" title="Permanent link">#</a></h3>
+<ol>
+<li>Open HACS in your Home Assistant instance</li>
+<li>Go to <strong>Integrations</strong> and click the menu in the top-right corner</li>
+<li>Select <strong>Custom repositories</strong> and add:</li>
+<li><strong>Repository:</strong> <code>https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator</code></li>
+<li><strong>Category:</strong> Integration</li>
+<li>Find <strong>Battery Charge Calculator</strong> in HACS and click <strong>Download</strong></li>
+<li>Restart Home Assistant</li>
+</ol>
+<h3 id="manual">Manual<a class="headerlink" href="#manual" title="Permanent link">#</a></h3>
+<ol>
+<li>Download the latest <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator/releases">release</a></li>
+<li>Copy the <code>custom_components/battery_charge_calculator</code> folder into your Home Assistant <code>config/custom_components/</code> directory</li>
+<li>Restart Home Assistant</li>
+</ol>
+<hr />
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
+<p>After installation, add the integration via the Home Assistant UI:</p>
+<ol>
+<li>Go to <strong>Settings → Devices &amp; Services → Add Integration</strong></li>
+<li>Search for <strong>Battery Charge Calculator</strong></li>
+<li>Fill in the required fields:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GivEnergy Serial Number</strong></td>
+<td>The serial number of your GivEnergy inverter (used to address MQTT topics via GivTCP)</td>
+</tr>
+<tr>
+<td><strong>Octopus Account Number</strong></td>
+<td>Your Octopus Energy account number (e.g. <code>A-XXXXXXXX</code>)</td>
+</tr>
+<tr>
+<td><strong>Octopus API Key</strong></td>
+<td>Your Octopus Energy API key (from <a href="https://octopus.energy/dashboard">octopus.energy/dashboard</a>)</td>
+</tr>
+<tr>
+<td><strong>Simulate Only</strong></td>
+<td>If enabled, the schedule is calculated but <strong>not</strong> sent to GivEnergy — useful for testing</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">GivTCP and MQTT required</p>
+<p>This integration communicates with your GivEnergy inverter via <strong>GivTCP</strong> over <strong>MQTT</strong> — no GivEnergy API token is needed. You must have <a href="https://github.com/GivEnergy/giv_tcp">GivTCP</a> running and an MQTT broker (e.g. Mosquitto) set up and connected to Home Assistant before adding this integration.</p>
+</div>
+<hr />
+<h2 id="getting-your-api-credentials">Getting your API credentials<a class="headerlink" href="#getting-your-api-credentials" title="Permanent link">#</a></h2>
+<h3 id="givenergy">GivEnergy<a class="headerlink" href="#givenergy" title="Permanent link">#</a></h3>
+<p>No API token is required. The integration communicates with your inverter via <strong>GivTCP</strong> over <strong>MQTT</strong>.</p>
+<ol>
+<li>Install and configure <a href="https://github.com/GivEnergy/giv_tcp">GivTCP</a> (available as a Home Assistant add-on or Docker container)</li>
+<li>Ensure GivTCP is connected to an MQTT broker (e.g. the Mosquitto add-on in Home Assistant)</li>
+<li>Your inverter serial number is shown in the GivTCP configuration or on the GivEnergy portal under <strong>My Devices</strong></li>
+</ol>
+<h3 id="octopus-energy">Octopus Energy<a class="headerlink" href="#octopus-energy" title="Permanent link">#</a></h3>
+<ol>
+<li>Log in to <a href="https://octopus.energy">octopus.energy</a></li>
+<li>Go to <strong>Account → API Access</strong> to find your API key and account number</li>
+</ol>
+<hr />
+<h2 id="ml-service-setup-optional">ML Service setup (optional)<a class="headerlink" href="#ml-service-setup-optional" title="Permanent link">#</a></h2>
+<p>The ML service is a standalone Docker container that learns your home's real consumption patterns and improves power demand forecasts over time. It is entirely optional — the integration works fully without it.</p>
+<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h3>
+<ul>
+<li>Docker installed on a machine on the same local network as Home Assistant</li>
+<li>The machine must be reachable by Home Assistant on your LAN (a Raspberry Pi, NAS, or the same host running HA all work)</li>
+</ul>
+<h3 id="step-1-get-the-container-image-onto-your-host">Step 1 — Get the container image onto your host<a class="headerlink" href="#step-1-get-the-container-image-onto-your-host" title="Permanent link">#</a></h3>
+<p>Each release automatically publishes a pre-built image to the GitHub Container Registry (GHCR). You can pull it directly, build from source, or transfer a locally-built image — whichever suits your setup.</p>
+<h4 id="option-a-pull-from-ghcr-recommended">Option A — Pull from GHCR (recommended)<a class="headerlink" href="#option-a-pull-from-ghcr-recommended" title="Permanent link">#</a></h4>
+<p>The easiest option on any machine with internet access:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/rjn368/bcc-ml-service:latest
+</code></pre></div>
+<p>To pin to a specific release version (recommended for production):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/rjn368/bcc-ml-service:1.2.3
+</code></pre></div>
+<p><strong>Subsequent updates:</strong></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/rjn368/bcc-ml-service:latest
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--force-recreate<span class="w"> </span>bcc-ml-service
+</code></pre></div>
+<p>The trained model in the <code>bcc-ml-data</code> volume is preserved across updates.</p>
+<h4 id="option-b-build-directly-on-the-target-machine">Option B — Build directly on the target machine<a class="headerlink" href="#option-b-build-directly-on-the-target-machine" title="Permanent link">#</a></h4>
+<p>Clone the repo onto the machine where Docker is running, then build there:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator.git
+<span class="nb">cd</span><span class="w"> </span>HomeAssistant-BatteryChargeCalculator/ml-service
+docker<span class="w"> </span>compose<span class="w"> </span>build<span class="w"> </span>bcc-ml-service
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>bcc-ml-service
+</code></pre></div>
+<p><strong>Subsequent updates</strong> — pull the latest code and rebuild in place:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>HomeAssistant-BatteryChargeCalculator/ml-service
+git<span class="w"> </span>pull
+docker<span class="w"> </span>compose<span class="w"> </span>build<span class="w"> </span>bcc-ml-service
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--force-recreate<span class="w"> </span>bcc-ml-service
+</code></pre></div>
+<h4 id="option-c-build-on-your-dev-machine-ship-as-a-tar-file">Option C — Build on your dev machine, ship as a tar file<a class="headerlink" href="#option-c-build-on-your-dev-machine-ship-as-a-tar-file" title="Permanent link">#</a></h4>
+<p>If the HA host has no internet access, build the image locally and transfer it.</p>
+<p><strong>Step-by-step via a file:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build on your dev machine</span>
+<span class="nb">cd</span><span class="w"> </span>ml-service
+docker<span class="w"> </span>compose<span class="w"> </span>build<span class="w"> </span>bcc-ml-service
+
+<span class="c1"># 2. Export to a compressed tar</span>
+docker<span class="w"> </span>save<span class="w"> </span>bcc-ml-service<span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="w"> </span>&gt;<span class="w"> </span>bcc-ml-service.tar.gz
+
+<span class="c1"># 3. Copy to the HA host</span>
+scp<span class="w"> </span>bcc-ml-service.tar.gz<span class="w"> </span>user@ha-host:~
+
+<span class="c1"># 4. On the HA host — load the image</span>
+docker<span class="w"> </span>load<span class="w"> </span>&lt;<span class="w"> </span>bcc-ml-service.tar.gz
+</code></pre></div>
+<p><strong>One-shot via SSH (no intermediate file):</strong></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>save<span class="w"> </span>bcc-ml-service<span class="w"> </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span>user@ha-host<span class="w"> </span>docker<span class="w"> </span>load
+</code></pre></div>
+<p>After loading, copy <code>docker-compose.yml</code> to the HA host and continue from Step 2 below.</p>
+<h3 id="step-2-create-the-docker-network-first-time-only">Step 2 — Create the Docker network (first time only)<a class="headerlink" href="#step-2-create-the-docker-network-first-time-only" title="Permanent link">#</a></h3>
+<p>The service joins the same Docker network as your other HA-adjacent containers:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>--subnet<span class="o">=</span><span class="m">172</span>.19.0.0/24<span class="w"> </span>ha-network
+</code></pre></div>
+<p>If the network already exists you can skip this step.</p>
+<h3 id="step-3-start-the-service">Step 3 — Start the service<a class="headerlink" href="#step-3-start-the-service" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>bcc-ml-service
+</code></pre></div>
+<h3 id="step-4-retrieve-the-api-key-and-tls-fingerprint">Step 4 — Retrieve the API key and TLS fingerprint<a class="headerlink" href="#step-4-retrieve-the-api-key-and-tls-fingerprint" title="Permanent link">#</a></h3>
+<p>On first start the service generates a random API key and a self-signed TLS certificate. Both are printed to the container log:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>logs<span class="w"> </span>bcc-ml-service
+</code></pre></div>
+<p>Look for lines like:</p>
+<div class="highlight"><pre><span></span><code>[BCC ML Service] Generated API key: 3f8a2c…
+[BCC ML Service] TLS certificate SHA-256 fingerprint: 4A:3B:…
+</code></pre></div>
+<p>Copy both values — you will need them in the next step.</p>
+<h3 id="step-5-enable-ml-in-home-assistant">Step 5 — Enable ML in Home Assistant<a class="headerlink" href="#step-5-enable-ml-in-home-assistant" title="Permanent link">#</a></h3>
+<ol>
+<li>Go to <strong>Settings → Devices &amp; Services → Battery Charge Calculator → Configure</strong></li>
+<li>Scroll to the <strong>Machine Learning</strong> section and enable it</li>
+<li>Enter the service URL (e.g. <code>https://192.168.1.50:8765</code>)</li>
+<li>Paste the <strong>API key</strong> from the container log</li>
+<li>Paste the <strong>TLS fingerprint</strong> from the container log (enables secure certificate pinning without a CA)</li>
+<li>Click <strong>Submit</strong></li>
+</ol>
+<p>Home Assistant will immediately connect to the service, send your configuration, and queue the first training run.</p>
+<div class="admonition tip">
+<p class="admonition-title">Training takes a few minutes</p>
+<p>The first training run fetches up to 90 days of historical consumption data from GivEnergy or Octopus. Check progress in <strong>Settings → Devices &amp; Services → Battery Charge Calculator</strong> — the <strong>ML Model Status</strong> sensor will show <code>ready</code> when training completes.</p>
+</div>
+
+
+
+
+
+
+
+
+  <aside class="md-source-file">
+    
+    
+    
+      
+  
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Contributors">
+      
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4"/></svg>
+      
+    </span>
+    <nav>
+      robert.nash
+    </nav>
+  </span>
+
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.top", "search.suggest", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>

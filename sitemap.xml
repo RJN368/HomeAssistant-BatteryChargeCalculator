@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/faq/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/how-it-works/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/machine-learning/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/power_calculator-enhancement/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/sensors/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+    <url>
+         <loc>https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/setup/</loc>
+         <lastmod>2026-04-12</lastmod>
+    </url>
+</urlset>

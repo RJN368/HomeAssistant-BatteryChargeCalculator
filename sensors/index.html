@@ -1,0 +1,930 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/sensors/">
+      
+      
+        <link rel="prev" href="../setup/">
+      
+      
+        <link rel="next" href="../how-it-works/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Sensors - Home Assistant Battery Charge Calculator</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sensors" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-header__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Home Assistant Battery Charge Calculator
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sensors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-nav__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Home Assistant Battery Charge Calculator
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Sensors
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Sensors
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#battery-charge-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Battery Charge Projection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-prediction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cost Prediction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#battery-charge-slots" class="md-nav__link">
+    <span class="md-ellipsis">
+      Battery Charge Slots
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-sensors" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML sensors
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML sensors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ml-model-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Model Status
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-power-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Power Surface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-annual-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Annual Forecast
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-sensors-in-dashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the sensors in dashboards
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the sensors in dashboards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-template-next-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example template — next action
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How It Works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../machine-learning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Machine Learning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power_calculator-enhancement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Power Calculator
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#battery-charge-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Battery Charge Projection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cost-prediction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cost Prediction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#battery-charge-slots" class="md-nav__link">
+    <span class="md-ellipsis">
+      Battery Charge Slots
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-sensors" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML sensors
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML sensors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ml-model-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Model Status
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-power-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Power Surface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ml-annual-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML Annual Forecast
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-sensors-in-dashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the sensors in dashboards
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the sensors in dashboards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-template-next-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example template — next action
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="sensors">Sensors<a class="headerlink" href="#sensors" title="Permanent link">#</a></h1>
+<p>The integration creates the following sensors in Home Assistant:</p>
+<hr />
+<h2 id="battery-charge-projection">Battery Charge Projection<a class="headerlink" href="#battery-charge-projection" title="Permanent link">#</a></h2>
+<p><strong>Entity:</strong> <code>sensor.battery_charge_projection</code></p>
+<p>Provides a forward-looking view of the calculated battery state over the scheduled time slots. The sensor's primary value is the projected initial battery power (kWh) for the first upcoming slot.</p>
+<p>The sensor also exposes detailed attributes containing all scheduled time slots, including:</p>
+<ul>
+<li><code>start_datetime</code> — start time of the slot</li>
+<li><code>end_datetime</code> — end time of the slot</li>
+<li><code>action</code> — charge, discharge, or export</li>
+<li><code>power</code> — power level for the slot (kW)</li>
+<li><code>cost</code> — estimated cost or saving for the slot (£)</li>
+<li><code>initial_power</code> — battery charge level at the start of the slot (kWh)</li>
+</ul>
+<p><strong>Unit:</strong> kWh
+<strong>Device class:</strong> Energy</p>
+<hr />
+<h2 id="cost-prediction">Cost Prediction<a class="headerlink" href="#cost-prediction" title="Permanent link">#</a></h2>
+<p><strong>Entity:</strong> <code>sensor.cost_prediction</code></p>
+<p>Shows the estimated total energy cost for the current schedule, based on the Octopus Energy import/export rates and the calculated battery schedule.</p>
+<p><strong>Unit:</strong> £ (GBP)</p>
+<hr />
+<h2 id="battery-charge-slots">Battery Charge Slots<a class="headerlink" href="#battery-charge-slots" title="Permanent link">#</a></h2>
+<p><strong>Entity:</strong> <code>sensor.battery_charge_slots</code></p>
+<p>Represents the currently active or next upcoming charge/discharge slot as determined by the schedule. Useful for automations and dashboards to show what the battery is doing right now.</p>
+<hr />
+<h2 id="ml-sensors">ML sensors<a class="headerlink" href="#ml-sensors" title="Permanent link">#</a></h2>
+<p>The following sensors are only created when <strong>ML is enabled</strong> in the integration settings.</p>
+<h3 id="ml-model-status">ML Model Status<a class="headerlink" href="#ml-model-status" title="Permanent link">#</a></h3>
+<p><strong>Entity:</strong> <code>sensor.ml_model_status</code></p>
+<p>Reports the current state of the ML service and the trained model.</p>
+<p><strong>State values:</strong></p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>not_configured</code></td>
+<td>ML enabled but service URL or API key not set</td>
+</tr>
+<tr>
+<td><code>configured</code></td>
+<td>Service reachable, no model trained yet</td>
+</tr>
+<tr>
+<td><code>training</code></td>
+<td>Training run in progress</td>
+</tr>
+<tr>
+<td><code>ready</code></td>
+<td>Model trained and available</td>
+</tr>
+<tr>
+<td><code>service_unreachable</code></td>
+<td>HA cannot reach the ML service</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>is_ready</code></td>
+<td><code>true</code> when a trained model is available</td>
+</tr>
+<tr>
+<td><code>is_training</code></td>
+<td><code>true</code> while a training run is in progress</td>
+</tr>
+<tr>
+<td><code>model_trained_at</code></td>
+<td>ISO-8601 UTC timestamp of the last successful training run</td>
+</tr>
+<tr>
+<td><code>model_n_training_samples</code></td>
+<td>Number of clean half-hour slots used for training</td>
+</tr>
+<tr>
+<td><code>model_val_rmse</code></td>
+<td>Validation RMSE (kWh/slot) from the last training run</td>
+</tr>
+<tr>
+<td><code>model_type</code></td>
+<td><code>hist_gbr</code> (HistGradientBoostingRegressor) or <code>ridge</code></td>
+</tr>
+<tr>
+<td><code>blend_weight</code></td>
+<td>Current ML blend weight (0 = pure physics, 1 = full ML)</td>
+</tr>
+<tr>
+<td><code>doy_daily_kwh</code></td>
+<td>366-entry list of mean daily consumption by day-of-year</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="ml-power-surface">ML Power Surface<a class="headerlink" href="#ml-power-surface" title="Permanent link">#</a></h3>
+<p><strong>Entity:</strong> <code>sensor.ml_power_surface</code></p>
+<p><strong>State:</strong> Total number of cells in the power surface (normally 832 = 16 temperatures × 52 weeks). A non-zero value confirms the surface has been computed.</p>
+<p>Exposes the learned week × temperature → daily-kWh power surface as sensor attributes. The surface shows how the model predicts your home's total daily electricity consumption across the full range of temperatures and seasons, based on your actual historical data.</p>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temps</code></td>
+<td>List of 16 temperature values (−10 °C to +20 °C in 2 °C steps)</td>
+</tr>
+<tr>
+<td><code>weeks</code></td>
+<td>List of 52 ISO week numbers (1–52)</td>
+</tr>
+<tr>
+<td><code>z</code></td>
+<td>52 × 16 matrix of blended (ML + physics) daily kWh predictions</td>
+</tr>
+<tr>
+<td><code>z_physics</code></td>
+<td>52 × 16 matrix of physics-only daily kWh predictions (when a physics model is configured)</td>
+</tr>
+<tr>
+<td><code>blend_weight</code></td>
+<td>ML blend weight at the time the surface was computed</td>
+</tr>
+<tr>
+<td><code>generated_at</code></td>
+<td>ISO-8601 UTC timestamp of the training run that produced this surface</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Lovelace 3-D chart</strong> (requires the <a href="https://github.com/dbuezas/lovelace-plotly-graph-card">Plotly Graph Card</a>):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom:plotly-graph</span>
+<span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ML power surface — week × temperature</span>
+<span class="nt">raw_plotly_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">layout</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">scene</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">xaxis</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Temperature (°C)</span>
+<span class="w">    </span><span class="nt">yaxis</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Week of year</span>
+<span class="w">    </span><span class="nt">zaxis</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Daily kWh</span>
+<span class="w">  </span><span class="nt">showlegend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">displayModeBar</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">entities</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">entity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sensor.ml_power_surface</span>
+<span class="w">    </span><span class="nt">show_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">surface</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ML blended</span>
+<span class="w">    </span><span class="nt">colorscale</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Blues</span>
+<span class="w">    </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.temps</span>
+<span class="w">    </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.weeks</span>
+<span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.z</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">surface</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Physics only</span>
+<span class="w">    </span><span class="nt">colorscale</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Oranges</span>
+<span class="w">    </span><span class="nt">opacity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<span class="w">    </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.temps</span>
+<span class="w">    </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.weeks</span>
+<span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ex hass.states[&#39;sensor.ml_power_surface&#39;].attributes.z_physics</span>
+</code></pre></div>
+<hr />
+<h3 id="ml-annual-forecast">ML Annual Forecast<a class="headerlink" href="#ml-annual-forecast" title="Permanent link">#</a></h3>
+<p><strong>Entity:</strong> <code>sensor.ml_annual_forecast</code></p>
+<p>Shows the model's predicted annual electricity consumption profile by day of year, as a 366-entry list stored in sensor attributes. Useful for building a year-at-a-glance bar chart showing expected seasonal variation in your energy use.</p>
+<hr />
+<h2 id="using-the-sensors-in-dashboards">Using the sensors in dashboards<a class="headerlink" href="#using-the-sensors-in-dashboards" title="Permanent link">#</a></h2>
+<p>You can use these sensors in Home Assistant dashboards with the <strong>entities card</strong> or <strong>ApexCharts card</strong> for a visual battery schedule overview. The projection sensor's attributes contain the full timeslot data which can be templated or graphed.</p>
+<h3 id="example-template-next-action">Example template — next action<a class="headerlink" href="#example-template-next-action" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">state_attr(&#39;sensor.battery_charge_slots&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&#39;action&#39;</span><span class="nv">)</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+  <aside class="md-source-file">
+    
+    
+    
+      
+  
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Contributors">
+      
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4"/></svg>
+      
+    </span>
+    <nav>
+      robert.nash
+    </nav>
+  </span>
+
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.top", "search.suggest", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>
