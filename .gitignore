@@ -4,6 +4,7 @@ run_*tests.sh
 site
 .cache/
 development/config/GivTCP/**
+development/config/bcc-ml-data/**
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/
 .squad/log/
