@@ -129,10 +129,10 @@
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
             }
+        },
+        "error": {
+            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
         }
-    },
-    "errors": {
-        "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
     },
     "options": {
         "step": {
@@ -264,6 +264,9 @@
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
             }
+        },
+        "error": {
+            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
         }
     },
     "selector": {

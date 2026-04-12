@@ -5,7 +5,7 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from . import const
 from .coordinators import BatteryChargeCoordinator
@@ -14,10 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [SENSOR_DOMAIN]
 
-
-async def async_setup(hass, config):
-    """Track states and offer events for sensors."""
-    return True
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(const.DOMAIN)
 
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:

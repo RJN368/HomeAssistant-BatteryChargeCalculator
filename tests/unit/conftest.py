@@ -65,6 +65,7 @@ def _install_ha_stubs() -> None:
     cv.string = str
     cv.boolean = bool
     cv.positive_int = int
+    cv.config_entry_only_config_schema = lambda domain: (lambda config: config)
     _stub("homeassistant.helpers.update_coordinator")
     _stub("homeassistant.helpers.aiohttp_client")
     _stub("homeassistant.helpers.event")

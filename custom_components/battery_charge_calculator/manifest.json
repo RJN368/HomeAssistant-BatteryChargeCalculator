@@ -8,7 +8,7 @@
         "mqtt",
         "websocket_api"
     ],
-    "documentation": "",
+    "documentation": "https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator",
     "domain": "battery_charge_calculator",
     "iot_class": "cloud_polling",
     "name": "Battery Charge Calculator",
