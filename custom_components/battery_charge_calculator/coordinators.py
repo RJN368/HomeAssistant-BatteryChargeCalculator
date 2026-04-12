@@ -423,13 +423,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             if self.ml_client is not None:
                 await self.ml_client.async_refresh_status()
 
-            try:
-                await self.async_refresh()
-            except RuntimeError as err:
-                if "Debouncer lock is not re-entrant" in str(err):
-                    _LOGGER.warning("Debouncer lock is not re-entrant: %s", err)
-                else:
-                    raise
+            self.async_set_updated_data(self.timeslots)
         except Exception as exc:
             _LOGGER.error(
                 "Exception in octopus_state_change_listener: %s", exc, exc_info=True
@@ -463,10 +457,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
     """Update the data"""
 
     async def _async_update_data(self):
-        _LOGGER.info("update data in entity (forcing plan refresh)")
-
-        # Always refresh the plan before returning timeslots
-        await self.octopus_state_change_listener(None)
+        _LOGGER.info("update data in entity")
 
         simulate = self.config_entry.options.get(const.SIMULATE_ONLY)
         active_slot = self.current_active_slot()

@@ -156,6 +156,9 @@ def _install_ha_stubs() -> None:
             async with self._debounced_refresh.async_lock:
                 pass
 
+        def async_set_updated_data(self, data):
+            self.data = data
+
         async def async_shutdown(self):
             pass
 
