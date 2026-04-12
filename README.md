@@ -12,17 +12,13 @@ This Home Assistant addon connects to Octopus Energy to fetch import and export 
 - Automatically schedules updates in GivEnergy
 - Optimizes for cost savings and energy efficiency
 
-## Python 3.14 / HA Core 2026.3+ Compatibility
+## Machine Learning Power Estimation
 
-> **Note:** The optional ML power estimation feature requires `scikit-learn`, which is **not currently installable on Python 3.14** in HA Core 2026.3+.
->
-> There are no official binary wheels for scikit-learn on Python 3.14 yet, and the fallback source build requires `meson`, which is absent from the HA container environment. Attempting to build from source results in a `Permission denied: 'meson'` error.
->
-> **Impact:** The core integration (battery scheduling, heating estimation, Octopus/GivEnergy connectivity) works normally on all Python versions. Only the ML power estimation feature (enabled via the *ML settings* config step) is affected.
->
-> **Behaviour:** If ML is enabled in config but `scikit-learn` is not installed, the integration loads normally but ML features are silently disabled. The `ML Power Model Status` sensor will report `sklearn_unavailable` with a descriptive message.
->
-> **Resolution:** Once `scikit-learn` publishes Python 3.14 wheels, re-install the integration or run `pip install scikit-learn` in your HA Python environment to re-enable ML features.
+The ML power estimation feature runs as a separate Docker container (`bcc-ml-service`), completely independent of Home Assistant's Python environment. This means there are no Python version constraints — it works with any HA version.
+
+The ML service learns your household's energy consumption patterns from historical GivEnergy data and produces per-slot power demand forecasts alongside the physics-based estimates.
+
+See the [setup documentation](https://rjn368.github.io/HomeAssistant-batterychargecalculator/setup/) for instructions on deploying the ML service.
 
 
 ## Installation
