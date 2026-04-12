@@ -1,4 +1,6 @@
 {
+    "domain": "battery_charge_calculator",
+    "name": "Battery Charge Calculator",
     "codeowners": [
         "@rjn368"
     ],
@@ -9,9 +11,7 @@
         "websocket_api"
     ],
     "documentation": "https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator",
-    "domain": "battery_charge_calculator",
     "iot_class": "cloud_polling",
-    "name": "Battery Charge Calculator",
     "requirements": [
         "scipy>=1.12"
     ],
