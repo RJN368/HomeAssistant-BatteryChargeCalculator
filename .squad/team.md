@@ -1,6 +1,6 @@
 # Squad Team
 
-> HomeAsssitant-BatteryChargeCalculator
+> HomeAssistant-BatteryChargeCalculator
 
 ## Coordinator
 
@@ -24,5 +24,5 @@
 
 ## Project Context
 
-- **Project:** HomeAsssitant-BatteryChargeCalculator
+- **Project:** HomeAssistant-BatteryChargeCalculator
 - **Created:** 2026-04-09

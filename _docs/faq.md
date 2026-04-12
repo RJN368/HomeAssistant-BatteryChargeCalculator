@@ -118,4 +118,4 @@ This usually means the coordinator has not yet completed its first successful da
 
 ### Where can I get help?
 
-Open an issue on the [GitHub repository](https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator/issues).
+Open an issue on the [GitHub repository](https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator/issues).

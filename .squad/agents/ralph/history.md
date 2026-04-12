@@ -1,6 +1,6 @@
 # Project Context
 
-- **Project:** HomeAsssitant-BatteryChargeCalculator
+- **Project:** HomeAssistant-BatteryChargeCalculator
 - **Created:** 2026-04-09
 
 ## Core Context

@@ -1,6 +1,6 @@
 site_name: Home Assistant Battery Charge Calculator
-repo_url: https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator
-site_url: https://rjn368.github.io/HomeAsssitant-BatteryChargeCalculator/
+repo_url: https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator
+site_url: https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/
 docs_dir: _docs
 
 nav:

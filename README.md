@@ -36,7 +36,7 @@ You can install this integration via [HACS](https://github.com/hacs/integration)
 
 ### Manual
 
-1. Download the latest [release](https://github.com/rjn368/HomeAsssitant-BatteryChargeCalculator/releases)
+1. Download the latest [release](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/releases)
 2. Copy the contents of `custom_components` into your Home Assistant `<config directory>/custom_components` folder
 3. Restart Home Assistant
 
@@ -58,4 +58,4 @@ If you find this addon useful, consider [sponsoring the developer](https://githu
 
 ## FAQ
 
-Before raising anything, please read through the [faq](https://rjn368.github.io/HomeAssistant-batterychargecalculator/faq). If you have questions, then you can raise a [discussion](https://github.com/rjn368/HomeAsssitant-BatteryChargeCalculator/discussions). If you have found a bug or have a feature request please [raise it](https://github.com/rjn368/HomeAsssitant-BatteryChargeCalculator/issues) using the appropriate report template.
+Before raising anything, please read through the [faq](https://rjn368.github.io/HomeAssistant-batterychargecalculator/faq). If you have questions, then you can raise a [discussion](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/discussions). If you have found a bug or have a feature request please [raise it](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/issues) using the appropriate report template.

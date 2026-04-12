@@ -7,14 +7,14 @@
 1. Open HACS in your Home Assistant instance
 2. Go to **Integrations** and click the menu in the top-right corner
 3. Select **Custom repositories** and add:
-   - **Repository:** `https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator`
+   - **Repository:** `https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator`
    - **Category:** Integration
 4. Find **Battery Charge Calculator** in HACS and click **Download**
 5. Restart Home Assistant
 
 ### Manual
 
-1. Download the latest [release](https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator/releases)
+1. Download the latest [release](https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator/releases)
 2. Copy the `custom_components/battery_charge_calculator` folder into your Home Assistant `config/custom_components/` directory
 3. Restart Home Assistant
 
@@ -98,8 +98,8 @@ The trained model in the `bcc-ml-data` volume is preserved across updates.
 Clone the repo onto the machine where Docker is running, then build there:
 
 ```bash
-git clone https://github.com/RJN368/HomeAsssitant-BatteryChargeCalculator.git
-cd HomeAsssitant-BatteryChargeCalculator/ml-service
+git clone https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator.git
+cd HomeAssistant-BatteryChargeCalculator/ml-service
 docker compose build bcc-ml-service
 docker compose up -d bcc-ml-service
 ```
@@ -107,7 +107,7 @@ docker compose up -d bcc-ml-service
 **Subsequent updates** — pull the latest code and rebuild in place:
 
 ```bash
-cd HomeAsssitant-BatteryChargeCalculator/ml-service
+cd HomeAssistant-BatteryChargeCalculator/ml-service
 git pull
 docker compose build bcc-ml-service
 docker compose up -d --force-recreate bcc-ml-service

@@ -4,7 +4,7 @@ Persistent memory agent that maintains context across sessions.
 
 ## Project Context
 
-**Project:** HomeAsssitant-BatteryChargeCalculator
+**Project:** HomeAssistant-BatteryChargeCalculator
 
 
 ## Responsibilities
