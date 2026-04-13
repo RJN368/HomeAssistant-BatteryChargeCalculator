@@ -610,6 +610,157 @@ def validate_model_compatibility(model_metadata: dict, current_feature_columns: 
 
 ---
 
+## Annual Tariff Comparison Feature
+*Added: 2026-04-13 — sources: Keaton (architecture), Hockney (maths review)*
+
+### ADC-1: Separate coordinator (`TariffComparisonCoordinator`)
+
+**Decision:** New lightweight `TariffComparisonCoordinator` (`tariff_comparison/__init__.py`), weekly update interval. Not merged into `BatteryChargeCoordinator`.
+
+**Rationale:** `BatteryChargeCoordinator` runs every 60 seconds for real-time battery scheduling. Tariff comparison is a once-a-week operation; merging would add unnecessary complexity and risk to the hot path. Separate coordinator keeps concerns isolated.
+
+*Agreed by: Keaton — proposed, awaiting Robert's answers to OQ-1 through OQ-6*
+
+---
+
+### ADC-2: Disk cache for historical data
+
+**Decision:** JSON cache at `{config_dir}/battery_charge_calculator_tariff_cache.json` using the same atomic write pattern from D-4 (`tempfile.mkstemp` + `os.replace`).
+
+**Rationale:** Historical meter consumption and tariff rates are immutable once a period has passed. Without a cache, a weekly update would re-fetch ~17,520 rows × N tariffs needlessly. Cache invalidated only on year rollover, new tariff added, or user refresh service call.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-3: New sub-package `tariff_comparison/`
+
+**Decision:** New sub-package alongside `ml/` rather than adding files to the top-level package.
+
+```
+custom_components/battery_charge_calculator/
+├── tariff_comparison/
+│   ├── __init__.py       — package init; exports TariffComparisonCoordinator
+│   ├── client.py         — TariffComparisonClient (Octopus historical data)
+│   ├── calculator.py     — cost calculation; returns monthly breakdown dicts
+│   └── cache.py          — JSON disk cache with atomic write
+└── sensors/
+    └── tariff_comparison.py   — TariffComparisonSensor
+```
+
+**Rationale:** Mirrors `ml/` sub-package precedent (D-3); keeps feature self-contained and trivially removable. Consistent with D-2's scope-of-change table.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-4: Tariff config stored as JSON string in options
+
+**Decision:** `TARIFF_COMPARISON_TARIFFS` stored as a JSON-serialised string in the config entry options dict.
+
+**Rationale:** HA config entry options are a flat dict; nested structures require serialisation. Consistent with `HEATING_KNOWN_POINTS` precedent (`const.py` line 37). Options flow deserialises with `json.loads()` before validation.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-5: v1 uses manual tariff code entry (JSON text area)
+
+**Decision:** Options flow presents a JSON text area for entering tariff pairs. No live Octopus product catalogue dropdown.
+
+**Rationale:** The Octopus `/v1/products/` endpoint returns hundreds of entries including obsolete historical tariffs; filtering them into a meaningful dropdown requires substantial additional logic. Deferred to v2.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-6: Rolling 12-month window ending at start of current month
+
+**Decision:** Comparison window = `(today − 12 months, rounded to month start)` → `(start of current month)`.
+
+**Rationale:** Avoids partial-month data at either boundary. Window advances automatically each month. Default; may be overridden per OQ-2.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-7: Export earnings optional (gated on export meter serial)
+
+**Decision:** Export earnings calculated only when `OCTOPUS_EXPORT_METER_SERIAL` is provided. If absent, export earnings = 0.0 and `export_meter_serial_missing: true` is set in sensor attributes.
+
+**Rationale:** Export meter serial is not yet in the config (D-18 deferred export meter as "v2"). Feature must work without it.
+
+*Agreed by: Keaton — proposed*
+
+---
+
+### ADC-H1: Critical — Rate-before-window seed required in `fetch_unit_rates()` *(Hockney)*
+
+**Decision:** `fetch_unit_rates()` must issue a second request with `period_to={period_from}&page_size=1` before the main window fetch, and prepend the returned rate to `raw_rates` before building the rate map.
+
+**Problem fixed:** The Octopus unit-rates endpoint filters `valid_from >= period_from`. For Standard Variable / Fixed tariffs whose single rate predates the window, the main query returns zero rows. Forward-fill has no seed → all 17,520 slots compute at 0 p/kWh silently. Agile unaffected (rates always generated within the window).
+
+*Required by: Hockney — 2026-04-13. Applies to: `tariff_comparison/client.py` `fetch_unit_rates()`*
+
+---
+
+### ADC-H2: Critical — Export-only slots must not be dropped *(Hockney)*
+
+**Decision:** The per-slot loop must iterate over the **union** of all distinct `interval_start` timestamps from both import and export lists. Missing per-meter slots default to 0 kWh.
+
+**Problem fixed:** The prior implicit iteration domain was import-only. Any 30-min window present in export data but absent from import data (e.g. solar PV export during low-load hours) would be silently dropped — understating export earnings.
+
+*Required by: Hockney — 2026-04-13. Applies to: `tariff_comparison/calculator.py` slot iteration*
+
+---
+
+### ADC-H3: Formula gap — `include_standing_charges` Iverson bracket *(Hockney)*
+
+**Decision:** The monthly net-cost formula must make the standing charge conditional explicit:
+
+$$\text{net\_cost\_gbp}(m) = \text{import\_cost\_gbp}(m) - \text{export\_earnings\_gbp}(m) + \text{standing\_charge\_gbp}(m) \times [\text{include\_standing\_charges}]$$
+
+**Problem fixed:** The function signature accepts `include_standing_charges: bool` and §4.2 supports per-tariff override, but the printed formula unconditionally added standing charges.
+
+*Required by: Hockney — 2026-04-13. Applies to: `_docs/tariff-comparison.md` §6.3 and `tariff_comparison/calculator.py`*
+
+---
+
+### ADC-H4: Formula gap — `days(m)` must use calendar arithmetic, not slot count *(Hockney)*
+
+**Decision:** `days(m)` in the standing charge formula must be computed via `calendar.monthrange` or `datetime.date` arithmetic — calendar days, not `slot_count / 48`.
+
+**Problem fixed:** On DST spring-forward days, `slot_count / 48 = 0.958`; on fall-back days, `1.042`. This corrupts standing charges by ~±46p on those months. Calendar arithmetic gives integer day counts unaffected by DST.
+
+*Required by: Hockney — 2026-04-13. Applies to: `tariff_comparison/calculator.py` monthly aggregation*
+
+---
+
+### ADC-H5: Implementation requirement — timezone-aware UTC throughout *(Hockney)*
+
+**Decision:** All `datetime` values used as rate map keys and consumption `interval_start` values must be timezone-aware UTC at every parse boundary (API response and cache load). Implementers must verify `isinstance(dt.tzinfo, timezone)` or equivalent at parse time.
+
+**Problem fixed:** Mixed tz-aware / tz-naive datetimes cause every dict lookup to fail silently — `coverage_pct` reads as 0%, forward-fill pads the entire year from the last seed rate.
+
+*Required by: Hockney — 2026-04-13. Applies to: `tariff_comparison/client.py` and `tariff_comparison/calculator.py`*
+
+---
+
+### Open questions — Annual Tariff Comparison (pending Robert's answers)
+
+| # | Question | Default | Blocking? |
+|---|---|---|---|
+| OQ-1 | Export meter serial: manual config, auto-discover from account API, or defer? | Defer (export = 0) | No |
+| OQ-2 | Rolling 12 months vs. fixed calendar year? | Rolling 12 months | No |
+| OQ-3 | Current tariff: always pinned or user-removable? | Always pinned | No |
+| OQ-4 | Standing charges: included by default? | Yes | No |
+| OQ-5 | Update interval: weekly or monthly? | Weekly | No |
+| OQ-6 | Partial month handling at window boundary? | Rolling window avoids it | No |
+
+All defaults are safe; implementation can proceed without Robert's answers.
+
+---
+
 ## Active Decisions (other)
 
 *No other active decisions recorded.*
