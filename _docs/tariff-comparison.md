@@ -1,6 +1,6 @@
 # Annual Tariff Comparison Visualisation — Feature Specification
 
-**Status:** Draft — awaiting Robert's review
+**Status:** Approved by robert.nash (2026-04-13) — ready for implementation
 **Author:** Keaton (Lead Architect)
 **Date:** 2026-04-13
 **Implements:** Feature request by robert.nash
@@ -60,7 +60,7 @@ If those same meter reads are replayed against Octopus Go rates (e.g. 7 p/kWh du
 | **B — Base-load isolation** | Decompose meter reads into tariff-independent base load + battery arbitrage component; re-simulate only the arbitrage for each non-current tariff's rates | Medium | Medium (requires estimating base load from combined meter + battery history data) |
 | **C — Naive replay with disclosure** | Use real meter reads for all tariffs; prominently flag that non-current tariff costs reflect current-tariff-optimised behaviour | Low (but transparent) | Minimal |
 
-**Recommended default for v1: Approach C** — honest, low implementation risk, and clearly flagged to the user in sensor attributes and the Lovelace card. Approach A is the v2 enhancement target (see [OQ-7](#oq-7--consumption-data-model-approach) and [§6.7](#67-consumption-data-model)).
+**Selected approach (confirmed by robert.nash, 2026-04-13): A + C combined.** Approach C (naive replay with disclosure) delivers immediate results from day one. Approach A (full `GeneticEvaluator` simulation using Open-Meteo historical weather) runs as a background task and progressively replaces naive replay data per non-current tariff as simulation completes. See [§6.7](#67-consumption-data-model) for the full pipeline and state-transition model.
 
 ---
 
@@ -188,7 +188,41 @@ Standing charges can change mid-year (e.g. fixed-term tariff rollover). The calc
 
 **Export tariffs:** Export tariffs do not have standing charges. Standing charges are only fetched for import tariffs.
 
-### 3.5 API Rate Limits and Call Volume
+### 3.5 Open-Meteo Historical Weather API
+
+Used by the Approach A simulation pipeline (§6.7) to source historical hourly temperatures for each day in the comparison window.
+
+**Endpoint:**
+```
+GET https://archive-api.open-meteo.com/v1/archive
+    ?latitude={hass.config.latitude}
+    &longitude={hass.config.longitude}
+    &start_date={YYYY-MM-DD}
+    &end_date={YYYY-MM-DD}
+    &hourly=temperature_2m
+    &timezone=UTC
+```
+
+**Authentication:** None required. Free public API, no key needed.
+
+**Fetch strategy:** Request the full 12-month window in a single API call. Response contains ~8,760 hourly rows per year — lightweight and fast (< 5 seconds typical).
+
+**Response fields used:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `hourly.time` | list of ISO-8601 strings | Hourly timestamps (UTC) |
+| `hourly.temperature_2m` | list of floats | °C; one value per hour |
+
+**Resampling to 30-minute slots:** Each hourly value is duplicated into both 30-minute slots within that hour before passing to `PowerCalculator.calculate()`. E.g. `temperature_2m[i]` → slots at `HH:00` and `HH:30`.
+
+**Cache key:** `open_meteo_{period_from_date}_{period_to_date}`. Stored in the same JSON cache file as tariff rates (§5.5). Not re-fetched unless the rolling window advances past the cached range.
+
+**`OpenMeteoHistoricalClient`:** New thin client in `tariff_comparison/open_meteo_historical.py`. Accepts `lat`/`lon` from `hass.config.latitude`/`hass.config.longitude`; returns a `dict[date, list[float]]` mapping each date to its 24 hourly temperatures.
+
+---
+
+### 3.6 API Rate Limits and Call Volume
 
 For a 12-month comparison with N configured tariffs:
 
@@ -199,7 +233,8 @@ For a 12-month comparison with N configured tariffs:
 | Import unit rates per tariff | N | 1–2 calls per tariff (pagination) |
 | Export unit rates per tariff | N | As above; 0 if no export tariffs |
 | Import standing charges per tariff | N | Typically 1 call per tariff |
-| **Total for N=4 tariff pairs** | **~11–14** | Well within Octopus API limits |
+| Open-Meteo historical temperature (full year) | 1 | Free; no auth; cached after first fetch |
+| **Total for N=4 tariff pairs** | **~12–15** | Well within Octopus API limits |
 
 After initial fetch, all data is cached to disk (§5.5) and is **not re-fetched on every coordinator update**.
 
@@ -290,7 +325,8 @@ custom_components/battery_charge_calculator/
 │   ├── __init__.py              — package init; exports TariffComparisonCoordinator
 │   ├── client.py                — TariffComparisonClient (Octopus historical data)
 │   ├── calculator.py            — cost calculation; returns monthly breakdown dicts
-│   └── cache.py                 — JSON disk cache with atomic write
+│   ├── cache.py                 — JSON disk cache with atomic write
+│   └── open_meteo_historical.py — OpenMeteoHistoricalClient (historical weather, free, no auth)
 └── sensors/
     └── tariff_comparison.py     — TariffComparisonSensor
 ```
@@ -690,32 +726,123 @@ validation check against the per-slot implementation. -->
 
 ### 6.7 Consumption data model
 
-This section formalises how consumption data is sourced for each tariff in the comparison, in response to the design issue described in [§⚠️ Consumption Data Validity](#-consumption-data-validity--the-tariff-optimisation-problem).
+This section formalises how consumption data is sourced per tariff using the **A+C combined pipeline**, as directed by robert.nash.
 
 #### Current tariff (`is_current: true`)
 
-Always uses **real half-hourly meter reads** from the Octopus API (§3.1). No simulation or approximation is applied. `comparison_method = "real_meter_reads"`.
+Always uses **real half-hourly meter reads** from the Octopus API (§3.1). No simulation or approximation applied. `comparison_method = "real_meter_reads"`. Unchanged.
 
-#### Non-current tariffs (`is_current: false`) — three models
+#### Non-current tariffs — the A+C combined pipeline
 
-| Model | `comparison_method` value | Description | Data required |
-|---|---|---|---|
-| **Approach A — Simulation** | `"simulation"` | Per day: fetch Open-Meteo historical temperature → `PowerCalculator.calculate()` → `GeneticEvaluator.run()` with tariff's historical rates → derive simulated grid import/export | Open-Meteo historical API (`archive-api.open-meteo.com`), `hass.config.latitude`/`longitude`, full `GeneticEvaluator` + `PowerCalculator` pipeline |
-| **Approach B — Base-load isolation** | `"base_load_isolation"` | Decompose meter reads into tariff-independent base load + battery arbitrage; re-simulate arbitrage component only for target tariff rates | Estimated base load from grid meter + battery discharge MQTT data; historical battery SOC data |
-| **Approach C — Naive replay** | `"naive_replay"` | Apply target tariff rates directly to actual meter reads, with a prominent `data_quality_notes` warning | No additional data beyond what §3 already requires |
+Non-current tariffs automatically progress through three phases.
 
-#### Recommended v1 default: Approach C
+**Phase 1 — Approach C (immediate, always available)**
 
-**v1 uses `naive_replay` for all non-current tariffs.** A `data_quality_notes` array is included in every non-current tariff entry (see §7) to surface the limitation to the user and to any consuming UI.
+Computed on the first coordinator update after data is fetched. Real meter reads are replayed against each non-current tariff's historical rates. No additional data dependencies. Results are immediately available in the sensor.
 
-The coordinator sets `comparison_method = "naive_replay"` in sensor attributes until a future version upgrades to Approach A. The upgrade path from Approach C to Approach A requires:
+```
+comparison_method = "naive_replay"
+simulation_progress_pct = 0.0
+data_quality_notes = ["Consumption data reflects system behaviour optimised for the
+  current tariff. Non-current tariff costs may be understated or overstated compared
+  to what they would actually be on this tariff. Simulation in progress."]
+```
 
-1. Adding an `OpenMeteoHistoricalClient` (free, no auth; uses same lat/lon as the ML feature already configured).
-2. Threading per-day `PowerCalculator.calculate()` + `GeneticEvaluator.run()` calls through `hass.async_add_executor_job()` — consistent with D-5.
-3. Accumulating simulated import/export timeslots per day, then aggregating to monthly costs.
-4. Updating `comparison_method` to `"simulation"` and clearing `data_quality_notes` once simulation is active.
+**Phase 2 — Approach A simulation (background task, progressive)**
 
-Simulation is expected to take several minutes for a full year of a non-current tariff but runs as a background task (no blocking of the event loop; results cached to disk; UI shows stale data with a `simulation_in_progress: true` flag until complete).
+Immediately after Phase 1 completes, the coordinator queues a simulation job for every non-current tariff that does not have a completed `"simulation"` result in the cache. Each job runs entirely in background and never blocks the event loop.
+
+Per-job steps:
+
+1. **Fetch Open-Meteo historical temperatures** (§3.5) for the full 12-month window in one API call. Result cached as `open_meteo_{period_from}_{period_to}`. Subsequent tariffs reuse the same cached temperature data — only one Open-Meteo fetch per year window regardless of N tariffs.
+
+2. **Iterate day by day** (up to 365 iterations) through the comparison window. For each day:
+
+   a. Slice 24 hourly temperatures into 48 × 30-min slots (duplicate each hourly value).
+
+   b. Look up that day's historical unit rates from the rate map already in cache (§5.5) — no additional API call.
+
+   c. Run `PowerCalculator.calculate(temp_slots)` → half-hourly household power demand. Uses the same `PowerCalculator` instance as the main coordinator, with the same heat loss / heating config.
+
+   d. Run `GeneticEvaluator.run(demand_forecast, tariff_rates, battery_config)` → optimised `timeslots` for that day under that tariff's rates.
+
+   e. Derive simulated grid import/export from the returned `timeslots`:
+      - `import_kwh += slot.kwh` for each slot with `charge_option == 'charge'`
+      - `export_kwh += slot.export_kwh` for each slot with `charge_option == 'export'`
+      - Discharge/idle slots: household demand served from battery; grid import ≈ `base_load_kwh_per_30min` from config.
+
+   f. Apply that day's tariff rates to simulated import/export values → accumulate into monthly cost buckets.
+
+   All `PowerCalculator.calculate()` and `GeneticEvaluator.run()` calls are wrapped in `hass.async_add_executor_job()` (D-5 compliance — CPU-bound work off the event loop). Days are processed sequentially within a tariff to avoid thread contention.
+
+3. **Progress reporting:** After every 30 days of simulation, the coordinator calls `async_set_updated_data()` to push a partial update to the sensor. `simulation_progress_pct` advances from 0 → 100 in ~12 steps.
+
+   ```
+   comparison_method = "simulation_in_progress"
+   simulation_progress_pct = 42.0   (example: 153 of 365 days complete)
+   data_quality_notes = ["Simulation 42% complete. Showing naive replay data until
+     simulation finishes."]
+   ```
+
+4. **Completion:** When all 365 days for a tariff are simulated, write results to cache (new `simulation_results` section — see below), update the tariff's sensor data to Approach A values, and fire a final coordinator update.
+
+   ```
+   comparison_method = "simulation"
+   simulation_progress_pct = 100.0
+   data_quality_notes = []
+   ```
+
+**Phase 3 — Simulation complete (subsequent restarts)**
+
+Once simulation is cached for a `(tariff_code, data_year)` key, coordinator restarts load from cache instantly. No re-simulation unless:
+- Service `refresh_tariff_comparison` is called (force flag).
+- The rolling `data_year` in the cache no longer matches the current target window.
+- The tariff configuration changes (new tariff code added or modified).
+
+#### Performance expectations
+
+| Task | Expected duration | Runs on |
+|---|---|---|
+| Phase 1 — Approach C (all tariffs) | < 10 seconds | First coordinator update |
+| Open-Meteo fetch (full year, once) | < 5 seconds | Async; shared across all tariffs |
+| `GeneticEvaluator.run()` per day | 100–500 ms (existing) | Executor thread, per D-5 |
+| Full simulation for one non-current tariff (365 days) | ~1–3 minutes | Background; non-blocking |
+| Full simulation for N=4 non-current tariffs (sequential) | ~4–12 minutes total | Background; non-blocking |
+
+Robert sees Approach C data within seconds. Approach A data replaces it progressively over ~4–12 minutes. The sensor is useful from the moment the integration first loads.
+
+#### Cache additions for simulation results
+
+New `simulation_results` section in the cache JSON (§5.5), keyed by tariff code:
+
+```json
+"simulation_results": {
+  "E-1R-INTELLI-VAR-22-10-01-B": {
+    "status": "complete",
+    "completed_at": "2026-04-13T10:15:00Z",
+    "data_year": "2025-04",
+    "monthly": [
+      {
+        "month": "2025-04",
+        "import_kwh_simulated": 210.5,
+        "export_kwh_simulated": 52.3,
+        "import_cost_gbp": 38.20,
+        "export_earnings_gbp": 11.40,
+        "standing_charge_gbp": 13.91,
+        "net_cost_gbp": 40.71
+      }
+    ],
+    "annual": {
+      "import_cost_gbp": 443.10,
+      "export_earnings_gbp": 143.20,
+      "standing_charges_gbp": 169.21,
+      "net_cost_gbp": 469.11
+    }
+  }
+}
+```
+
+`status` values: `"in_progress"`, `"complete"`.
 
 ---
 
@@ -775,9 +902,10 @@ Simulation is expected to take several minutes for a full year of a non-current 
       "export_tariff_code": "E-1R-AGILE-OUTGOING-19-05-13-B",
       "is_current": false,
       "include_standing_charges": true,
-      "comparison_method": "naive_replay",
+      "comparison_method": "simulation_in_progress",
+      "simulation_progress_pct": 42.0,
       "data_quality_notes": [
-        "Consumption data reflects system behaviour optimised for the current tariff. Non-current tariff costs on naive replay may be understated or overstated."
+        "Simulation 42% complete. Currently showing naive replay data. Values will update as simulation finishes."
       ],
       "coverage_pct": 100.0,
       "monthly": [ "..." ],
@@ -800,8 +928,13 @@ Simulation is expected to take several minutes for a full year of a non-current 
 - `monthly` array always has exactly 12 entries, in ascending calendar month order.
 - All monetary values are rounded to 2 decimal places (`round(value, 2)`).
 - `coverage_pct` is `float` in range `[0.0, 100.0]`. Values below 95.0 trigger `coverage_warning: true` at the top level.
-- `comparison_method` is a string per tariff entry: `"real_meter_reads"` for the current tariff; `"naive_replay"` for non-current tariffs in v1. Future values: `"simulation"`, `"base_load_isolation"` (see §6.7).
-- `data_quality_notes` is an array of strings per tariff entry. Empty array (`[]`) for the current tariff. Non-empty for non-current tariffs using naive replay, notifying consumers (the Lovelace card, the user) of the limitation. The Lovelace card **must** render these notes visibly (e.g. as a footnote or tooltip on the comparison chart).
+- `comparison_method` values per tariff entry:
+  - `"real_meter_reads"` — current tariff; actual meter data.
+  - `"naive_replay"` — non-current tariff; Phase 1 (Approach C); simulation not yet started.
+  - `"simulation_in_progress"` — non-current tariff; Phase 2 (Approach A running); naive replay data shown; `simulation_progress_pct` is 0–100.
+  - `"simulation"` — non-current tariff; Phase 3 (Approach A complete); accurate simulated data; `data_quality_notes` is empty.
+- `simulation_progress_pct` is `float` in range `[0.0, 100.0]`. Present on all non-current tariff entries. `0.0` when in `naive_replay` state; `100.0` when in `simulation` state.
+- `data_quality_notes` is an array of zero or more strings per tariff entry. Empty (`[]`) for the current tariff and for fully-simulated non-current tariffs. Non-empty during Phase 1 and Phase 2. The Lovelace card **must** render these notes visibly (e.g. as a footnote or tooltip on the comparison chart) when non-empty.
 - `export_meter_serial_missing: true` when export comparison was requested but no export meter serial is configured. Export earnings will be 0.0 for all tariffs in this case.
 
 ---
@@ -924,7 +1057,7 @@ The following are explicitly excluded from v1:
 | Automatic tariff recommendation engine | Robert chooses which tariffs to compare; no automated "best tariff" ranking logic |
 | Standing charge comparison for export tariffs | Export tariffs do not have standing charges; no action required |
 | Retroactive comparison for years prior to 12 months ago | Only the most recent 12 complete months are supported per refresh |
-| Full battery schedule simulation for non-current tariffs (Approach A) | Computationally intensive (365 × genetic evaluator runs per non-current tariff per year); deferred to v2. v1 uses naive meter-read replay with disclosure flag (Approach C — see §⚠️ and §6.7). Upgrade path to Approach A is fully described in §6.7. |
+| Approach B — base-load isolation | Requires estimating base load from combined meter + battery SOC history; accuracy gain over Approach C is marginal if battery SOC data is incomplete. Dropped in favour of full Approach A simulation (§6.7). |
 
 ---
 
@@ -997,52 +1130,19 @@ The following require Robert's input before implementation begins.
 
 ---
 
-### OQ-7 — Consumption data model approach
+### OQ-7 — Consumption data model approach ✅ RESOLVED
 
 **Raised by:** robert.nash (2026-04-13)
-**Context:** Robert identified that meter reads for non-current tariffs are polluted by the fact that the current tariff's optimisation algorithm has shaped the consumption pattern. His exact words:
+**Resolved by:** robert.nash (2026-04-13) — *"let's focus the feature on Approach A and C combined"*
 
-> "When comparing tariffs we want the real energy use but ironically this will be polluted by the fact that the system is tuned to be optimised for the tariff that it is on. Therefore we may need to use predicted use for the non active tariff. ie comparing last years agile with charge, discharge and export periods with Octopus Go would not be accurate as the charge, discharge and export periods would be different."
+**Decision:** Use the **A+C combined pipeline** as fully specified in §6.7.
 
-**Question:** Which data model should be used for non-current tariff consumption in the comparison?
+- **Approach C** (naive replay) delivers immediate results from day one — no waiting, no additional complexity.
+- **Approach A** (full `GeneticEvaluator` simulation using Open-Meteo historical weather) runs as a background task, progressively replacing naive replay data per non-current tariff as simulation completes (~4–12 minutes for a full year of N=4 tariffs).
+- **Approach B** (base-load isolation) is explicitly dropped.
+- `comparison_method` transitions per tariff: `naive_replay` → `simulation_in_progress` → `simulation`.
 
-**Option A — Simulation (most accurate)**
-
-Simulate what the charge/discharge/export schedule would have been if the system had run optimised for each non-current tariff's historical rates. Per day:
-1. Fetch Open-Meteo historical temperature (`archive-api.open-meteo.com/v1/archive?latitude=&longitude=&start_date=&end_date=&hourly=temperature_2m`, free, no auth).
-2. Run `PowerCalculator.calculate()` to produce a half-hourly power demand forecast for that day.
-3. Run `GeneticEvaluator.run()` with that tariff's historical rates and the demand forecast.
-4. Derive simulated grid import/export values from the resulting `timeslots` (`kwh`, `charge_option`, `export_kwh`).
-5. Apply that tariff's rates to simulated import/export values → cost.
-
-*Accuracy:* High — correctly reflects what the system would have done under that tariff.
-*Complexity:* High — 365 × `GeneticEvaluator` runs per non-current tariff per year. Expected runtime: several minutes per tariff as a background task.
-*Data dependencies:* Open-Meteo historical API (already used by the ML feature); `hass.config.latitude`/`longitude` (already configured); `GeneticEvaluator` and `PowerCalculator` (already exist in the codebase — no new components required beyond an `OpenMeteoHistoricalClient`).
-
-**Option B — Base-load isolation (pragmatic approximation)**
-
-Decompose each day's meter reads into tariff-independent base load (appliances, lighting, hot water) and battery arbitrage behaviour (charging, discharging, exporting). Re-simulate only the arbitrage component for each non-current tariff's rates. The base load is assumed unchanged across tariffs.
-
-*Accuracy:* Medium — correct if base load is truly tariff-independent (reasonable assumption), but requires estimating base load from combined meter + battery data.
-*Complexity:* Medium — requires historical battery SOC data via MQTT or GivEnergy API; availability for the full 12-month window is uncertain.
-*Risk:* If battery SOC history is unavailable, falls back to Approach C with no accuracy gain over the simpler option.
-
-**Option C — Naive replay with honest disclosure (v1 viable)**
-
-Apply each tariff's historical rates directly to actual meter reads. Prominently flag the limitation in sensor attributes and the Lovelace card:
-- `"comparison_method": "naive_replay"` per non-current tariff entry.
-- `"data_quality_notes": ["Consumption data reflects system behaviour optimised for the current tariff. Non-current tariff costs may be understated or overstated."]`
-- The Lovelace card displays this note visibly (footnote or tooltip).
-
-*Accuracy:* Low — but honest and clearly communicated; Robert can account for the directional bias in his decision.
-*Complexity:* Minimal — no additional data sources, no additional compute. Implement alongside the core feature.
-
-**Keaton's recommendation:**
-- **v1: Option C.** Delivers the feature immediately with no additional complexity. Honest disclosure means Robert is not misled; the directional bias (current tariff looks comparatively better) is a known and flagged artefact.
-- **v2: Option A.** Upgrades non-current tariff accuracy once v1 is validated and in use. The upgrade path is fully specified in §6.7 and reuses existing codebase components (`GeneticEvaluator`, `PowerCalculator`, Open-Meteo) — no architectural changes required, only a new background task and an `OpenMeteoHistoricalClient`.
-- Option B is not recommended for v2 either: accuracy gain over Approach C is marginal if battery SOC history is incomplete, and it adds complexity without the rigour of full simulation.
-
-**Action required:** Robert to confirm whether v1 Approach C is acceptable, or whether he requires Approach A simulation accuracy before releasing the feature.
+No further action required. Implementation can proceed on both phases simultaneously.
 
 ---
 
