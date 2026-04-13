@@ -32,6 +32,38 @@ Costs are calculated retrospectively: actual recorded grid import and export rea
 
 ---
 
+## ⚠️ Consumption Data Validity — The Tariff Optimisation Problem
+
+> **Design issue raised by robert.nash — 2026-04-13**
+
+The "replay actual meter reads against each tariff" approach described in §1 has a fundamental validity problem when the user's battery system is actively optimised for the current tariff.
+
+### The problem
+
+The battery charge/discharge/export schedule is recalculated **every 30 minutes** by `GeneticEvaluator.run()` specifically for the active tariff's rate profile. On Agile, this means the system charges during the cheapest half-hour slots (often 2–5 p/kWh at 2–4 am) and exports during the most expensive slots (30–50 p/kWh at peak). The Octopus import and export meter reads therefore reflect **Agile-optimised behaviour**.
+
+If those same meter reads are replayed against Octopus Go rates (e.g. 7 p/kWh during the fixed 23:30–05:30 overnight window, 24 p/kWh flat outside), the comparison is invalid:
+
+- On Go, the system would have charged during the **fixed overnight window** — not Agile's dynamic cheap slots, which may fall at different times or overlap only partially.
+- Discharge and export timing would be different because the rate incentive profile differs.
+- Result: replaying Agile-optimised meter reads against Go rates **misrepresents what Go would actually cost**, biasing the comparison in favour of the current tariff.
+
+> *Robert's words (2026-04-13):*
+> "When comparing tariffs we want the real energy use but ironically this will be polluted by the fact that the system is tuned to be optimised for the tariff that it is on. Therefore we may need to use predicted use for the non active tariff.
+> ie comparing last years agile with charge, discharge and export periods with Octopus Go would not be accurate as the charge, discharge and export periods would be different."
+
+### Three viable approaches
+
+| Approach | Description | Accuracy | Complexity |
+|---|---|---|---|
+| **A — Simulation** | For each non-current tariff: fetch that day's historical rates + Open-Meteo weather → run `PowerCalculator.calculate()` → run `GeneticEvaluator.run()` → derive simulated grid import/export → apply tariff rates | High | High (365 × genetic evaluator runs per non-current tariff) |
+| **B — Base-load isolation** | Decompose meter reads into tariff-independent base load + battery arbitrage component; re-simulate only the arbitrage for each non-current tariff's rates | Medium | Medium (requires estimating base load from combined meter + battery history data) |
+| **C — Naive replay with disclosure** | Use real meter reads for all tariffs; prominently flag that non-current tariff costs reflect current-tariff-optimised behaviour | Low (but transparent) | Minimal |
+
+**Recommended default for v1: Approach C** — honest, low implementation risk, and clearly flagged to the user in sensor attributes and the Lovelace card. Approach A is the v2 enhancement target (see [OQ-7](#oq-7--consumption-data-model-approach) and [§6.7](#67-consumption-data-model)).
+
+---
+
 ## 2. User Stories
 
 ### US-1 — Baseline tariff comparison
@@ -51,6 +83,9 @@ Costs are calculated retrospectively: actual recorded grid import and export rea
 
 ### US-6 — On-demand refresh
 > As Robert, I want a Home Assistant service call (`battery_charge_calculator.refresh_tariff_comparison`) that triggers an immediate fresh data fetch and recalculation, rather than waiting for the next scheduled refresh.
+
+### US-7 — Data validity disclosure
+> As Robert, I want the sensor to clearly indicate whether non-current tariff costs are based on real meter reads, simulated schedules, or base-load isolation — and where those costs may be unreliable due to tariff-optimised consumption — so I know how much to trust the comparison and can make an informed tariff switching decision.
 
 ---
 
@@ -653,6 +688,35 @@ For a user actively shifting load on Agile, the per-slot formula may yield impor
 for illustrating the unit conversion and net formula; it should not be used as a
 validation check against the per-slot implementation. -->
 
+### 6.7 Consumption data model
+
+This section formalises how consumption data is sourced for each tariff in the comparison, in response to the design issue described in [§⚠️ Consumption Data Validity](#-consumption-data-validity--the-tariff-optimisation-problem).
+
+#### Current tariff (`is_current: true`)
+
+Always uses **real half-hourly meter reads** from the Octopus API (§3.1). No simulation or approximation is applied. `comparison_method = "real_meter_reads"`.
+
+#### Non-current tariffs (`is_current: false`) — three models
+
+| Model | `comparison_method` value | Description | Data required |
+|---|---|---|---|
+| **Approach A — Simulation** | `"simulation"` | Per day: fetch Open-Meteo historical temperature → `PowerCalculator.calculate()` → `GeneticEvaluator.run()` with tariff's historical rates → derive simulated grid import/export | Open-Meteo historical API (`archive-api.open-meteo.com`), `hass.config.latitude`/`longitude`, full `GeneticEvaluator` + `PowerCalculator` pipeline |
+| **Approach B — Base-load isolation** | `"base_load_isolation"` | Decompose meter reads into tariff-independent base load + battery arbitrage; re-simulate arbitrage component only for target tariff rates | Estimated base load from grid meter + battery discharge MQTT data; historical battery SOC data |
+| **Approach C — Naive replay** | `"naive_replay"` | Apply target tariff rates directly to actual meter reads, with a prominent `data_quality_notes` warning | No additional data beyond what §3 already requires |
+
+#### Recommended v1 default: Approach C
+
+**v1 uses `naive_replay` for all non-current tariffs.** A `data_quality_notes` array is included in every non-current tariff entry (see §7) to surface the limitation to the user and to any consuming UI.
+
+The coordinator sets `comparison_method = "naive_replay"` in sensor attributes until a future version upgrades to Approach A. The upgrade path from Approach C to Approach A requires:
+
+1. Adding an `OpenMeteoHistoricalClient` (free, no auth; uses same lat/lon as the ML feature already configured).
+2. Threading per-day `PowerCalculator.calculate()` + `GeneticEvaluator.run()` calls through `hass.async_add_executor_job()` — consistent with D-5.
+3. Accumulating simulated import/export timeslots per day, then aggregating to monthly costs.
+4. Updating `comparison_method` to `"simulation"` and clearing `data_quality_notes` once simulation is active.
+
+Simulation is expected to take several minutes for a full year of a non-current tariff but runs as a background task (no blocking of the event loop; results cached to disk; UI shows stale data with a `simulation_in_progress: true` flag until complete).
+
 ---
 
 ## 7. Sensor Schema
@@ -679,6 +743,8 @@ validation check against the per-slot implementation. -->
       "export_tariff_code": "E-1R-AGILE-OUTGOING-19-05-13-B",
       "is_current": true,
       "include_standing_charges": true,
+      "comparison_method": "real_meter_reads",
+      "data_quality_notes": [],
       "coverage_pct": 99.7,
       "monthly": [
         {
@@ -709,6 +775,10 @@ validation check against the per-slot implementation. -->
       "export_tariff_code": "E-1R-AGILE-OUTGOING-19-05-13-B",
       "is_current": false,
       "include_standing_charges": true,
+      "comparison_method": "naive_replay",
+      "data_quality_notes": [
+        "Consumption data reflects system behaviour optimised for the current tariff. Non-current tariff costs on naive replay may be understated or overstated."
+      ],
       "coverage_pct": 100.0,
       "monthly": [ "..." ],
       "annual": {
@@ -730,6 +800,8 @@ validation check against the per-slot implementation. -->
 - `monthly` array always has exactly 12 entries, in ascending calendar month order.
 - All monetary values are rounded to 2 decimal places (`round(value, 2)`).
 - `coverage_pct` is `float` in range `[0.0, 100.0]`. Values below 95.0 trigger `coverage_warning: true` at the top level.
+- `comparison_method` is a string per tariff entry: `"real_meter_reads"` for the current tariff; `"naive_replay"` for non-current tariffs in v1. Future values: `"simulation"`, `"base_load_isolation"` (see §6.7).
+- `data_quality_notes` is an array of strings per tariff entry. Empty array (`[]`) for the current tariff. Non-empty for non-current tariffs using naive replay, notifying consumers (the Lovelace card, the user) of the limitation. The Lovelace card **must** render these notes visibly (e.g. as a footnote or tooltip on the comparison chart).
 - `export_meter_serial_missing: true` when export comparison was requested but no export meter serial is configured. Export earnings will be 0.0 for all tariffs in this case.
 
 ---
@@ -852,6 +924,7 @@ The following are explicitly excluded from v1:
 | Automatic tariff recommendation engine | Robert chooses which tariffs to compare; no automated "best tariff" ranking logic |
 | Standing charge comparison for export tariffs | Export tariffs do not have standing charges; no action required |
 | Retroactive comparison for years prior to 12 months ago | Only the most recent 12 complete months are supported per refresh |
+| Full battery schedule simulation for non-current tariffs (Approach A) | Computationally intensive (365 × genetic evaluator runs per non-current tariff per year); deferred to v2. v1 uses naive meter-read replay with disclosure flag (Approach C — see §⚠️ and §6.7). Upgrade path to Approach A is fully described in §6.7. |
 
 ---
 
@@ -921,6 +994,55 @@ The following require Robert's input before implementation begins.
 **Impact:** Minor. The rolling window approach (always ending at the first of the current month) ensures all 12 months in the window are complete. This is the recommended approach with no proration needed.
 
 **Recommendation:** Use the rolling window approach as specced. Mark this question as resolved unless Robert has a specific preference for calendar-year alignment.
+
+---
+
+### OQ-7 — Consumption data model approach
+
+**Raised by:** robert.nash (2026-04-13)
+**Context:** Robert identified that meter reads for non-current tariffs are polluted by the fact that the current tariff's optimisation algorithm has shaped the consumption pattern. His exact words:
+
+> "When comparing tariffs we want the real energy use but ironically this will be polluted by the fact that the system is tuned to be optimised for the tariff that it is on. Therefore we may need to use predicted use for the non active tariff. ie comparing last years agile with charge, discharge and export periods with Octopus Go would not be accurate as the charge, discharge and export periods would be different."
+
+**Question:** Which data model should be used for non-current tariff consumption in the comparison?
+
+**Option A — Simulation (most accurate)**
+
+Simulate what the charge/discharge/export schedule would have been if the system had run optimised for each non-current tariff's historical rates. Per day:
+1. Fetch Open-Meteo historical temperature (`archive-api.open-meteo.com/v1/archive?latitude=&longitude=&start_date=&end_date=&hourly=temperature_2m`, free, no auth).
+2. Run `PowerCalculator.calculate()` to produce a half-hourly power demand forecast for that day.
+3. Run `GeneticEvaluator.run()` with that tariff's historical rates and the demand forecast.
+4. Derive simulated grid import/export values from the resulting `timeslots` (`kwh`, `charge_option`, `export_kwh`).
+5. Apply that tariff's rates to simulated import/export values → cost.
+
+*Accuracy:* High — correctly reflects what the system would have done under that tariff.
+*Complexity:* High — 365 × `GeneticEvaluator` runs per non-current tariff per year. Expected runtime: several minutes per tariff as a background task.
+*Data dependencies:* Open-Meteo historical API (already used by the ML feature); `hass.config.latitude`/`longitude` (already configured); `GeneticEvaluator` and `PowerCalculator` (already exist in the codebase — no new components required beyond an `OpenMeteoHistoricalClient`).
+
+**Option B — Base-load isolation (pragmatic approximation)**
+
+Decompose each day's meter reads into tariff-independent base load (appliances, lighting, hot water) and battery arbitrage behaviour (charging, discharging, exporting). Re-simulate only the arbitrage component for each non-current tariff's rates. The base load is assumed unchanged across tariffs.
+
+*Accuracy:* Medium — correct if base load is truly tariff-independent (reasonable assumption), but requires estimating base load from combined meter + battery data.
+*Complexity:* Medium — requires historical battery SOC data via MQTT or GivEnergy API; availability for the full 12-month window is uncertain.
+*Risk:* If battery SOC history is unavailable, falls back to Approach C with no accuracy gain over the simpler option.
+
+**Option C — Naive replay with honest disclosure (v1 viable)**
+
+Apply each tariff's historical rates directly to actual meter reads. Prominently flag the limitation in sensor attributes and the Lovelace card:
+- `"comparison_method": "naive_replay"` per non-current tariff entry.
+- `"data_quality_notes": ["Consumption data reflects system behaviour optimised for the current tariff. Non-current tariff costs may be understated or overstated."]`
+- The Lovelace card displays this note visibly (footnote or tooltip).
+
+*Accuracy:* Low — but honest and clearly communicated; Robert can account for the directional bias in his decision.
+*Complexity:* Minimal — no additional data sources, no additional compute. Implement alongside the core feature.
+
+**Keaton's recommendation:**
+- **v1: Option C.** Delivers the feature immediately with no additional complexity. Honest disclosure means Robert is not misled; the directional bias (current tariff looks comparatively better) is a known and flagged artefact.
+- **v2: Option A.** Upgrades non-current tariff accuracy once v1 is validated and in use. The upgrade path is fully specified in §6.7 and reuses existing codebase components (`GeneticEvaluator`, `PowerCalculator`, Open-Meteo) — no architectural changes required, only a new background task and an `OpenMeteoHistoricalClient`.
+- Option B is not recommended for v2 either: accuracy gain over Approach C is marginal if battery SOC history is incomplete, and it adds complexity without the rigour of full simulation.
+
+**Action required:** Robert to confirm whether v1 Approach C is acceptable, or whether he requires Approach A simulation accuracy before releasing the feature.
 
 ---
 
