@@ -152,7 +152,9 @@ def calculate_tariff_cost(
                     else month_end
                 )
                 overlap_start = max(sc_from, month_start)
-                overlap_end = min(sc_to, effective_month_end) if sc_to else effective_month_end
+                overlap_end = (
+                    min(sc_to, effective_month_end) if sc_to else effective_month_end
+                )
                 if overlap_start >= overlap_end:
                     continue
                 days_active = (overlap_end - overlap_start).days
@@ -185,14 +187,6 @@ def calculate_tariff_cost(
 
     return {
         "monthly": monthly_results,
-        "totals": {
-            "import_cost_gbp": round(total_import_gbp, 2),
-            "export_earnings_gbp": round(total_export_gbp, 2),
-            "standing_charges_gbp": round(total_sc_gbp, 2),
-            "net_cost_gbp": round(
-                total_import_gbp - total_export_gbp + total_sc_gbp, 2
-            ),
-        },
         "coverage_pct": coverage_pct,
         "slot_count": len(all_timestamps),
     }
@@ -202,12 +196,6 @@ def _empty_result() -> dict[str, Any]:
     """Return a zeroed result dict when no slot data is available."""
     return {
         "monthly": [],
-        "totals": {
-            "import_cost_gbp": 0.0,
-            "export_earnings_gbp": 0.0,
-            "standing_charges_gbp": 0.0,
-            "net_cost_gbp": 0.0,
-        },
         "coverage_pct": 0.0,
         "slot_count": 0,
     }

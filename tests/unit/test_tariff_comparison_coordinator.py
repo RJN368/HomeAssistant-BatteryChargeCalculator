@@ -27,6 +27,7 @@ _calculate_all = TariffComparisonCoordinator._calculate_all
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _slot(dt: datetime, consumption: float) -> dict:
     return {"interval_start": dt, "consumption": consumption}
 
@@ -59,6 +60,7 @@ def _build_rate_dict(
 # Tests: export_tariff_code in entries
 # ---------------------------------------------------------------------------
 
+
 class TestExportTariffCodeInEntries:
     def test_export_tariff_code_is_set_when_shared_export_code_provided(self):
         """Each tariff entry has export_tariff_code == shared_export_code."""
@@ -73,7 +75,10 @@ class TestExportTariffCodeInEntries:
         tariff_rates = {
             "IMPORT-A": _build_rate_dict(t, None, 25.0),
             "IMPORT-B": _build_rate_dict(t, None, 20.0),
-            "EXPORT-X": {"unit_rates": [_rate_entry(t, None, 5.0)], "standing_charges": []},
+            "EXPORT-X": {
+                "unit_rates": [_rate_entry(t, None, 5.0)],
+                "standing_charges": [],
+            },
         }
 
         result = _calculate_all(
@@ -96,7 +101,9 @@ class TestExportTariffCodeInEntries:
         """export_tariff_code is None when shared_export_code is not provided."""
         period_from, period_to = _make_period()
         t = period_from
-        tariff_configs = [{"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}]
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}
+        ]
         tariff_rates = {"IMPORT-A": _build_rate_dict(t, None, 25.0)}
         import_slots = [_slot(t, 0.5)]
 
@@ -119,6 +126,7 @@ class TestExportTariffCodeInEntries:
 # Tests: export_earnings_gbp
 # ---------------------------------------------------------------------------
 
+
 class TestExportEarnings:
     def test_export_earnings_nonzero_when_export_slots_and_rates_provided(self):
         """export_earnings_gbp > 0 when export slots and export rate map are provided."""
@@ -131,7 +139,7 @@ class TestExportEarnings:
         # 4 import slots, 2 export slots
         import_slots = [_slot(t + timedelta(minutes=30 * i), 0.5) for i in range(4)]
         export_slots = [
-            _slot(t + timedelta(minutes=0), 1.0),   # 1 kWh exported at 14:30
+            _slot(t + timedelta(minutes=0), 1.0),  # 1 kWh exported at 14:30
             _slot(t + timedelta(minutes=30), 0.8),  # 0.8 kWh exported at 15:00
         ]
         export_code = "EXPORT-SEG"
@@ -158,8 +166,10 @@ class TestExportEarnings:
         entry = result["tariffs"][0]
         assert entry["export_tariff_code"] == export_code
         # 1.0 + 0.8 = 1.8 kWh * 15 p/kWh = 27 p = £0.27
-        assert entry["totals"]["export_earnings_gbp"] == pytest.approx(0.27, abs=0.01)
         assert entry["monthly"][0]["export_earnings_gbp"] == pytest.approx(0.27, abs=0.01)
+        assert entry["monthly"][0]["export_earnings_gbp"] == pytest.approx(
+            0.27, abs=0.01
+        )
 
     def test_export_earnings_zero_when_export_rate_code_not_in_tariff_rates(self):
         """export_earnings_gbp == 0 when shared_export_code has no rate data fetched."""
@@ -189,18 +199,23 @@ class TestExportEarnings:
         # export_tariff_code is set even though rates are missing (entry records intent)
         assert result["tariffs"][0]["export_tariff_code"] == "EXPORT-MISSING"
         # But earnings are 0 because no rate map could be built
-        assert result["tariffs"][0]["totals"]["export_earnings_gbp"] == 0.0
+        assert result["tariffs"][0]["monthly"][0]["export_earnings_gbp"] == 0.0
 
     def test_export_earnings_zero_when_export_slots_none(self):
         """export_earnings_gbp == 0 when no export meter is configured."""
         period_from, period_to = _make_period()
         t = period_from
-        tariff_configs = [{"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}]
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}
+        ]
         import_slots = [_slot(t, 0.5)]
         export_code = "EXPORT-X"
         tariff_rates = {
             "IMPORT-A": _build_rate_dict(t, None, 25.0),
-            export_code: {"unit_rates": [_rate_entry(t, None, 15.0)], "standing_charges": []},
+            export_code: {
+                "unit_rates": [_rate_entry(t, None, 15.0)],
+                "standing_charges": [],
+            },
         }
 
         result = _calculate_all(
@@ -215,12 +230,13 @@ class TestExportEarnings:
             shared_export_code=export_code,
         )
 
-        assert result["tariffs"][0]["totals"]["export_earnings_gbp"] == 0.0
+        assert result["tariffs"][0]["monthly"][0]["export_earnings_gbp"] == 0.0
 
 
 # ---------------------------------------------------------------------------
 # Tests: period_to boundary — no partial-month leakage
 # ---------------------------------------------------------------------------
+
 
 class TestPeriodToBoundary:
     def test_slot_at_exactly_period_to_is_excluded(self):
@@ -230,8 +246,7 @@ class TestPeriodToBoundary:
 
         # All March slots plus one stray April slot at exactly period_to
         march_slots = [
-            _slot(period_from + timedelta(minutes=30 * i), 0.5)
-            for i in range(2)
+            _slot(period_from + timedelta(minutes=30 * i), 0.5) for i in range(2)
         ]
         april_boundary_slot = _slot(period_to, 0.5)  # exactly at period_to
         import_slots = march_slots + [april_boundary_slot]
@@ -243,7 +258,9 @@ class TestPeriodToBoundary:
                 "standing_charges": [],
             }
         }
-        tariff_configs = [{"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}]
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}
+        ]
 
         result = _calculate_all(
             None,
@@ -257,10 +274,14 @@ class TestPeriodToBoundary:
         )
 
         months = [m["month"] for m in result["tariffs"][0]["monthly"]]
-        assert "2026-04" not in months, "April slot at period_to boundary must be excluded"
+        assert "2026-04" not in months, (
+            "April slot at period_to boundary must be excluded"
+        )
         assert "2026-03" in months
 
-    def test_standing_charges_not_calculated_for_full_month_when_only_boundary_slot(self):
+    def test_standing_charges_not_calculated_for_full_month_when_only_boundary_slot(
+        self,
+    ):
         """Standing charges for a partial-month entry must be prorated to period_to.
 
         Regression: when a slot at period_to leaks in, the calculator was
@@ -271,7 +292,9 @@ class TestPeriodToBoundary:
         period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
         period_to = datetime(2026, 4, 1, 0, 0, tzinfo=UTC)
 
-        march_slots = [_slot(period_from + timedelta(minutes=30 * i), 0.5) for i in range(2)]
+        march_slots = [
+            _slot(period_from + timedelta(minutes=30 * i), 0.5) for i in range(2)
+        ]
         april_slot = _slot(period_to, 0.1)  # leaks in from API
         import_slots = march_slots + [april_slot]
 
@@ -282,7 +305,9 @@ class TestPeriodToBoundary:
                 "standing_charges": [_rate_entry(sc_valid_from, None, 50.0)],  # 50p/day
             }
         }
-        tariff_configs = [{"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}]
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}
+        ]
 
         result = _calculate_all(
             None,

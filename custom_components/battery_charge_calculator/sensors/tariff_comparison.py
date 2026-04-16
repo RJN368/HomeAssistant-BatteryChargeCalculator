@@ -72,10 +72,14 @@ class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
             }
             return
 
-        # State = net annual cost of the first (current) tariff
+        # State = net cost of the first (current) tariff — sum all monthly rows
+        # (window is 1 month, so this equals monthly[0].net_cost_gbp)
         first_tariff = data["tariffs"][0]
-        annual = first_tariff.get("totals", {})
-        net_cost = annual.get("net_cost_gbp")
+        monthly = first_tariff.get("monthly", [])
+        if monthly:
+            net_cost: float | None = sum(m.get("net_cost_gbp", 0.0) for m in monthly)
+        else:
+            net_cost = None
         self._attr_native_value = round(net_cost, 2) if net_cost is not None else None
 
         # Full data dict as attributes
