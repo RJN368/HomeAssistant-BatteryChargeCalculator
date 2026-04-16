@@ -429,7 +429,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 tariff_entry["simulation_progress_pct"] = 100.0
                 tariff_entry["data_quality_notes"] = []
                 tariff_entry["monthly"] = sim["monthly"]
-                tariff_entry["annual"] = sim["annual"]
+                tariff_entry["totals"] = sim["totals"]
 
         return result
 
@@ -507,7 +507,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 "data_quality_notes": data_quality_notes,
                 "coverage_pct": coverage,
                 "monthly": calc_result["monthly"],
-                "annual": calc_result["annual"],
+                "totals": calc_result["totals"],
             }
             tariff_results.append(tariff_entry)
 
@@ -602,7 +602,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         simulation_progress_pct: float,
         data_quality_notes: list[str],
         monthly: list[dict] | None = None,
-        annual: dict | None = None,
+        totals: dict | None = None,
     ) -> None:
         """Update the live coordinator data for one tariff and notify listeners.
 
@@ -619,7 +619,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             simulation_progress_pct=simulation_progress_pct,
             data_quality_notes=data_quality_notes,
             monthly=monthly,
-            annual=annual,
+            totals=totals,
         )
         self.async_set_updated_data(live)
 
@@ -760,7 +760,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         final_monthly = _build_simulation_monthly(
             monthly_import_pence, monthly_export_pence, sc_raw, include_sc
         )
-        annual = _sum_annual(final_monthly)
+        totals = _sum_totals(final_monthly)
 
         self._push_simulation_progress(
             import_code,
@@ -768,18 +768,18 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             simulation_progress_pct=100.0,
             data_quality_notes=[],
             monthly=final_monthly,
-            annual=annual,
+            totals=totals,
         )
 
         # Persist simulation results to cache
-        await self._persist_simulation_result(import_code, final_monthly, annual)
+        await self._persist_simulation_result(import_code, final_monthly, totals)
         _LOGGER.info("Approach A simulation complete for %s", import_code)
 
     async def _persist_simulation_result(
         self,
         import_code: str,
         monthly: list[dict],
-        annual: dict,
+        totals: dict,
     ) -> None:
         """Append completed simulation results to the on-disk cache."""
         cache = await self.hass.async_add_executor_job(read_cache, self._config_dir)
@@ -791,7 +791,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "data_year": cache.get("data_year", ""),
             "monthly": monthly,
-            "annual": annual,
+            "totals": totals,
         }
         await self.hass.async_add_executor_job(write_cache, self._config_dir, cache)
 
@@ -806,7 +806,7 @@ def _update_tariff_entry(
     simulation_progress_pct: float,
     data_quality_notes: list[str],
     monthly: list[dict] | None = None,
-    annual: dict | None = None,
+    totals: dict | None = None,
 ) -> None:
     """Mutate the matching tariff entry in *result* in-place."""
     for entry in result.get("tariffs", []):
@@ -816,8 +816,8 @@ def _update_tariff_entry(
             entry["data_quality_notes"] = data_quality_notes
             if monthly is not None:
                 entry["monthly"] = monthly
-            if annual is not None:
-                entry["annual"] = annual
+            if totals is not None:
+                entry["totals"] = totals
             break
 
 
@@ -870,7 +870,7 @@ def _build_simulation_monthly(
     return results
 
 
-def _sum_annual(monthly: list[dict]) -> dict[str, float]:
+def _sum_totals(monthly: list[dict]) -> dict[str, float]:
     """Sum monthly results to annual totals."""
     total_import = sum(m["import_cost_gbp"] for m in monthly)
     total_export = sum(m["export_earnings_gbp"] for m in monthly)

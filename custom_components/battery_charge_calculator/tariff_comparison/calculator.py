@@ -115,9 +115,9 @@ def calculate_tariff_cost(
     months_sorted = sorted(set(monthly_import_p) | set(monthly_export_p))
 
     monthly_results: list[dict] = []
-    annual_import_gbp = 0.0
-    annual_export_gbp = 0.0
-    annual_sc_gbp = 0.0
+    total_import_gbp = 0.0
+    total_export_gbp = 0.0
+    total_sc_gbp = 0.0
 
     for month_key in months_sorted:
         year, month = int(month_key[:4]), int(month_key[5:7])
@@ -158,9 +158,9 @@ def calculate_tariff_cost(
             }
         )
 
-        annual_import_gbp += import_gbp
-        annual_export_gbp += export_gbp
-        annual_sc_gbp += sc_gbp
+        total_import_gbp += import_gbp
+        total_export_gbp += export_gbp
+        total_sc_gbp += sc_gbp
 
     coverage_pct = (
         round((direct_hits / total_import_slots) * 100.0, 2)
@@ -170,12 +170,12 @@ def calculate_tariff_cost(
 
     return {
         "monthly": monthly_results,
-        "annual": {
-            "import_cost_gbp": round(annual_import_gbp, 2),
-            "export_earnings_gbp": round(annual_export_gbp, 2),
-            "standing_charges_gbp": round(annual_sc_gbp, 2),
+        "totals": {
+            "import_cost_gbp": round(total_import_gbp, 2),
+            "export_earnings_gbp": round(total_export_gbp, 2),
+            "standing_charges_gbp": round(total_sc_gbp, 2),
             "net_cost_gbp": round(
-                annual_import_gbp - annual_export_gbp + annual_sc_gbp, 2
+                total_import_gbp - total_export_gbp + total_sc_gbp, 2
             ),
         },
         "coverage_pct": coverage_pct,
@@ -187,7 +187,7 @@ def _empty_result() -> dict[str, Any]:
     """Return a zeroed result dict when no slot data is available."""
     return {
         "monthly": [],
-        "annual": {
+        "totals": {
             "import_cost_gbp": 0.0,
             "export_earnings_gbp": 0.0,
             "standing_charges_gbp": 0.0,

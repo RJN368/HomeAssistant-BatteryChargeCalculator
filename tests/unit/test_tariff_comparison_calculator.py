@@ -62,7 +62,7 @@ class TestBasicImportOnlyCost:
         )
 
         # 2 × 0.5 kWh × 20 p/kWh = 20 p = £0.20
-        assert result["annual"]["import_cost_gbp"] == pytest.approx(0.20, abs=0.01)
+        assert result["totals"]["import_cost_gbp"] == pytest.approx(0.20, abs=0.01)
 
     def test_no_export_earnings_when_export_slots_none(self):
         """export_slots=None → export_earnings_gbp is 0.0 for all months."""
@@ -79,7 +79,7 @@ class TestBasicImportOnlyCost:
             include_standing_charges=False,
         )
 
-        assert result["annual"]["export_earnings_gbp"] == 0.0
+        assert result["totals"]["export_earnings_gbp"] == 0.0
         for month in result["monthly"]:
             assert month["export_earnings_gbp"] == 0.0
 
@@ -99,8 +99,8 @@ class TestBasicImportOnlyCost:
             include_standing_charges=False,
         )
 
-        assert result["annual"]["net_cost_gbp"] == pytest.approx(
-            result["annual"]["import_cost_gbp"], abs=0.01
+        assert result["totals"]["net_cost_gbp"] == pytest.approx(
+            result["totals"]["import_cost_gbp"], abs=0.01
         )
 
 
@@ -131,13 +131,13 @@ class TestImportAndExport:
         expected_export = (0.1 * 15) / 100  # £0.015
         expected_net = expected_import - expected_export  # £0.060
 
-        assert result["annual"]["import_cost_gbp"] == pytest.approx(
+        assert result["totals"]["import_cost_gbp"] == pytest.approx(
             expected_import, abs=0.01
         )
-        assert result["annual"]["export_earnings_gbp"] == pytest.approx(
+        assert result["totals"]["export_earnings_gbp"] == pytest.approx(
             expected_export, abs=0.01
         )
-        assert result["annual"]["net_cost_gbp"] == pytest.approx(expected_net, abs=0.01)
+        assert result["totals"]["net_cost_gbp"] == pytest.approx(expected_net, abs=0.01)
 
 
 # ---------------------------------------------------------------------------
@@ -201,16 +201,16 @@ class TestMonthlyAggregation:
         sum_sc = sum(m["standing_charge_gbp"] for m in result["monthly"])
         sum_net = sum(m["net_cost_gbp"] for m in result["monthly"])
 
-        assert result["annual"]["import_cost_gbp"] == pytest.approx(
+        assert result["totals"]["import_cost_gbp"] == pytest.approx(
             sum_import, abs=0.01
         )
-        assert result["annual"]["export_earnings_gbp"] == pytest.approx(
+        assert result["totals"]["export_earnings_gbp"] == pytest.approx(
             sum_export, abs=0.01
         )
-        assert result["annual"]["standing_charges_gbp"] == pytest.approx(
+        assert result["totals"]["standing_charges_gbp"] == pytest.approx(
             sum_sc, abs=0.01
         )
-        assert result["annual"]["net_cost_gbp"] == pytest.approx(sum_net, abs=0.01)
+        assert result["totals"]["net_cost_gbp"] == pytest.approx(sum_net, abs=0.01)
 
     def test_monthly_keys_are_yyyy_mm_strings(self):
         import_slots, rate_map = self._build_inputs()
@@ -279,7 +279,7 @@ class TestStandingChargesExcluded:
 
         for month in result["monthly"]:
             assert month["standing_charge_gbp"] == 0.0
-        assert result["annual"]["standing_charges_gbp"] == 0.0
+        assert result["totals"]["standing_charges_gbp"] == 0.0
 
 
 class TestStandingChargeMidYearChange:
@@ -346,7 +346,7 @@ class TestRateMapForwardFill:
         # If t2 was incorrectly zeroed: 0.5×20/100 + 1.0×0/100 + 0.5×30/100 = 0.25
         # If t2 correctly forward-filled: 0.5×20/100 + 1.0×20/100 + 0.5×30/100 = 0.45
         expected_import = (0.5 * 20 + 1.0 * 20 + 0.5 * 30) / 100  # £0.45
-        assert result["annual"]["import_cost_gbp"] == pytest.approx(
+        assert result["totals"]["import_cost_gbp"] == pytest.approx(
             expected_import, abs=0.01
         )
 
@@ -472,7 +472,7 @@ class TestUnionOfTimestamps:
         # Export from t2: 0.2 × 15p = 3.0p
         # Total export earnings: 4.5p = £0.045
         expected_export = (0.1 * 15 + 0.2 * 15) / 100
-        assert result["annual"]["export_earnings_gbp"] == pytest.approx(
+        assert result["totals"]["export_earnings_gbp"] == pytest.approx(
             expected_export, abs=0.01
         )
 
@@ -531,5 +531,5 @@ class TestMonetaryRounding:
                 )
 
         for field in ("import_cost_gbp", "export_earnings_gbp", "net_cost_gbp"):
-            val = result["annual"][field]
+            val = result["totals"][field]
             assert round(val, 2) == val, f"annual[{field}]={val} is not rounded to 2 dp"

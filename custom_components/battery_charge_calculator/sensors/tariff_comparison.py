@@ -74,7 +74,7 @@ class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
 
         # State = net annual cost of the first (current) tariff
         first_tariff = data["tariffs"][0]
-        annual = first_tariff.get("annual", {})
+        annual = first_tariff.get("totals", {})
         net_cost = annual.get("net_cost_gbp")
         self._attr_native_value = round(net_cost, 2) if net_cost is not None else None
 
