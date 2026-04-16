@@ -158,6 +158,18 @@ DEFAULT_ML_TRAINING_LOOKBACK_DAYS = 730  # days of historical data to fetch
 ML_MODEL_STATUS_SENSOR = "battery_charge_calculator.ml_model_status"
 ML_MODEL_STATUS_SENSOR_NAME = "ML Power Model Status"
 ANNUAL_FORECAST_SENSOR = "battery_charge_calculator.annual_forecast"
+
+# Last recalculation sensor
+LAST_RECALCULATION_SENSOR = "battery_charge_calculator.last_recalculation"
+LAST_RECALCULATION_SENSOR_NAME = "Charge Slots Last Recalculated"
+
+# Recalculation reason values
+REPLAN_REASON_INITIAL_SETUP = "initial_setup"
+REPLAN_REASON_NO_PLAN = "no_plan"
+REPLAN_REASON_PLAN_EXPIRING = "plan_expiring"
+REPLAN_REASON_BATTERY_DEVIATION = "battery_deviation"
+REPLAN_REASON_NO_ACTIVE_SLOT = "no_active_slot"
+REPLAN_REASON_MANUAL = "manual"
 ANNUAL_FORECAST_SENSOR_NAME = "Annual Energy Forecast"
 DAILY_POWER_FORECAST_SENSOR = "battery_charge_calculator.daily_power_forecast"
 DAILY_POWER_FORECAST_SENSOR_NAME = "Daily Power Forecast"

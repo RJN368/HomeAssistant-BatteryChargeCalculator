@@ -1,3 +1,7 @@
+import sys
+import warnings
+from zoneinfo import ZoneInfo
+
 """Unit tests for the BatteryChargeCoordinator."""
 
 from datetime import datetime, timedelta, timezone
@@ -98,6 +102,42 @@ class TestCeilDt:
 
 
 class TestCurrentActiveSlot:
+    def test_naive_datetime_in_slot_warns_and_converts(self, caplog):
+        import logging as stdlib_logging
+
+        coord = _make_coordinator()
+        # Naive datetime (should warn and treat as UTC)
+        naive_dt = datetime(2026, 4, 4, 12, 0, 0)
+        with caplog.at_level(stdlib_logging.WARNING):
+            slot = _make_timeslot(dt=naive_dt)
+        coord.timeslots = [slot]
+        coord.tz = ZoneInfo("Europe/London")
+        # Slot is UTC 12:00 → Europe/London (BST, UTC+1 in April) = 13:00
+        now_london = datetime(2026, 4, 4, 13, 0, 0, tzinfo=ZoneInfo("Europe/London"))
+        with patch(
+            "custom_components.battery_charge_calculator.coordinators.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = now_london
+            result = coord.current_active_slot()
+        assert result is slot
+        assert any("Naive datetime" in r.message for r in caplog.records)
+
+    def test_dst_transition_slot_matching(self):
+        coord = _make_coordinator()
+        # Slot at 01:30 UTC, which is 02:30 BST (DST starts in UK on 2026-03-29)
+        dt_utc = datetime(2026, 3, 29, 1, 30, 0, tzinfo=timezone.utc)
+        slot = _make_timeslot(dt=dt_utc)
+        coord.timeslots = [slot]
+        coord.tz = ZoneInfo("Europe/London")
+        # Simulate now as 02:30 BST — datetime is already tz-aware, no need to set tzinfo
+        now = dt_utc.astimezone(ZoneInfo("Europe/London"))
+        with patch(
+            "custom_components.battery_charge_calculator.coordinators.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = now
+            result = coord.current_active_slot()
+        assert result is slot
+
     def test_returns_none_when_no_timeslots(self):
         coord = _make_coordinator()
         coord.timeslots = []
@@ -301,15 +341,17 @@ class TestShouldReplan:
     async def test_returns_true_when_no_timeslots(self):
         coord = _make_coordinator()
         coord.timeslots = []
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
+        assert reason == const.REPLAN_REASON_NO_PLAN
 
     @pytest.mark.asyncio
     async def test_returns_true_when_timeslots_is_none(self):
         coord = _make_coordinator()
         coord.timeslots = None
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
+        assert reason == const.REPLAN_REASON_NO_PLAN
 
     @pytest.mark.asyncio
     async def test_returns_true_when_fewer_than_2h_remaining(self):
@@ -322,8 +364,9 @@ class TestShouldReplan:
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
+        assert reason == const.REPLAN_REASON_PLAN_EXPIRING
 
     @pytest.mark.asyncio
     async def test_returns_false_when_more_than_2h_remaining_and_battery_on_track(self):
@@ -334,8 +377,8 @@ class TestShouldReplan:
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
-        result = await coord._should_replan()
-        assert result is False
+        should, reason = await coord._should_replan()
+        assert should is False
 
     @pytest.mark.asyncio
     async def test_returns_true_when_battery_deviation_exceeds_10_percent(self):
@@ -348,8 +391,9 @@ class TestShouldReplan:
         coord.timeslots = [active_slot, last_slot]
         # 5.0 - 3.6 = 1.4 kWh → 1.4 / 9.0 ≈ 15.6 %
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
+        assert reason == const.REPLAN_REASON_BATTERY_DEVIATION
 
     @pytest.mark.asyncio
     async def test_returns_false_when_battery_deviation_within_10_percent(self):
@@ -362,8 +406,8 @@ class TestShouldReplan:
         coord.timeslots = [active_slot, last_slot]
         # 5.8 - 5.0 = 0.8 kWh → 0.8 / 9.0 ≈ 8.9 %
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.8)
-        result = await coord._should_replan()
-        assert result is False
+        should, reason = await coord._should_replan()
+        assert should is False
 
     @pytest.mark.asyncio
     async def test_returns_false_just_below_10_percent_boundary(self):
@@ -376,8 +420,8 @@ class TestShouldReplan:
         coord.timeslots = [active_slot, last_slot]
         # 0.89 / 9.0 ≈ 9.9 %, safely below the > 10 % threshold
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.89)
-        result = await coord._should_replan()
-        assert result is False
+        should, reason = await coord._should_replan()
+        assert should is False
 
     @pytest.mark.asyncio
     async def test_uses_configured_battery_capacity_for_deviation(self):
@@ -394,8 +438,8 @@ class TestShouldReplan:
         coord.timeslots = [active_slot, last_slot]
         # 1.4 kWh deviation on a 12 kWh battery ≈ 11.7 % → still triggers replan
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
 
     @pytest.mark.asyncio
     async def test_larger_battery_capacity_means_more_tolerance(self):
@@ -408,7 +452,8 @@ class TestShouldReplan:
         last = self._make_future_slot(coord_small, hours_from_now=3.5)
         coord_small.timeslots = [active, last]
         coord_small.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
-        assert await coord_small._should_replan() is True
+        should_small, _ = await coord_small._should_replan()
+        assert should_small is True
 
         # 1.4 kWh on 20 kWh = 7.0 % → does not trigger
         coord_large = _make_coordinator()
@@ -418,7 +463,8 @@ class TestShouldReplan:
         last2 = self._make_future_slot(coord_large, hours_from_now=3.5)
         coord_large.timeslots = [active2, last2]
         coord_large.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=3.6)
-        assert await coord_large._should_replan() is False
+        should_large, _ = await coord_large._should_replan()
+        assert should_large is False
 
     @pytest.mark.asyncio
     async def test_returns_false_when_soc_unavailable(self):
@@ -429,8 +475,8 @@ class TestShouldReplan:
         active_slot = self._make_active_slot(coord, initial_power=5.0)
         coord.timeslots = [active_slot, last_slot]
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=None)
-        result = await coord._should_replan()
-        assert result is False
+        should, reason = await coord._should_replan()
+        assert should is False
 
     @pytest.mark.asyncio
     async def test_returns_true_when_no_active_slot_despite_timeslots(self):
@@ -445,8 +491,9 @@ class TestShouldReplan:
         last_slot = self._make_future_slot(coord, hours_from_now=3.5)
         coord.timeslots = [past_slot, last_slot]
         coord.givenergy.get_inverter_soc_kwh = AsyncMock(return_value=5.0)
-        result = await coord._should_replan()
-        assert result is True
+        should, reason = await coord._should_replan()
+        assert should is True
+        assert reason == const.REPLAN_REASON_NO_ACTIVE_SLOT
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +512,9 @@ class TestConditionalReplan:
 
         await coord._conditional_replan()
 
-        coord.octopus_state_change_listener.assert_called_once_with(None)
+        coord.octopus_state_change_listener.assert_called_once_with(
+            None, reason=const.REPLAN_REASON_NO_PLAN
+        )
 
     @pytest.mark.asyncio
     async def test_skips_replan_when_plan_is_valid(self):

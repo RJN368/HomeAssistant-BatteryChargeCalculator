@@ -1,7 +1,10 @@
 """Battery projection sensor."""
 
 from __future__ import annotations
+
 from typing import Any
+from zoneinfo import ZoneInfo
+import logging
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfEnergy
@@ -37,6 +40,8 @@ class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update attributes when coordinator data changes."""
+        # ...existing code...
+
         data = getattr(self.coordinator, "data", None)
         if data and len(data) > 0 and hasattr(data[0], "start_datetime"):
             slots = {"data": []}
@@ -46,15 +51,20 @@ class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
             for val in data:
                 if not hasattr(val, "start_datetime"):
                     continue
-                if current_day < val.start_datetime.day:
+                dt = val.start_datetime
+                if dt.tzinfo is None:
+                    logging.warning(
+                        "Naive datetime in battery projection slot; assuming UTC."
+                    )
+                    dt = dt.replace(tzinfo=datetime.timezone.utc)
+                dt = dt.astimezone(ZoneInfo("Europe/London"))
+                if current_day < dt.day:
                     cost_sum = 0
                 cost_sum += getattr(val, "cost", 0)
-                current_day = val.start_datetime.day
+                current_day = dt.day
                 slotdata.append(
                     {
-                        "date": val.start_datetime.isoformat()
-                        if hasattr(val.start_datetime, "isoformat")
-                        else str(val.start_datetime),
+                        "date": dt.isoformat(),
                         "cost": getattr(val, "cost", 0),
                         "charge_option": getattr(val, "charge_option", None),
                         "cost_total": cost_sum,

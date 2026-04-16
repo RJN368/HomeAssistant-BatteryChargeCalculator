@@ -4,7 +4,11 @@ Fetches current import and export tariff rates and standing charges
 for the account, regardless of tariff type.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 import aiohttp
 
@@ -31,7 +35,17 @@ def _active_agreement(agreements: list[dict]) -> dict | None:
         if valid_from_str is None:
             continue
         valid_from = datetime.fromisoformat(valid_from_str)
+        if valid_from.tzinfo is None:
+            _LOGGER.warning(
+                "Naive datetime detected in agreement valid_from; assuming UTC."
+            )
+            valid_from = valid_from.replace(tzinfo=UTC)
         valid_to = datetime.fromisoformat(valid_to_str) if valid_to_str else None
+        if valid_to and valid_to.tzinfo is None:
+            _LOGGER.warning(
+                "Naive datetime detected in agreement valid_to; assuming UTC."
+            )
+            valid_to = valid_to.replace(tzinfo=UTC)
         if valid_from <= now and (valid_to is None or valid_to > now):
             return agreement
     return None
@@ -57,6 +71,18 @@ def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
     slots: list[dict] = []
     current = slot_start
     last_value = raw_rates[0]["value_inc_vat"]
+
+    # Ensure all rate datetimes are timezone-aware and convert to Europe/London for slot matching
+    for r in raw_rates:
+        for k in ("start", "end"):
+            dt = r[k]
+            if dt.tzinfo is None:
+                _LOGGER.warning(f"Naive datetime detected in rate {k}; assuming UTC.")
+                r[k] = dt.replace(tzinfo=UTC)
+            # Always convert to Europe/London for slot logic
+            r[k] = r[k].astimezone(ZoneInfo("Europe/London"))
+    current = current.astimezone(ZoneInfo("Europe/London"))
+    end_time = end_time.astimezone(ZoneInfo("Europe/London"))
 
     while current < end_time:
         # Find a rate whose window directly covers this slot
@@ -191,20 +217,32 @@ class OctopusAgileRatesClient:
             resp.raise_for_status()
             data = await resp.json()
             _far_future = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
-            raw_rates = sorted(
-                [
+            raw_rates = []
+            for r in data["results"]:
+                if not r.get("valid_from"):
+                    continue
+                start = datetime.fromisoformat(r["valid_from"])
+                if start.tzinfo is None:
+                    _LOGGER.warning(
+                        "Naive datetime detected in rate start; assuming UTC."
+                    )
+                    start = start.replace(tzinfo=UTC)
+                end = (
+                    datetime.fromisoformat(r["valid_to"])
+                    if r.get("valid_to")
+                    else _far_future
+                )
+                if end.tzinfo is None:
+                    _LOGGER.warning(
+                        "Naive datetime detected in rate end; assuming UTC."
+                    )
+                    end = end.replace(tzinfo=UTC)
+                raw_rates.append(
                     {
-                        "start": datetime.fromisoformat(r["valid_from"]),
-                        "end": (
-                            datetime.fromisoformat(r["valid_to"])
-                            if r.get("valid_to")
-                            else _far_future
-                        ),
+                        "start": start,
+                        "end": end,
                         "value_inc_vat": float(r["value_inc_vat"]) / 100,
                     }
-                    for r in data["results"]
-                    if r.get("valid_from")
-                ],
-                key=lambda r: r["start"],
-            )
+                )
+            raw_rates = sorted(raw_rates, key=lambda r: r["start"])
             return _expand_to_30min_slots(raw_rates, days)
