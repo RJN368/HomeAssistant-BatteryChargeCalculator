@@ -371,7 +371,12 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         if non_current:
             self.hass.async_create_task(
                 self._start_simulations(
-                    non_current, new_tariff_rates, period_from, period_to, result
+                    non_current,
+                    new_tariff_rates,
+                    period_from,
+                    period_to,
+                    result,
+                    shared_export_code=shared_export_code,
                 )
             )
 
@@ -563,11 +568,16 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         cache = await self.hass.async_add_executor_job(read_cache, self._config_dir)
         tariff_rates = _rates_from_cache((cache or {}).get("tariff_rates", {}))
+        shared_export_code: str | None = (cache or {}).get("export_tariff_code") or None
 
         current_result = copy.deepcopy(self.data)
         task = self.hass.async_create_task(
             self._run_tariff_simulation(
-                tariff_config, tariff_rates, period_from, period_to
+                tariff_config,
+                tariff_rates,
+                period_from,
+                period_to,
+                shared_export_code=shared_export_code,
             )
         )
         self._simulation_tasks[code] = task
@@ -579,6 +589,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         period_from: datetime,
         period_to: datetime,
         current_result: dict[str, Any],  # noqa: ARG002 — kept for API compat
+        shared_export_code: str | None = None,
     ) -> None:
         """Launch background simulation tasks for all non-current tariffs."""
         for tc in tariff_configs:
@@ -591,7 +602,13 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             ):
                 continue
             task = self.hass.async_create_task(
-                self._run_tariff_simulation(tc, tariff_rates, period_from, period_to)
+                self._run_tariff_simulation(
+                    tc,
+                    tariff_rates,
+                    period_from,
+                    period_to,
+                    shared_export_code=shared_export_code,
+                )
             )
             self._simulation_tasks[code] = task
 
@@ -629,6 +646,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         tariff_rates: dict[str, dict],
         period_from: datetime,
         period_to: datetime,
+        shared_export_code: str | None = None,
     ) -> None:
         """Background coroutine: run full Approach A GeneticEvaluator simulation.
 
@@ -641,7 +659,10 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         from .simulator import TariffSimulator
 
         import_code: str = tariff_config.get("import_tariff_code", "")
-        export_code: str | None = tariff_config.get("export_tariff_code")
+        # Use the shared account export tariff — per-tariff export_tariff_code
+        # is never stored in the config, so tariff_config.get() would always
+        # return None.  The coordinator resolves it once at fetch time.
+        export_code: str | None = shared_export_code
         include_sc: bool = tariff_config.get("include_standing_charges", True)
 
         _LOGGER.info("Starting Approach A simulation for tariff: %s", import_code)

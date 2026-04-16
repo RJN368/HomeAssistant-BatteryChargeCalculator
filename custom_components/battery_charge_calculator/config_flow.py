@@ -364,7 +364,7 @@ def _tariff_codes_from_stored_json(tariffs_json: str) -> list[str]:
                     if code:
                         codes.append(code)
             return codes
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         pass
     return []
 
