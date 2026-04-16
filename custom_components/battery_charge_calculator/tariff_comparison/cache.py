@@ -98,12 +98,14 @@ def build_cache_payload(
     consumption_import: list[dict],
     consumption_export: list[dict],
     tariff_rates: dict[str, dict],
+    export_tariff_code: str | None = None,
 ) -> dict[str, Any]:
     """Construct the full cache payload ready for write_cache()."""
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "data_year": data_year,
+        "export_tariff_code": export_tariff_code,
         "consumption": {
             "import": consumption_import,
             "export": consumption_export,

@@ -346,6 +346,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             consumption_import=_slots_to_cache(import_slots),
             consumption_export=_slots_to_cache(export_slots or []),
             tariff_rates=_rates_to_cache(new_tariff_rates),
+            export_tariff_code=shared_export_code,
         )
         await self.hass.async_add_executor_job(
             write_cache, self._config_dir, cache_payload
@@ -362,6 +363,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             period_from,
             period_to,
             export_meter_missing,
+            shared_export_code,
         )
 
         # ── 6. Schedule background Approach A simulation for non-current tariffs ──
@@ -390,6 +392,8 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         )
 
         tariff_rates = _rates_from_cache(cache.get("tariff_rates", {}))
+        # Restore the shared export tariff code that was resolved at fetch time
+        shared_export_code: str | None = cache.get("export_tariff_code") or None
 
         opts = self._entry.options
         export_mpan = opts.get(const.OCTOPUS_EXPORT_MPN) or None
@@ -404,6 +408,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             period_from,
             period_to,
             export_meter_missing,
+            shared_export_code,
         )
 
         # Overlay any completed simulation results that were persisted to cache.
@@ -437,6 +442,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         period_from: datetime,
         period_to: datetime,
         export_meter_missing: bool,
+        shared_export_code: str | None = None,
     ) -> dict[str, Any]:
         """Run the cost calculator for each configured tariff and assemble result."""
         client_helper = TariffComparisonClient("", "", "")
@@ -446,7 +452,8 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         for tc in tariff_configs:
             import_code: str = tc.get("import_tariff_code", "")
-            export_code: str | None = tc.get("export_tariff_code")
+            # All tariffs share the same export tariff (the account's real one).
+            export_code: str | None = shared_export_code
             include_sc: bool = tc.get("include_standing_charges", True)
             is_current: bool = tc.get("is_current", False)
 
