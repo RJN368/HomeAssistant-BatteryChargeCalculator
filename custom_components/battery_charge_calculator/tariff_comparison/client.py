@@ -210,8 +210,6 @@ class TariffComparisonClient:
         params = {
             "period_from": period_from.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "period_to": period_to.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "group_by": "half_hour",
-            "order_by": "period",
             "page_size": _PAGE_SIZE,
         }
         raw = await _paginate(session, url, params, auth=self._auth)
