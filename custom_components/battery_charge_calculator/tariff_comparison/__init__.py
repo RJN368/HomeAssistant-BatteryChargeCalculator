@@ -254,7 +254,13 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         # ── 3. Fetch rates for each tariff ───────────────────────────────
         tariff_rates_cache: dict[str, dict] = {}
         if existing_cache:
-            tariff_rates_cache = existing_cache.get("tariff_rates", {})
+            # Parse ISO strings back to datetimes so comparisons in
+            # _build_historical_rate_map work regardless of whether this
+            # data came straight from the cache (strings) or from a fresh
+            # API fetch (datetimes).
+            tariff_rates_cache = _rates_from_cache(
+                existing_cache.get("tariff_rates", {})
+            )
 
         new_tariff_rates: dict[str, dict] = {}
         errors: list[str] = []
