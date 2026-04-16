@@ -16,6 +16,7 @@ from .sensors import (
     CostPredictionSensor,
     DailyPowerForecastSensor,
     EstimatedPowerDemandSensor,
+    LastRecalculationSensor,
     MLModelStatusSensor,
     MLPowerSurfaceSensor,
     TimeSlotSensor,
@@ -34,6 +35,7 @@ async def async_setup_entry(
         BatterySocSensor(hass, coordinator),
         EstimatedPowerDemandSensor(hass, coordinator),
         DailyPowerForecastSensor(hass, coordinator),
+        LastRecalculationSensor(hass, coordinator),
     ]
     if config_entry.options.get(const.ML_ENABLED, False):
         entities.append(MLModelStatusSensor(hass, coordinator))

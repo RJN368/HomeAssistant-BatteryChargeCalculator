@@ -68,6 +68,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.timeslots = []
         self.totalcost = 0
         self.end_of_day_cost = 0
+        self.recalculation_time: datetime | None = None
+        self.recalculation_reason: str | None = None
         # Each entry: {"time": ISO string, "temp_c": float, "kwh": float}
         self.daily_power_forecast: list[dict] = []
         self.agile_rates_client = OctopusAgileRatesClient(
@@ -149,7 +151,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 await self.ml_client.async_start()
             except Exception as exc:
                 _LOGGER.warning("ML service unreachable at startup: %s", exc)
-        await self.octopus_state_change_listener(None)
+        await self.octopus_state_change_listener(
+            None, reason=const.REPLAN_REASON_INITIAL_SETUP
+        )
         self._timer_unsub = async_track_time_interval(
             self.hass,
             self._handle_planning_timer,
@@ -180,14 +184,15 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
           than 10 % of maximum battery capacity.
         - Fewer than 2 hours remain on the current plan.
         """
-        if await self._should_replan():
-            await self.octopus_state_change_listener(None)
+        should, reason = await self._should_replan()
+        if should:
+            await self.octopus_state_change_listener(None, reason=reason)
 
-    async def _should_replan(self) -> bool:
-        """Return True when conditions warrant replacing the current plan."""
+    async def _should_replan(self) -> tuple[bool, str]:
+        """Return (True, reason) when conditions warrant replacing the current plan."""
         if not self.timeslots:
             _LOGGER.debug("No existing plan — re-planning required")
-            return True
+            return True, const.REPLAN_REASON_NO_PLAN
 
         # Trigger re-plan when the plan is nearly exhausted.
         last_slot = self.timeslots[-1]
@@ -203,19 +208,19 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 "Fewer than 2 hours remain on the current plan (%s) — re-planning",
                 time_remaining,
             )
-            return True
+            return True, const.REPLAN_REASON_PLAN_EXPIRING
 
         # Trigger re-plan when the battery level has drifted too far from the
         # projection embedded in the plan.
         actual_battery_kw = await self.givenergy.get_inverter_soc_kwh(self.hass)
         if actual_battery_kw is None:
             _LOGGER.warning("Battery SOC unavailable — skipping re-plan check")
-            return False
+            return False, ""
 
         active_slot = self.current_active_slot()
         if active_slot is None:
             _LOGGER.debug("No active timeslot found — re-planning required")
-            return True
+            return True, const.REPLAN_REASON_NO_ACTIVE_SLOT
 
         projected_battery_kw = active_slot.initial_power
         deviation = (
@@ -228,14 +233,14 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 actual_battery_kw,
                 projected_battery_kw,
             )
-            return True
+            return True, const.REPLAN_REASON_BATTERY_DEVIATION
 
         _LOGGER.debug(
             "Plan is still valid (battery deviation %.1f %%, %.1fh remaining) — skipping re-plan",
             deviation * 100,
             time_remaining.total_seconds() / 3600,
         )
-        return False
+        return False, ""
 
     async def async_shutdown(self) -> None:
         """Cancel the hourly planning timer on shutdown."""
@@ -252,8 +257,12 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         if self.ml_client is not None:
             await self.ml_client.async_trigger_retrain()
 
-    async def octopus_state_change_listener(self, event):
-        _LOGGER.debug("octopus_state_change_listener")
+    async def octopus_state_change_listener(
+        self, event, *, reason: str = const.REPLAN_REASON_MANUAL
+    ):
+        _LOGGER.debug("octopus_state_change_listener — reason: %s", reason)
+        self.recalculation_time = datetime.now(timezone.utc)
+        self.recalculation_reason = reason
 
         try:
             now = datetime.now(timezone.utc)
