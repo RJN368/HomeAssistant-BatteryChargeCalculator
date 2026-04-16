@@ -130,10 +130,10 @@
                 }
             },
             "tariff_comparison": {
-                "title": "Annual Tariff Comparison",
-                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last 12 months of real meter data.",
+                "title": "Monthly Tariff Comparison",
+                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last month of real meter data.",
                 "data": {
-                    "tariff_comparison_enabled": "Enable annual tariff comparison"
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison"
                 },
                 "data_description": {
                     "tariff_comparison_enabled": "When enabled, a new sensor will be created showing monthly cost breakdowns for each selected tariff."
@@ -141,7 +141,7 @@
             },
             "tariff_comparison_pick": {
                 "title": "Select Tariffs to Compare",
-                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Annual Tariff Comparison sensor.",
+                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Monthly Tariff Comparison sensor.",
                 "data": {
                     "tariff_comparison_tariffs": "Tariffs to compare"
                 },
@@ -287,10 +287,10 @@
                 }
             },
             "tariff_comparison": {
-                "title": "Annual Tariff Comparison",
-                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last 12 months of real meter data.",
+                "title": "Monthly Tariff Comparison",
+                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last month of real meter data.",
                 "data": {
-                    "tariff_comparison_enabled": "Enable annual tariff comparison"
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison"
                 },
                 "data_description": {
                     "tariff_comparison_enabled": "When enabled, a new sensor will be created showing monthly cost breakdowns for each selected tariff."
@@ -298,7 +298,7 @@
             },
             "tariff_comparison_pick": {
                 "title": "Select Tariffs to Compare",
-                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Annual Tariff Comparison sensor.",
+                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Monthly Tariff Comparison sensor.",
                 "data": {
                     "tariff_comparison_tariffs": "Tariffs to compare"
                 },

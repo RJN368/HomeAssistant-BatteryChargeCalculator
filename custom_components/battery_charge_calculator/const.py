@@ -200,7 +200,7 @@ DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT = False
 
 # Sensor identifiers
 TARIFF_COMPARISON_SENSOR = "battery_charge_calculator.tariff_comparison"
-TARIFF_COMPARISON_SENSOR_NAME = "Annual Tariff Comparison"
+TARIFF_COMPARISON_SENSOR_NAME = "Monthly Tariff Comparison"
 
 # Export meter serial — new field; added alongside OCTOPUS_METER_SERIAL (D-18)
 OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"

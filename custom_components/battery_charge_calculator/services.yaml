@@ -9,7 +9,7 @@ trigger_ml_training:
 refresh_tariff_comparison:
   name: Refresh tariff comparison
   description: >
-    Trigger an immediate full refresh of the annual tariff comparison data,
+    Trigger an immediate full refresh of the monthly tariff comparison data,
     bypassing the weekly cache. Useful after adding a new tariff or if the
     displayed data appears stale. Tariff comparison must be enabled in the
     integration's configuration options.

@@ -130,14 +130,14 @@
                 }
             },
             "tariff_comparison": {
-                "title": "Annual Tariff Comparison",
-                "description": "Compare what your electricity would have cost under different Octopus tariffs over the last 12 months, broken down monthly. See {octopus_tariff_url} for available tariff codes.",
+                "title": "Monthly Tariff Comparison",
+                "description": "Compare what your electricity would have cost under different Octopus tariffs over the last month, broken down monthly. See {octopus_tariff_url} for available tariff codes.",
                 "data": {
-                    "tariff_comparison_enabled": "Enable annual tariff comparison",
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison",
                     "tariff_comparison_tariffs": "Tariff list (JSON)"
                 },
                 "data_description": {
-                    "tariff_comparison_enabled": "When enabled, a new sensor 'Annual Tariff Comparison' will be created with monthly cost breakdowns for each configured tariff.",
+                    "tariff_comparison_enabled": "When enabled, a new sensor 'Monthly Tariff Comparison' will be created with monthly cost breakdowns for each configured tariff.",
                     "tariff_comparison_tariffs": "JSON array of tariff objects. Each entry: {\"name\": \"My Tariff\", \"import_tariff_code\": \"E-1R-AGILE-FLEX-22-11-25-B\", \"export_tariff_code\": \"E-1R-AGILE-OUTGOING-19-05-13-B\", \"include_standing_charges\": true, \"is_current\": false}. Maximum 6 entries. Leave blank to use only the current tariff."
                 }
             }
@@ -278,14 +278,14 @@
                 }
             },
             "tariff_comparison": {
-                "title": "Annual Tariff Comparison",
-                "description": "Compare what your electricity would have cost under different Octopus tariffs over the last 12 months, broken down monthly. See {octopus_tariff_url} for available tariff codes.",
+                "title": "Monthly Tariff Comparison",
+                "description": "Compare what your electricity would have cost under different Octopus tariffs over the last month, broken down monthly. See {octopus_tariff_url} for available tariff codes.",
                 "data": {
-                    "tariff_comparison_enabled": "Enable annual tariff comparison",
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison",
                     "tariff_comparison_tariffs": "Tariff list (JSON)"
                 },
                 "data_description": {
-                    "tariff_comparison_enabled": "When enabled, a new sensor 'Annual Tariff Comparison' will be created with monthly cost breakdowns for each configured tariff.",
+                    "tariff_comparison_enabled": "When enabled, a new sensor 'Monthly Tariff Comparison' will be created with monthly cost breakdowns for each configured tariff.",
                     "tariff_comparison_tariffs": "JSON array of tariff objects. Each entry: {\"name\": \"My Tariff\", \"import_tariff_code\": \"E-1R-AGILE-FLEX-22-11-25-B\", \"export_tariff_code\": \"E-1R-AGILE-OUTGOING-19-05-13-B\", \"include_standing_charges\": true, \"is_current\": false}. Maximum 6 entries. Leave blank to use only the current tariff."
                 }
             }
