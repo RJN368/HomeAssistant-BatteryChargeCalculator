@@ -1,13 +1,14 @@
 """TariffComparisonCoordinator — package init.
 
 Exports TariffComparisonCoordinator, a lightweight DataUpdateCoordinator that
-orchestrates the fetch-calculate-cache cycle for the Annual Tariff Comparison
-feature.
+orchestrates the fetch-calculate-cache cycle for the Tariff Comparison feature.
 
-Architecture rationale (§5.4): this coordinator is intentionally separate from
-BatteryChargeCoordinator.  The main coordinator refreshes every minute for
-real-time battery scheduling; tariff comparison only needs a weekly refresh and
-should not slow the hot path.
+Architecture:
+- _async_update_data() returns immediately with cached data (or empty dict).
+- When the cache is stale a background task (_background_fetch_and_calculate)
+  does all the network I/O and CPU work, then calls async_set_updated_data().
+- The comparison window is the previous complete calendar month.
+- Update interval: configurable, default 7 days.
 """
 
 from __future__ import annotations
@@ -43,25 +44,28 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _target_data_year(now: datetime) -> str:
-    """Return the data_year key for the rolling 12-month window.
+    """Return the data_year key for the rolling 1-month window.
 
-    The window ends at the start of the current calendar month so that only
-    complete months are included (§3.1).  Returns 'YYYY-MM' of the start month.
-    e.g. if today is 2026-04-16, window = 2025-04-01 → 2026-04-01 → '2025-04'
+    The window covers the previous complete calendar month.
+    Returns 'YYYY-MM' of that month.
+    e.g. if today is 2026-04-16, window = 2026-03-01 → 2026-04-01 → '2026-03'
     """
     period_from, _ = _period_bounds(now)
     return period_from.strftime("%Y-%m")
 
 
 def _period_bounds(now: datetime) -> tuple[datetime, datetime]:
-    """Return (period_from, period_to) UTC datetimes for the rolling 12-month window."""
+    """Return (period_from, period_to) UTC datetimes for the rolling 1-month window.
+
+    Covers the previous complete calendar month so only settled data is used.
+    """
     period_to = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # Go back exactly 12 calendar months
+    # Go back exactly 1 calendar month
     to_month = period_to.month
     to_year = period_to.year
-    from_month = to_month - 12
+    from_month = to_month - 1
     if from_month <= 0:
-        from_month += 12
+        from_month = 12
         from_year = to_year - 1
     else:
         from_year = to_year
@@ -94,12 +98,15 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         self._force_refresh = False
         # Active per-tariff simulation background tasks keyed by import tariff code
         self._simulation_tasks: dict[str, asyncio.Task] = {}
+        # Background fetch task (only one at a time)
+        self._fetch_task: asyncio.Task | None = None
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Orchestrate the full fetch-calculate-cache cycle.
+        """Return cached data immediately; trigger background fetch if stale.
 
-        Returns the tariff comparison dict (matches sensor attribute schema §7).
-        Raises UpdateFailed if ALL tariffs fail (partial failure is tolerated).
+        This method returns as fast as possible so the event loop is never
+        blocked.  Heavy I/O and CPU work runs in _background_fetch_and_calculate
+        which calls async_set_updated_data() when complete.
         """
         opts = self._entry.options
         tariffs_json: str = opts.get(const.TARIFF_COMPARISON_TARIFFS, "[]")
@@ -140,17 +147,61 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             )
 
         _LOGGER.info(
-            "Tariff cache missing or stale — fetching from Octopus API "
+            "Tariff cache missing or stale — scheduling background fetch "
             "(period: %s → %s)",
             period_from.date(),
             period_to.date(),
         )
         self._force_refresh = False
 
-        session = async_get_clientsession(self.hass)
-        return await self._fetch_and_calculate(
-            session, tariff_configs, period_from, period_to, current_data_year, cache
-        )
+        # Fire-and-forget: background task does the real work and calls
+        # async_set_updated_data() when complete.  We return immediately so
+        # the event loop is never blocked by network I/O or CPU work.
+        if self._fetch_task is None or self._fetch_task.done():
+            self._fetch_task = self.hass.async_create_task(
+                self._background_fetch_and_calculate(
+                    tariff_configs, period_from, period_to, current_data_year, cache
+                )
+            )
+
+        # Return whatever we have right now (stale cache or empty)
+        if cache is not None:
+            try:
+                return self._build_result_from_cache(
+                    cache, tariff_configs, period_from, period_to
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        return {"tariffs": [], "calculating": True}
+
+    async def _background_fetch_and_calculate(
+        self,
+        tariff_configs: list[dict],
+        period_from: datetime,
+        period_to: datetime,
+        data_year: str,
+        existing_cache: dict | None,
+    ) -> None:
+        """Background task: fetch from API, calculate, update sensor.
+
+        Runs entirely outside _async_update_data so the event loop stays free.
+        Calls async_set_updated_data() on success.
+        """
+        try:
+            session = async_get_clientsession(self.hass)
+            result = await self._fetch_and_calculate(
+                session,
+                tariff_configs,
+                period_from,
+                period_to,
+                data_year,
+                existing_cache,
+            )
+            self.async_set_updated_data(result)
+        except UpdateFailed as exc:
+            _LOGGER.error("Background tariff fetch failed: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.exception("Unexpected error in background tariff fetch: %s", exc)
 
     async def _fetch_and_calculate(
         self,
@@ -268,7 +319,9 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         )
 
         # ── 5. Run calculator for each tariff (Phase 1 — naive replay) ──
-        result = self._calculate_all(
+        # CPU-bound: run in executor so the event loop stays free
+        result = await self.hass.async_add_executor_job(
+            self._calculate_all,
             tariff_configs,
             import_slots,
             export_slots,
@@ -415,7 +468,10 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         service handler.
         """
         self._force_refresh = True
-        # Cancel any running simulation tasks before full re-fetch
+        # Cancel any running background tasks before re-fetch
+        if self._fetch_task and not self._fetch_task.done():
+            self._fetch_task.cancel()
+            self._fetch_task = None
         for key, task in list(self._simulation_tasks.items()):
             if not task.done():
                 task.cancel()
