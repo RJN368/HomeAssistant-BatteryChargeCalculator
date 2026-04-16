@@ -1,12 +1,21 @@
 """Config flow for the battery_manager component."""
 
+import json
+import re
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.helpers.selector import (
+    BooleanSelector,
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from . import const
 
@@ -216,6 +225,73 @@ def _ml_settings_schema(
             ): vol.All(vol.Coerce(int), vol.Range(min=14, max=730)),
         }
     )
+
+
+_TARIFF_CODE_RE = re.compile(r"^E-[12]R-[A-Z0-9\-]+-[A-Z]$")
+_MAX_TARIFFS = 6
+
+
+def _region_from_tariff_code(tariff_code: str) -> str:
+    """Extract the single-letter region suffix from an Octopus tariff code.
+
+    e.g. 'E-1R-AGILE-FLEX-22-11-25-B' -> 'B'
+    """
+    return tariff_code.split("-")[-1]
+
+
+def _tariff_comparison_schema(
+    enabled: bool = False,
+    tariffs_json: str = "",
+) -> vol.Schema:
+    """Schema for the tariff comparison options step (§4.3)."""
+    return vol.Schema(
+        {
+            vol.Optional(
+                const.TARIFF_COMPARISON_ENABLED, default=enabled
+            ): BooleanSelector(),
+            vol.Optional(
+                const.TARIFF_COMPARISON_TARIFFS, default=tariffs_json
+            ): TextSelector(
+                TextSelectorConfig(multiline=True, type=TextSelectorType.TEXT)
+            ),
+        }
+    )
+
+
+def _validate_tariff_json(tariffs_json: str) -> list[str]:
+    """Validate the tariff comparison JSON string.
+
+    Returns a list of error messages; empty list = valid.
+    """
+    errors: list[str] = []
+    if not tariffs_json.strip():
+        return errors  # empty is OK (feature will be disabled)
+    try:
+        tariffs = json.loads(tariffs_json)
+    except json.JSONDecodeError as exc:
+        return [f"Invalid JSON: {exc}"]
+
+    if not isinstance(tariffs, list):
+        return ["Tariff list must be a JSON array"]
+
+    if len(tariffs) > _MAX_TARIFFS:
+        errors.append(f"Maximum {_MAX_TARIFFS} tariff entries allowed")
+
+    names_seen: set[str] = set()
+    for i, entry in enumerate(tariffs):
+        name = entry.get("name", f"entry {i + 1}")
+        if name in names_seen:
+            errors.append(f"Duplicate tariff name '{name}' — names must be unique")
+        names_seen.add(name)
+
+        import_code = entry.get("import_tariff_code", "")
+        if import_code and not _TARIFF_CODE_RE.match(import_code):
+            errors.append(
+                f"'{import_code}' does not match expected tariff code format "
+                f"(e.g. E-1R-AGILE-FLEX-22-11-25-B)"
+            )
+
+    return errors
 
 
 def estimate_heat_loss(
@@ -457,7 +533,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             # Also update self.options to ensure persistence if options flow is used later
             if hasattr(self, "options"):
                 self.options.update(ml_settings)
-            return self._create_entry()
+            return await self.async_step_tariff_comparison()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -485,6 +561,45 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),
             ),
+        )
+
+    async def async_step_tariff_comparison(self, user_input=None):
+        """Tariff comparison settings step (§4.3).
+
+        Enables the annual tariff comparison feature and accepts a JSON list of
+        tariff entries.  Defaults to disabled so existing users are unaffected.
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            tariffs_json: str = user_input.get(const.TARIFF_COMPARISON_TARIFFS, "")
+            validation_errors = _validate_tariff_json(tariffs_json)
+            if validation_errors:
+                errors["base"] = "invalid_tariff_json"
+            else:
+                tc_settings = {
+                    const.TARIFF_COMPARISON_ENABLED: user_input.get(
+                        const.TARIFF_COMPARISON_ENABLED, False
+                    ),
+                    const.TARIFF_COMPARISON_TARIFFS: tariffs_json,
+                }
+                self._heating_data.update(tc_settings)
+                if hasattr(self, "options"):
+                    self.options.update(tc_settings)
+                return self._create_entry()
+
+        return self.async_show_form(
+            step_id="tariff_comparison",
+            data_schema=_tariff_comparison_schema(
+                enabled=self._heating_data.get(const.TARIFF_COMPARISON_ENABLED, False),
+                tariffs_json=self._heating_data.get(
+                    const.TARIFF_COMPARISON_TARIFFS, ""
+                ),
+            ),
+            errors=errors,
+            description_placeholders={
+                "octopus_tariff_url": "https://octopus.energy/tariffs/",
+            },
         )
 
     def _create_entry(self):
@@ -807,7 +922,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             )
-            return self._save_and_exit()
+            return await self.async_step_tariff_comparison()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -835,6 +950,42 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),
             ),
+        )
+
+    async def async_step_tariff_comparison(self, user_input=None):
+        """Tariff comparison settings step (options flow — §4.3).
+
+        Enables the annual tariff comparison feature and accepts a JSON list of
+        tariff entries.  Defaults to disabled so existing users are unaffected.
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            tariffs_json: str = user_input.get(const.TARIFF_COMPARISON_TARIFFS, "")
+            validation_errors = _validate_tariff_json(tariffs_json)
+            if validation_errors:
+                errors["base"] = "invalid_tariff_json"
+            else:
+                self.options.update(
+                    {
+                        const.TARIFF_COMPARISON_ENABLED: user_input.get(
+                            const.TARIFF_COMPARISON_ENABLED, False
+                        ),
+                        const.TARIFF_COMPARISON_TARIFFS: tariffs_json,
+                    }
+                )
+                return self._save_and_exit()
+
+        return self.async_show_form(
+            step_id="tariff_comparison",
+            data_schema=_tariff_comparison_schema(
+                enabled=self.options.get(const.TARIFF_COMPARISON_ENABLED, False),
+                tariffs_json=self.options.get(const.TARIFF_COMPARISON_TARIFFS, ""),
+            ),
+            errors=errors,
+            description_placeholders={
+                "octopus_tariff_url": "https://octopus.energy/tariffs/",
+            },
         )
 
     def _save_and_exit(self):

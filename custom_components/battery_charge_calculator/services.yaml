@@ -5,3 +5,11 @@ trigger_planning:
 trigger_ml_training:
   name: Trigger ML training
   description: Fetch historical consumption and temperature data then retrain the ML power estimation model immediately. ML must be enabled in the integration's configuration options.
+
+refresh_tariff_comparison:
+  name: Refresh tariff comparison
+  description: >
+    Trigger an immediate full refresh of the annual tariff comparison data,
+    bypassing the weekly cache. Useful after adding a new tariff or if the
+    displayed data appears stale. Tariff comparison must be enabled in the
+    integration's configuration options.

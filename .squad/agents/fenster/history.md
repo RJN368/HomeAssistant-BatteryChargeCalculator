@@ -54,7 +54,18 @@
 - **Graceful "both" fallback:** if Octopus fetch fails during a training cycle when source is "both", train on GivEnergy-only (without the extra column), set `consumption_signal_quality = "partial"`, log warning. Do NOT crash. The absence of the feature is handled by the schema mismatch check on the next successful "both" cycle — it triggers retrain.
 - **Auto-discovery of meter serial:** `GET /v1/electricity-meter-points/{mpan}/meters/` can pre-populate `OCTOPUS_METER_SERIAL` in the config flow. Use `aiohttp.BasicAuth(api_key, "")`. Catch all exceptions — failure should silently leave the field blank, not block setup. Pick meter with latest `installation_date` if multiple results are returned.
 
-### 2026-04-10 — ml_power_estimator.py Orchestrator Patterns
+### 2026-04-16 — Tariff Comparison Sub-Package Implementation
+
+- **Stub files already existed** (`cache.py`, `calculator.py`, `client.py`, `__init__.py`, `open_meteo_historical.py`). Always check before creating. The stubs had real content — around 100-500 lines each — needing fixes not full rewrites.
+- **cache.py syntax bug:** Python 2-style `except ValueError, TypeError:` was in the stub. Python 3 requires `except (ValueError, TypeError):`. Always run `python -m py_compile` after touching any file.
+- **calculator.py dict_keys union:** `monthly_import_p.keys() | monthly_export_p.keys()` requires Python 3.9+; safer to use `set(d1) | set(d2)`. Also fixed a `month_end` computation using a flawed formula — use explicit `if month == 12` branches.
+- **coordinator _target_data_year():** Original used `timedelta(days=365)` which drifts by ±1 day near leap years. Fixed to use `_period_bounds()` internally (month arithmetic) so both functions are consistent.
+- **_period_bounds() month rollback:** When computing `month - 12`, if month ≤ 0 after subtraction the year must also decrement. Only roll year back when `from_month <= 0`; do NOT modify year unconditionally.
+- **const.py idempotency:** Always check if constants exist before adding. The tariff comparison constants were already in const.py (added by a previous agent). My insert created duplicates. Verify with grep before any const.py append.
+- **Simulation in coordinator:** The coordinator's `__init__.py` stub was missing all Phase 2 simulation logic. Added: `self._simulation_tasks` dict, `async_start_simulation()`, `_start_simulations()`, `_run_tariff_simulation()`, `_persist_simulation_result()`, plus module-level helpers `_update_tariff_entry()`, `_build_simulation_monthly()`, `_sum_annual()`, `_build_power_calculator()`.
+- **Simulation cost accumulation:** GeneticEvaluator sets `timeslot.cost` directly in pence (positive = import, negative = export). Summing costs directly is the correct and division-safe approach. Do NOT try to back-calculate kWh from cost/rate.
+- **async_set_updated_data pattern:** Call with `copy.deepcopy(current_result)` to avoid subsequent mutations corrupting what the sensor received. The coordinator's `data` property is a reference — mutating it post-set will be visible to the sensor.
+- **HA import chain at test time:** `tariff_comparison/__init__.py` imports HA at module level. Any test that imports any tariff_comparison submodule will trigger the `__init__.py` and fail without a real HA environment. This is expected HA integration behaviour, not a bug.
 
 - **File location:** `ml/ml_power_estimator.py` is the sole HA boundary in the `ml/` sub-package. Only this file imports `homeassistant.*`. All other `ml/` files are pure Python.
 - **Coordinator injection pattern:** `MLPowerEstimator.__init__` receives `hass` and `config_entry`. `set_physics_calculator(pc)` is called by coordinator after `PowerCalulator` is constructed — this avoids circular dependency at init time.

@@ -175,3 +175,32 @@ DAILY_POWER_FORECAST_SENSOR = "battery_charge_calculator.daily_power_forecast"
 DAILY_POWER_FORECAST_SENSOR_NAME = "Daily Power Forecast"
 ML_POWER_SURFACE_SENSOR = "battery_charge_calculator.ml_power_surface"
 ML_POWER_SURFACE_SENSOR_NAME = "ML Power Surface"
+
+# ─────────────────────────── Tariff Comparison ───────────────────────────────
+# Feature introduced 2026-04-16.  All keys default to safe values so existing
+# config entries without tariff comparison settings continue to work unchanged.
+
+# Master switch — defaults to False so the feature is never activated unexpectedly
+TARIFF_COMPARISON_ENABLED = "tariff_comparison_enabled"
+
+# Tariff list — stored as a JSON string (list of tariff objects per §4.2)
+TARIFF_COMPARISON_TARIFFS = "tariff_comparison_tariffs"
+
+# Update / cache age thresholds (integer days)
+TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS = "tariff_comparison_update_interval_days"
+TARIFF_COMPARISON_CACHE_MAX_AGE_DAYS = "tariff_comparison_cache_max_age_days"
+
+# Whether to include export earnings in the comparison (False until OQ-1 resolved)
+TARIFF_COMPARISON_INCLUDE_EXPORT = "tariff_comparison_include_export"
+
+# Defaults
+DEFAULT_TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS = 7
+DEFAULT_TARIFF_COMPARISON_CACHE_MAX_AGE_DAYS = 7
+DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT = False
+
+# Sensor identifiers
+TARIFF_COMPARISON_SENSOR = "battery_charge_calculator.tariff_comparison"
+TARIFF_COMPARISON_SENSOR_NAME = "Annual Tariff Comparison"
+
+# Export meter serial — new field; added alongside OCTOPUS_METER_SERIAL (D-18)
+OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
