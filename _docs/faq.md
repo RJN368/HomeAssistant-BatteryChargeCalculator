@@ -82,6 +82,38 @@ The trained model and credentials in `./config/bcc-ml-data/` are preserved.
 
 ---
 
+## Annual Tariff Comparison
+
+### How does the tariff comparison work?
+
+It fetches your actual half-hourly import and export meter reads from the Octopus Energy API for the last 12 months, then calculates what those reads would have cost under each tariff's historical unit rates and standing charges. The result is a monthly breakdown per tariff.
+
+### Why does it say "naive_replay" instead of "simulation"?
+
+The comparison runs in two phases. **Naive replay** (available within minutes of enabling the feature) simply reprices your real meter reads at alternative tariff rates. It's accurate for fixed and TOU tariffs but slightly overestimates savings on cheap overnight tariffs, because your actual consumption patterns were shaped by your current tariff's pricing — not optimised for the alternative.
+
+**Simulation** (runs in the background overnight) re-runs the genetic algorithm day-by-day as if you had always been on each alternative tariff, giving a more honest comparison. The `comparison_method` attribute on each tariff entry tells you which method was used.
+
+### The tariff list shows tariffs from the wrong region
+
+The region is detected from your current import tariff code's last letter (e.g. `B` for East Midlands). If this is wrong, check your tariff code in **Settings → Devices & Services → Battery Charge Calculator → Configure → Annual Tariff Comparison**.
+
+### How often does the comparison update?
+
+Once a week by default. You can force an immediate refresh via **Developer Tools → Services → `battery_charge_calculator.refresh_tariff_comparison`**.
+
+### The Annual Tariff Comparison sensor shows `unavailable`
+
+1. Confirm the feature is enabled in the integration settings
+2. Check that your Octopus API key has access to your account's consumption data — test it at `https://api.octopus.energy/v1/accounts/{your-account}/`
+3. Check the Home Assistant logs for errors from `battery_charge_calculator.tariff_comparison`
+
+### Why does the comparison only cover import tariffs?
+
+By default only import tariffs are compared. Export comparison requires your export MPAN and serial number, which are optional fields in the integration settings (ML settings step). Once configured, export earnings are included in the net cost calculation.
+
+---
+
 ## Credentials and security
 
 ### Where are my API keys stored?

@@ -57,6 +57,20 @@ No API token is required. The integration communicates with your inverter via **
 
 ---
 
+## Annual Tariff Comparison (optional)
+
+The Annual Tariff Comparison feature shows you what your electricity would have cost over the last 12 months under different Octopus tariffs, using your real smart meter data.
+
+To enable it, go to **Settings → Devices & Services → Battery Charge Calculator → Configure** and proceed to the **Annual Tariff Comparison** step:
+
+1. Toggle **Enable annual tariff comparison** on
+2. On the next screen, a list of available Octopus tariffs is fetched automatically — your current tariff is pre-selected
+3. Tick the tariffs you want to compare and click **Submit**
+
+A new sensor `sensor.annual_tariff_comparison` will be created. See [Annual Tariff Comparison](tariff-comparison-guide.md) for dashboard setup and a full explanation of the results.
+
+---
+
 ## ML Service setup (optional)
 
 The ML service is a standalone Docker container that learns your home's real consumption patterns and improves power demand forecasts over time. It is entirely optional — the integration works fully without it.
