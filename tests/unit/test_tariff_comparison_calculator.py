@@ -137,9 +137,7 @@ class TestImportAndExport:
         assert result["annual"]["export_earnings_gbp"] == pytest.approx(
             expected_export, abs=0.01
         )
-        assert result["annual"]["net_cost_gbp"] == pytest.approx(
-            expected_net, abs=0.01
-        )
+        assert result["annual"]["net_cost_gbp"] == pytest.approx(expected_net, abs=0.01)
 
 
 # ---------------------------------------------------------------------------

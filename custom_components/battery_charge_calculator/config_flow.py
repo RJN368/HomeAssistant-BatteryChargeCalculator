@@ -1,13 +1,16 @@
 """Config flow for the battery_manager component."""
 
 import json
+import logging
 import re
 import voluptuous as vol
+
+import aiohttp
 
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import aiohttp_client, config_validation as cv
 from homeassistant.helpers.selector import (
     BooleanSelector,
     SelectSelector,
@@ -18,6 +21,9 @@ from homeassistant.helpers.selector import (
 )
 
 from . import const
+from .octopus_agile import OCTOPUS_API_BASE, OctopusAgileRatesClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 # ─────────────────────────── schema helpers ──────────────────────────────────
@@ -239,21 +245,26 @@ def _region_from_tariff_code(tariff_code: str) -> str:
     return tariff_code.split("-")[-1]
 
 
-def _tariff_comparison_schema(
-    enabled: bool = False,
-    tariffs_json: str = "",
-) -> vol.Schema:
-    """Schema for the tariff comparison options step (§4.3)."""
+def _tariff_comparison_enable_schema(enabled: bool = False) -> vol.Schema:
+    """Schema for the tariff comparison enable/disable toggle step."""
     return vol.Schema(
         {
             vol.Optional(
                 const.TARIFF_COMPARISON_ENABLED, default=enabled
             ): BooleanSelector(),
+        }
+    )
+
+
+def _tariff_comparison_pick_schema(
+    options: list[dict], current_codes: list[str]
+) -> vol.Schema:
+    """Schema for the tariff picker multi-select step."""
+    return vol.Schema(
+        {
             vol.Optional(
-                const.TARIFF_COMPARISON_TARIFFS, default=tariffs_json
-            ): TextSelector(
-                TextSelectorConfig(multiline=True, type=TextSelectorType.TEXT)
-            ),
+                const.TARIFF_COMPARISON_TARIFFS, default=current_codes
+            ): SelectSelector(SelectSelectorConfig(options=options, multiple=True)),
         }
     )
 
@@ -292,6 +303,80 @@ def _validate_tariff_json(tariffs_json: str) -> list[str]:
             )
 
     return errors
+
+
+async def _fetch_available_tariffs(
+    session: aiohttp.ClientSession, region_letter: str
+) -> list[dict]:
+    """Fetch available Octopus import tariff products and convert to SelectSelector options.
+
+    Uses the public (no-auth) Octopus products API. Filters out prepay, business,
+    and restricted products. Each result maps to a regional tariff code of the form
+    E-1R-{product_code}-{region_letter}.
+    """
+    url = f"{OCTOPUS_API_BASE}/products/"
+    params: dict = {"is_prepay": "false", "is_business": "false"}
+    options: list[dict] = []
+
+    while url:
+        try:
+            async with session.get(url, params=params) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Failed to fetch Octopus products: %s", exc)
+            break
+
+        for product in data.get("results", []):
+            if product.get("is_restricted", False):
+                continue
+            if product.get("direction", "IMPORT") == "EXPORT":
+                continue
+            code = product.get("code", "")
+            if not code:
+                continue
+            name = product.get("display_name") or product.get("full_name") or code
+            tariff_code = f"E-1R-{code}-{region_letter}"
+            options.append({"label": name, "value": tariff_code})
+
+        url = data.get("next")
+        params = {}
+
+    return options
+
+
+def _tariff_codes_from_stored_json(tariffs_json: str) -> list[str]:
+    """Extract import_tariff_code values from the stored JSON string.
+
+    Handles both the old dict-list format and a bare list of code strings.
+    """
+    if not tariffs_json:
+        return []
+    try:
+        data = json.loads(tariffs_json)
+        if isinstance(data, list):
+            codes = []
+            for item in data:
+                if isinstance(item, str):
+                    codes.append(item)
+                elif isinstance(item, dict):
+                    code = item.get("import_tariff_code", "")
+                    if code:
+                        codes.append(code)
+            return codes
+    except json.JSONDecodeError, TypeError:
+        pass
+    return []
+
+
+def _tariff_codes_to_stored_json(codes: list[str]) -> str:
+    """Convert a list of selected tariff codes to the coordinator's JSON format."""
+    return json.dumps(
+        [
+            {"import_tariff_code": code, "name": code, "is_current": i == 0}
+            for i, code in enumerate(codes)
+        ]
+    )
 
 
 def estimate_heat_loss(
@@ -564,45 +649,102 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
         )
 
     async def async_step_tariff_comparison(self, user_input=None):
-        """Tariff comparison settings step (§4.3).
+        """Step: enable/disable tariff comparison.
 
-        Enables the annual tariff comparison feature and accepts a JSON list of
-        tariff entries.  Defaults to disabled so existing users are unaffected.
+        A simple toggle. If enabled, proceeds to the tariff picker step
+        which fetches available tariffs from the Octopus API and lets the
+        user select from a graphical list.
+        """
+        if user_input is not None:
+            enabled = user_input.get(const.TARIFF_COMPARISON_ENABLED, False)
+            self._heating_data[const.TARIFF_COMPARISON_ENABLED] = enabled
+            if enabled:
+                return await self.async_step_tariff_comparison_pick()
+            # Feature disabled — store empty list and finish
+            self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = "[]"
+            return self._create_entry()
+
+        return self.async_show_form(
+            step_id="tariff_comparison",
+            data_schema=_tariff_comparison_enable_schema(
+                enabled=self._heating_data.get(const.TARIFF_COMPARISON_ENABLED, False),
+            ),
+        )
+
+    async def async_step_tariff_comparison_pick(self, user_input=None):
+        """Step: pick tariffs from a live list fetched from Octopus.
+
+        Fetches the product catalogue on first display (user_input is None).
+        The user's current tariff is pre-selected. On submit, stores the
+        selection as the coordinator-compatible JSON format.
         """
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            tariffs_json: str = user_input.get(const.TARIFF_COMPARISON_TARIFFS, "")
-            validation_errors = _validate_tariff_json(tariffs_json)
-            if validation_errors:
-                errors["base"] = "invalid_tariff_json"
+            selected: list[str] = user_input.get(const.TARIFF_COMPARISON_TARIFFS, [])
+            if not selected:
+                errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
             else:
-                tc_settings = {
-                    const.TARIFF_COMPARISON_ENABLED: user_input.get(
-                        const.TARIFF_COMPARISON_ENABLED, False
-                    ),
-                    const.TARIFF_COMPARISON_TARIFFS: tariffs_json,
-                }
-                self._heating_data.update(tc_settings)
-                if hasattr(self, "options"):
-                    self.options.update(tc_settings)
+                self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = (
+                    _tariff_codes_to_stored_json(selected)
+                )
                 return self._create_entry()
 
+        # --- Fetch available tariffs from Octopus ---
+        session = aiohttp_client.async_get_clientsession(self.hass)
+        available_options: list[dict] = []
+        current_code: str | None = None
+
+        try:
+            api_key = self._main_data.get(const.OCTOPUS_APIKEY, "")
+            account = self._main_data.get(const.OCTOPUS_ACCOUNT_NUMBER, "")
+            if api_key and account:
+                client = OctopusAgileRatesClient(api_key, account)
+                await client._find_current_tariffs(session)  # noqa: SLF001
+                current_code = client.import_tariff_code
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not resolve current tariff code: %s", exc)
+
+        region = current_code[-1] if current_code else "A"
+        try:
+            available_options = await _fetch_available_tariffs(session, region)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not fetch tariff list: %s", exc)
+            errors["base"] = "tariff_fetch_failed"
+
+        # Pre-select current tariff (and any previously saved codes)
+        existing_codes = _tariff_codes_from_stored_json(
+            self._heating_data.get(const.TARIFF_COMPARISON_TARIFFS, "")
+        )
+        default_codes = existing_codes or ([current_code] if current_code else [])
+
+        # Ensure pre-selected codes appear in the options list (in case the
+        # live fetch failed or the saved code is not in the current catalogue)
+        option_values = {o["value"] for o in available_options}
+        for code in default_codes:
+            if code and code not in option_values:
+                available_options.insert(
+                    0,
+                    {"label": f"{code} (your current tariff)", "value": code},
+                )
+
         return self.async_show_form(
-            step_id="tariff_comparison",
-            data_schema=_tariff_comparison_schema(
-                enabled=self._heating_data.get(const.TARIFF_COMPARISON_ENABLED, False),
-                tariffs_json=self._heating_data.get(
-                    const.TARIFF_COMPARISON_TARIFFS, ""
-                ),
+            step_id="tariff_comparison_pick",
+            data_schema=_tariff_comparison_pick_schema(
+                options=available_options,
+                current_codes=default_codes,
             ),
             errors=errors,
             description_placeholders={
-                "octopus_tariff_url": "https://octopus.energy/tariffs/",
+                "region": region,
             },
         )
 
+        options = {**self._main_data, **self._heating_data}
+        return self.async_create_entry(title=const.TITLE, data={}, options=options)
+
     def _create_entry(self):
+        """Finalise and create the config entry (called from tariff steps)."""
         options = {**self._main_data, **self._heating_data}
         return self.async_create_entry(title=const.TITLE, data={}, options=options)
 
@@ -953,39 +1095,78 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         )
 
     async def async_step_tariff_comparison(self, user_input=None):
-        """Tariff comparison settings step (options flow — §4.3).
-
-        Enables the annual tariff comparison feature and accepts a JSON list of
-        tariff entries.  Defaults to disabled so existing users are unaffected.
-        """
-        errors: dict[str, str] = {}
-
+        """Step: enable/disable tariff comparison (options flow)."""
         if user_input is not None:
-            tariffs_json: str = user_input.get(const.TARIFF_COMPARISON_TARIFFS, "")
-            validation_errors = _validate_tariff_json(tariffs_json)
-            if validation_errors:
-                errors["base"] = "invalid_tariff_json"
-            else:
-                self.options.update(
-                    {
-                        const.TARIFF_COMPARISON_ENABLED: user_input.get(
-                            const.TARIFF_COMPARISON_ENABLED, False
-                        ),
-                        const.TARIFF_COMPARISON_TARIFFS: tariffs_json,
-                    }
-                )
-                return self._save_and_exit()
+            enabled = user_input.get(const.TARIFF_COMPARISON_ENABLED, False)
+            self.options[const.TARIFF_COMPARISON_ENABLED] = enabled
+            if enabled:
+                return await self.async_step_tariff_comparison_pick()
+            self.options[const.TARIFF_COMPARISON_TARIFFS] = "[]"
+            return self._save_and_exit()
 
         return self.async_show_form(
             step_id="tariff_comparison",
-            data_schema=_tariff_comparison_schema(
+            data_schema=_tariff_comparison_enable_schema(
                 enabled=self.options.get(const.TARIFF_COMPARISON_ENABLED, False),
-                tariffs_json=self.options.get(const.TARIFF_COMPARISON_TARIFFS, ""),
+            ),
+        )
+
+    async def async_step_tariff_comparison_pick(self, user_input=None):
+        """Step: pick tariffs from a live Octopus product list (options flow)."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            selected: list[str] = user_input.get(const.TARIFF_COMPARISON_TARIFFS, [])
+            if not selected:
+                errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
+            else:
+                self.options[const.TARIFF_COMPARISON_TARIFFS] = (
+                    _tariff_codes_to_stored_json(selected)
+                )
+                return self._save_and_exit()
+
+        session = aiohttp_client.async_get_clientsession(self.hass)
+        available_options: list[dict] = []
+        current_code: str | None = None
+
+        try:
+            api_key = self.options.get(const.OCTOPUS_APIKEY, "")
+            account = self.options.get(const.OCTOPUS_ACCOUNT_NUMBER, "")
+            if api_key and account:
+                client = OctopusAgileRatesClient(api_key, account)
+                await client._find_current_tariffs(session)  # noqa: SLF001
+                current_code = client.import_tariff_code
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not resolve current tariff code: %s", exc)
+
+        region = current_code[-1] if current_code else "A"
+        try:
+            available_options = await _fetch_available_tariffs(session, region)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not fetch tariff list: %s", exc)
+            errors["base"] = "tariff_fetch_failed"
+
+        existing_codes = _tariff_codes_from_stored_json(
+            self.options.get(const.TARIFF_COMPARISON_TARIFFS, "")
+        )
+        default_codes = existing_codes or ([current_code] if current_code else [])
+
+        option_values = {o["value"] for o in available_options}
+        for code in default_codes:
+            if code and code not in option_values:
+                available_options.insert(
+                    0,
+                    {"label": f"{code} (your current tariff)", "value": code},
+                )
+
+        return self.async_show_form(
+            step_id="tariff_comparison_pick",
+            data_schema=_tariff_comparison_pick_schema(
+                options=available_options,
+                current_codes=default_codes,
             ),
             errors=errors,
-            description_placeholders={
-                "octopus_tariff_url": "https://octopus.energy/tariffs/",
-            },
+            description_placeholders={"region": region},
         )
 
     def _save_and_exit(self):

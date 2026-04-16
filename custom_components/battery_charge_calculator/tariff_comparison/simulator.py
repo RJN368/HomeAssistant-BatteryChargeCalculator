@@ -82,8 +82,12 @@ class TariffSimulator:
             hour = slot_idx // 2
             minute = 30 if slot_idx % 2 else 0
             slot_dt = datetime(
-                date_obj.year, date_obj.month, date_obj.day,
-                hour, minute, tzinfo=timezone.utc,
+                date_obj.year,
+                date_obj.month,
+                date_obj.day,
+                hour,
+                minute,
+                tzinfo=timezone.utc,
             )
             temp = temps_30min[slot_idx]
             demand_kwh = power_calculator.from_temp_and_time(
@@ -112,9 +116,7 @@ class TariffSimulator:
 
         # Accumulate costs directly from slot.cost (pence)
         # Positive cost = grid import; negative cost = export earnings
-        import_cost_pence: float = sum(
-            ts.cost for ts in timeslots if ts.cost > 0.0
-        )
+        import_cost_pence: float = sum(ts.cost for ts in timeslots if ts.cost > 0.0)
         export_earnings_pence: float = sum(
             -ts.cost for ts in timeslots if ts.cost < 0.0
         )
