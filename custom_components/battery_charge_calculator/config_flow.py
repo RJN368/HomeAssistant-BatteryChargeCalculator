@@ -370,7 +370,11 @@ def _tariff_codes_from_stored_json(tariffs_json: str) -> list[str]:
 
 
 def _tariff_codes_to_stored_json(codes: list[str]) -> str:
-    """Convert a list of selected tariff codes to the coordinator's JSON format."""
+    """Convert a list of selected tariff codes to the coordinator's JSON format.
+
+    Export tariff codes are not stored per-tariff — the coordinator resolves
+    the account's current export tariff automatically at fetch time.
+    """
     return json.dumps(
         [
             {"import_tariff_code": code, "name": code, "is_current": i == 0}

@@ -215,6 +215,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         """Fetch consumption + rates, run calculator, update cache, return result."""
         opts = self._entry.options
         api_key: str = opts.get(const.OCTOPUS_APIKEY, "")
+        account_number: str = opts.get(const.OCTOPUS_ACCOUNT_NUMBER, "")
         mpan: str = opts.get(const.OCTOPUS_MPN, "")
         meter_serial: str = opts.get(const.OCTOPUS_METER_SERIAL, "")
         export_mpan: str | None = opts.get(const.OCTOPUS_EXPORT_MPN) or None
@@ -227,6 +228,30 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             export_mpan=export_mpan,
             export_meter_serial=export_serial,
         )
+
+        # ── 0. Resolve the account's current export tariff code (shared) ─
+        # All comparison tariffs use the same export tariff — the one actually
+        # on the account.  We look it up once here rather than requiring the
+        # user to select it per tariff.
+        shared_export_code: str | None = None
+        if export_mpan and export_serial and api_key and account_number:
+            try:
+                from ..octopus_agile import OctopusAgileRatesClient
+
+                agile_client = OctopusAgileRatesClient(api_key, account_number)
+                await agile_client._find_current_tariffs(session)
+                shared_export_code = agile_client.export_tariff_code
+                if shared_export_code:
+                    _LOGGER.debug(
+                        "Using shared export tariff for all comparisons: %s",
+                        shared_export_code,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Could not resolve export tariff from account — export earnings "
+                    "will not be included in comparison: %s",
+                    exc,
+                )
 
         # ── 1. Fetch import consumption ──────────────────────────────────
         try:
@@ -267,7 +292,9 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         for tc in tariff_configs:
             import_code: str = tc.get("import_tariff_code", "")
-            export_code: str | None = tc.get("export_tariff_code")
+            # Use the shared account export tariff for all comparisons.
+            # Per-tariff export_tariff_code in stored JSON is ignored.
+            export_code: str | None = shared_export_code
             if not import_code:
                 continue
 
