@@ -355,7 +355,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         period_from: datetime,
         period_to: datetime,
     ) -> dict[str, Any]:
-        """Reconstruct result dict from cached data."""
+        """Reconstruct result dict from cached data, overlaying completed simulations."""
         import_slots = _slots_from_cache(cache.get("consumption", {}).get("import", []))
         export_slots_raw = cache.get("consumption", {}).get("export", [])
         export_slots: list[dict] | None = (
@@ -369,7 +369,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         export_serial = opts.get(const.OCTOPUS_EXPORT_METER_SERIAL) or None
         export_meter_missing = not (export_mpan and export_serial)
 
-        return self._calculate_all(
+        result = self._calculate_all(
             tariff_configs,
             import_slots,
             export_slots,
@@ -378,6 +378,28 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             period_to,
             export_meter_missing,
         )
+
+        # Overlay any completed simulation results that were persisted to cache.
+        # Validates data_year matches so stale simulations from a previous month
+        # are not shown against fresh consumption data.
+        sim_results: dict = cache.get("simulation_results", {})
+        cache_data_yr: str = cache.get("data_year", "")
+        current_data_yr: str = _target_data_year(datetime.now(timezone.utc))
+        for tariff_entry in result.get("tariffs", []):
+            code = tariff_entry.get("import_tariff_code", "")
+            sim = sim_results.get(code)
+            if (
+                sim
+                and sim.get("status") == "complete"
+                and sim.get("data_year", "") == cache_data_yr == current_data_yr
+            ):
+                tariff_entry["comparison_method"] = "simulation"
+                tariff_entry["simulation_progress_pct"] = 100.0
+                tariff_entry["data_quality_notes"] = []
+                tariff_entry["monthly"] = sim["monthly"]
+                tariff_entry["annual"] = sim["annual"]
+
+        return result
 
     def _calculate_all(
         self,
@@ -511,7 +533,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         current_result = copy.deepcopy(self.data)
         task = self.hass.async_create_task(
             self._run_tariff_simulation(
-                tariff_config, tariff_rates, period_from, period_to, current_result
+                tariff_config, tariff_rates, period_from, period_to
             )
         )
         self._simulation_tasks[code] = task
@@ -522,7 +544,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         tariff_rates: dict[str, dict],
         period_from: datetime,
         period_to: datetime,
-        current_result: dict[str, Any],
+        current_result: dict[str, Any],  # noqa: ARG002 — kept for API compat
     ) -> None:
         """Launch background simulation tasks for all non-current tariffs."""
         for tc in tariff_configs:
@@ -534,13 +556,38 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 and not self._simulation_tasks[code].done()
             ):
                 continue
-            result_snapshot = copy.deepcopy(current_result)
             task = self.hass.async_create_task(
-                self._run_tariff_simulation(
-                    tc, tariff_rates, period_from, period_to, result_snapshot
-                )
+                self._run_tariff_simulation(tc, tariff_rates, period_from, period_to)
             )
             self._simulation_tasks[code] = task
+
+    def _push_simulation_progress(
+        self,
+        import_code: str,
+        comparison_method: str,
+        simulation_progress_pct: float,
+        data_quality_notes: list[str],
+        monthly: list[dict] | None = None,
+        annual: dict | None = None,
+    ) -> None:
+        """Update the live coordinator data for one tariff and notify listeners.
+
+        Reads self.data live so concurrent simulations never overwrite each
+        other's progress — each only touches its own tariff entry.
+        """
+        if not self.data:
+            return
+        live = copy.deepcopy(self.data)
+        _update_tariff_entry(
+            live,
+            import_code,
+            comparison_method=comparison_method,
+            simulation_progress_pct=simulation_progress_pct,
+            data_quality_notes=data_quality_notes,
+            monthly=monthly,
+            annual=annual,
+        )
+        self.async_set_updated_data(live)
 
     async def _run_tariff_simulation(
         self,
@@ -548,14 +595,13 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         tariff_rates: dict[str, dict],
         period_from: datetime,
         period_to: datetime,
-        current_result: dict[str, Any],
     ) -> None:
         """Background coroutine: run full Approach A GeneticEvaluator simulation.
 
         Iterates day-by-day through the comparison window.  Calls
         hass.async_add_executor_job() for all CPU-bound work (D-5 compliance).
-        Calls async_set_updated_data() every 30 simulated days so the sensor
-        reflects incremental progress.
+        Updates sensor progress via _push_simulation_progress() so concurrent
+        simulations never overwrite each other's state.
         """
         from ..genetic_evaluator import GeneticEvaluator
         from .simulator import TariffSimulator
@@ -629,18 +675,16 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         monthly_import_pence: dict[str, float] = defaultdict(float)
         monthly_export_pence: dict[str, float] = defaultdict(float)
 
-        # Update the tariff entry in current_result to show simulation_in_progress
-        _update_tariff_entry(
-            current_result,
+        # Signal that this tariff is now being simulated
+        self._push_simulation_progress(
             import_code,
             comparison_method="simulation_in_progress",
             simulation_progress_pct=0.0,
             data_quality_notes=[
-                "Simulation 0% complete. Currently showing naive replay data. "
-                "Values will update as simulation finishes."
+                "Simulation starting. Currently showing naive replay data. "
+                "Values will update as simulation progresses."
             ],
         )
-        self.async_set_updated_data(copy.deepcopy(current_result))
 
         for day_idx, day_obj in enumerate(day_range):
             hourly_temps = weather_data.get(day_obj, [10.0] * 24)
@@ -666,25 +710,17 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             monthly_import_pence[month_key] += day_result["import_cost_pence"]
             monthly_export_pence[month_key] += day_result["export_earnings_pence"]
 
-            # Report progress every 30 days and on the final day
+            # Report progress every 5 days and on the final day
             days_done = day_idx + 1
-            if days_done % 30 == 0 or days_done == total_days:
+            progress_interval = max(1, total_days // 20)  # ~5% steps
+            if days_done % progress_interval == 0 or days_done == total_days:
                 progress_pct = round(days_done / total_days * 100.0, 1)
-                partial_monthly = _build_simulation_monthly(
-                    monthly_import_pence, monthly_export_pence, sc_raw, include_sc
-                )
-                note = (
-                    f"Simulation {progress_pct:.0f}% complete. "
-                    "Currently showing naive replay data. Values will update as simulation finishes."
-                )
-                _update_tariff_entry(
-                    current_result,
+                self._push_simulation_progress(
                     import_code,
                     comparison_method="simulation_in_progress",
                     simulation_progress_pct=progress_pct,
-                    data_quality_notes=[note],
+                    data_quality_notes=[f"Simulation {progress_pct:.0f}% complete."],
                 )
-                self.async_set_updated_data(copy.deepcopy(current_result))
 
         # Simulation complete
         final_monthly = _build_simulation_monthly(
@@ -692,8 +728,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         )
         annual = _sum_annual(final_monthly)
 
-        _update_tariff_entry(
-            current_result,
+        self._push_simulation_progress(
             import_code,
             comparison_method="simulation",
             simulation_progress_pct=100.0,
@@ -701,7 +736,6 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             monthly=final_monthly,
             annual=annual,
         )
-        self.async_set_updated_data(copy.deepcopy(current_result))
 
         # Persist simulation results to cache
         await self._persist_simulation_result(import_code, final_monthly, annual)
