@@ -231,27 +231,49 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         # ── 0. Resolve the account's current export tariff code (shared) ─
         # All comparison tariffs use the same export tariff — the one actually
-        # on the account.  We look it up once here rather than requiring the
-        # user to select it per tariff.
+        # on the account.  Two resolution strategies in priority order:
+        #   A) Account API (requires account_number) — uses OctopusAgileRatesClient
+        #   B) MPAN endpoint (no account_number needed) — uses the meter-point
+        #      agreements endpoint directly
         shared_export_code: str | None = None
-        if export_mpan and export_serial and api_key and account_number:
-            try:
-                from ..octopus_agile import OctopusAgileRatesClient
+        if export_mpan and export_serial and api_key:
+            # Strategy A: account-based (preferred when account_number is known)
+            if account_number:
+                try:
+                    from ..octopus_agile import OctopusAgileRatesClient
 
-                agile_client = OctopusAgileRatesClient(api_key, account_number)
-                await agile_client._find_current_tariffs(session)
-                shared_export_code = agile_client.export_tariff_code
-                if shared_export_code:
-                    _LOGGER.debug(
-                        "Using shared export tariff for all comparisons: %s",
-                        shared_export_code,
+                    agile_client = OctopusAgileRatesClient(api_key, account_number)
+                    await agile_client._find_current_tariffs(session)
+                    shared_export_code = agile_client.export_tariff_code
+                    if shared_export_code:
+                        _LOGGER.debug(
+                            "Export tariff resolved via account: %s",
+                            shared_export_code,
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.warning(
+                        "Account-based export tariff lookup failed: %s", exc
                     )
-            except Exception as exc:  # noqa: BLE001
-                _LOGGER.warning(
-                    "Could not resolve export tariff from account — export earnings "
-                    "will not be included in comparison: %s",
-                    exc,
-                )
+
+            # Strategy B: MPAN endpoint fallback (works without account_number)
+            if not shared_export_code:
+                try:
+                    shared_export_code = await client.fetch_export_tariff_code(session)
+                    if shared_export_code:
+                        _LOGGER.debug(
+                            "Export tariff resolved via MPAN endpoint: %s",
+                            shared_export_code,
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "No active export tariff found for MPAN %s — "
+                            "export earnings will not be included in comparison",
+                            export_mpan,
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.warning(
+                        "MPAN-based export tariff lookup failed: %s", exc
+                    )
 
         # ── 1. Fetch import consumption ──────────────────────────────────
         try:
@@ -486,6 +508,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 export_slots=export_slots,
                 export_rate_map=export_rate_map,
                 include_standing_charges=include_sc,
+                period_to=period_to,
             )
 
             coverage = calc_result["coverage_pct"]

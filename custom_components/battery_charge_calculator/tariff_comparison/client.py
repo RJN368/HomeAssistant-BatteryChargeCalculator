@@ -330,3 +330,47 @@ class TariffComparisonClient:
     ) -> dict[datetime, float]:
         """Build a {slot_start: rate_p_per_kwh} lookup dict for the given period."""
         return _build_historical_rate_map(raw_rates, period_from, period_to)
+
+    async def fetch_export_tariff_code(
+        self,
+        session: aiohttp.ClientSession,
+    ) -> str | None:
+        """Resolve the active export tariff code from the export MPAN endpoint.
+
+        Uses ``GET /v1/electricity-meter-points/{export_mpan}/`` which is
+        authenticated but does NOT require an account number.  This is the
+        fallback when account-based tariff resolution fails or the account
+        number is not configured.
+
+        Returns the tariff_code string of the active agreement, or None if
+        no export MPAN is configured or no active agreement is found.
+        """
+        if not self._export_mpan:
+            return None
+        url = f"{_OCTOPUS_BASE}/electricity-meter-points/{self._export_mpan}/"
+        async with session.get(url, auth=self._auth) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+        agreements: list[dict] = data.get("agreements", [])
+        if not agreements:
+            return None
+        now = datetime.now(timezone.utc)
+        # Sort descending by valid_from so the most-recent active agreement wins
+        for agreement in sorted(
+            agreements, key=lambda a: a.get("valid_from", ""), reverse=True
+        ):
+            valid_from_str = agreement.get("valid_from")
+            valid_to_str = agreement.get("valid_to")
+            if not valid_from_str:
+                continue
+            valid_from = datetime.fromisoformat(valid_from_str)
+            if valid_from.tzinfo is None:
+                valid_from = valid_from.replace(tzinfo=timezone.utc)
+            valid_to = None
+            if valid_to_str:
+                valid_to = datetime.fromisoformat(valid_to_str)
+                if valid_to.tzinfo is None:
+                    valid_to = valid_to.replace(tzinfo=timezone.utc)
+            if valid_from <= now and (valid_to is None or valid_to > now):
+                return agreement.get("tariff_code")
+        return None

@@ -533,3 +533,116 @@ class TestMonetaryRounding:
         for field in ("import_cost_gbp", "export_earnings_gbp", "net_cost_gbp"):
             val = result["totals"][field]
             assert round(val, 2) == val, f"annual[{field}]={val} is not rounded to 2 dp"
+
+
+# ---------------------------------------------------------------------------
+# Tests: period_to filtering (prevent partial-month leakage)
+# ---------------------------------------------------------------------------
+
+
+class TestPeriodToFiltering:
+    """Slots at exactly period_to must be excluded to prevent partial-month entries."""
+
+    def test_slot_exactly_at_period_to_is_excluded(self):
+        """Slot at period_to boundary must not appear in result."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 4, 1, 0, 0, tzinfo=UTC)
+
+        # Valid March slot + one boundary April slot
+        t_march = period_from
+        t_boundary = period_to  # exactly at period_to — must be excluded
+
+        import_slots = [_slot(t_march, 0.5), _slot(t_boundary, 0.5)]
+        rate_map = _rate_map((t_march, 20.0), (t_boundary, 20.0))
+
+        result = calculate_tariff_cost(
+            import_slots=import_slots,
+            import_rate_map=rate_map,
+            standing_charges=[],
+            export_slots=None,
+            export_rate_map=None,
+            include_standing_charges=False,
+            period_to=period_to,
+        )
+
+        months = [m["month"] for m in result["monthly"]]
+        assert "2026-04" not in months, "slot at period_to must be excluded"
+        assert "2026-03" in months
+
+    def test_slot_one_step_before_period_to_is_included(self):
+        """Slot at period_to minus 30 minutes must be included."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 4, 1, 0, 0, tzinfo=UTC)
+
+        t_last = period_to - timedelta(minutes=30)  # 2026-03-31 23:30 — included
+        t_boundary = period_to  # excluded
+
+        import_slots = [_slot(t_last, 0.5), _slot(t_boundary, 0.5)]
+        rate_map = _rate_map((t_last, 20.0), (t_boundary, 20.0))
+
+        result = calculate_tariff_cost(
+            import_slots=import_slots,
+            import_rate_map=rate_map,
+            standing_charges=[],
+            export_slots=None,
+            export_rate_map=None,
+            include_standing_charges=False,
+            period_to=period_to,
+        )
+
+        months = [m["month"] for m in result["monthly"]]
+        assert "2026-03" in months
+        assert "2026-04" not in months
+
+    def test_standing_charges_prorated_when_period_to_is_mid_month(self):
+        """Standing charges are prorated when period_to falls before month end.
+
+        If period_to = 2026-03-15 (mid-March), standing charges should only
+        cover 14 days (March 1–14), not the full 31 days.
+        """
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 3, 15, 0, 0, tzinfo=UTC)  # mid-month
+
+        t_slot = period_from
+        import_slots = [_slot(t_slot, 0.5)]
+        rate_map = _rate_map((t_slot, 20.0))
+
+        sc_valid_from = datetime(2026, 1, 1, tzinfo=UTC)
+        sc_list = [_sc(sc_valid_from, None, 50.0)]  # 50 p/day
+
+        result = calculate_tariff_cost(
+            import_slots=import_slots,
+            import_rate_map=rate_map,
+            standing_charges=sc_list,
+            export_slots=None,
+            export_rate_map=None,
+            include_standing_charges=True,
+            period_to=period_to,
+        )
+
+        mar_months = [m for m in result["monthly"] if m["month"] == "2026-03"]
+        assert len(mar_months) == 1
+        # 50 p/day × 14 days (Mar 1 to Mar 15) / 100 = £7.00
+        assert mar_months[0]["standing_charge_gbp"] == pytest.approx(7.00, abs=0.01)
+
+    def test_no_period_to_includes_all_slots(self):
+        """Without period_to, all slots are included (backward-compatible)."""
+        t1 = datetime(2026, 3, 31, 23, 30, tzinfo=UTC)
+        t2 = datetime(2026, 4, 1, 0, 0, tzinfo=UTC)  # would be excluded with period_to
+
+        import_slots = [_slot(t1, 0.5), _slot(t2, 0.5)]
+        rate_map = _rate_map((t1, 20.0), (t2, 20.0))
+
+        result = calculate_tariff_cost(
+            import_slots=import_slots,
+            import_rate_map=rate_map,
+            standing_charges=[],
+            export_slots=None,
+            export_rate_map=None,
+            include_standing_charges=False,
+            # period_to=None  ← omitted (default)
+        )
+
+        months = [m["month"] for m in result["monthly"]]
+        assert "2026-03" in months
+        assert "2026-04" in months  # included because no period_to cap

@@ -26,6 +26,7 @@ def calculate_tariff_cost(
     export_slots: list[dict] | None,
     export_rate_map: dict[datetime, float] | None,
     include_standing_charges: bool = True,
+    period_to: datetime | None = None,
 ) -> dict[str, Any]:
     """Calculate monthly and annual costs for one tariff against actual consumption.
 
@@ -48,6 +49,14 @@ def calculate_tariff_cost(
           BEFORE forward-fill (data quality indicator per Hockney §6.5)
         - ``slot_count``: int — total slot count processed
     """
+    # Exclude any slots at or after period_to (the Octopus API may return the
+    # boundary slot at exactly period_to, which would create a spurious partial-
+    # month entry with full-month standing charges).
+    if period_to:
+        import_slots = [s for s in import_slots if s["interval_start"] < period_to]
+        if export_slots:
+            export_slots = [s for s in export_slots if s["interval_start"] < period_to]
+
     # Build fast lookup dicts keyed by interval_start
     import_by_ts: dict[datetime, float] = {
         s["interval_start"]: s["consumption"] for s in import_slots
@@ -135,9 +144,15 @@ def calculate_tariff_cost(
             for sc_from, sc_to, sc_p_per_day in sc_entries:
                 if sc_from is None:
                     continue
-                # Clamp the validity window to this calendar month
+                # Clamp the validity window to this calendar month, and also
+                # to period_to so partial months are prorated correctly.
+                effective_month_end = (
+                    min(period_to, month_end)
+                    if period_to and period_to < month_end
+                    else month_end
+                )
                 overlap_start = max(sc_from, month_start)
-                overlap_end = min(sc_to, month_end) if sc_to else month_end
+                overlap_end = min(sc_to, effective_month_end) if sc_to else effective_month_end
                 if overlap_start >= overlap_end:
                     continue
                 days_active = (overlap_end - overlap_start).days
