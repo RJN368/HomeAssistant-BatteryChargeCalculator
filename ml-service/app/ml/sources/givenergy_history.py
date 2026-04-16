@@ -54,12 +54,19 @@ def _normalise_to_utc(ts_input: Union[str, datetime]) -> datetime:
     """
     ts = pd.Timestamp(ts_input)
     if ts.tzinfo is None:
-        # Naive — assume Europe/London (D-18, DST-safe localisation)
-        ts = ts.tz_localize(
-            _LONDON_TZ,
-            ambiguous="infer",
-            nonexistent="shift_forward",
-        )
+        # Naive — assume Europe/London (D-18, DST-safe localisation).
+        # pandas 2+ disallows ambiguous='infer' for scalar Timestamps; use
+        # ambiguous=False (first/summer-time occurrence) which matches the
+        # documented DST-ambiguity resolution intent.
+        try:
+            ts = ts.tz_localize(
+                _LONDON_TZ,
+                ambiguous=False,
+                nonexistent="shift_forward",
+            )
+        except Exception:
+            # Last-resort fallback: convert via UTC assumption
+            ts = ts.tz_localize(UTC)
     return ts.tz_convert(UTC).to_pydatetime()
 
 

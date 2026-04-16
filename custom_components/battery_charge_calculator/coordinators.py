@@ -2,7 +2,8 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -25,6 +26,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.id = entry.entry_id
         self.hass = hass
         self.tz = dt_util.get_time_zone(self.hass.config.time_zone)
+        if self.tz is None:
+            self.tz = ZoneInfo("Europe/London")
 
         # Build PowerCalulator from config
         heating_type = entry.options.get(const.HEATING_TYPE, const.DEFAULT_HEATING_TYPE)
@@ -160,6 +163,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
     @callback
     def _handle_planning_timer(self, now: datetime) -> None:
+        # Ensure now is aware and in local timezone
+        if now.tzinfo is None:
+            logging.warning("Naive datetime in _handle_planning_timer; assuming UTC.")
+            now = now.replace(tzinfo=timezone.utc)
+        now = now.astimezone(self.tz)
         """Trigger a conditional re-planning check every hour."""
         self.hass.async_create_task(self._conditional_replan())
 
@@ -183,7 +191,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         # Trigger re-plan when the plan is nearly exhausted.
         last_slot = self.timeslots[-1]
-        plan_end = last_slot.start_datetime + timedelta(minutes=30)
+        plan_end = last_slot.start_datetime
+        if plan_end.tzinfo is None:
+            logging.warning("Naive datetime in plan_end; assuming UTC.")
+            plan_end = plan_end.replace(tzinfo=timezone.utc)
+        plan_end = plan_end.astimezone(self.tz) + timedelta(minutes=30)
         now = datetime.now(tz=self.tz)
         time_remaining = plan_end - now
         if time_remaining <= timedelta(hours=2):
@@ -244,9 +256,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("octopus_state_change_listener")
 
         try:
-            time_now = self.ceil_dt(datetime.now(), timedelta(minutes=30)).astimezone(
-                self.tz
-            )
+            now = datetime.now(timezone.utc)
+            time_now = self.ceil_dt(now, timedelta(minutes=30)).astimezone(self.tz)
 
             session = async_get_clientsession(self.hass)
             octopus_import_standing_charge_rate: float = (
@@ -333,34 +344,42 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     hourly_forecast,
                     tempdata,
                     "temperature",
-                    lambda f: datetime.strptime(
-                        f["datetime"], "%Y-%m-%dT%H:%M:%S%z"
-                    ).strftime("%d:%H")
-                    == current_time.strftime("%d:%H"),
+                    lambda f: (
+                        datetime.strptime(f["datetime"], "%Y-%m-%dT%H:%M:%S%z")
+                        .astimezone(self.tz)
+                        .strftime("%d:%H")
+                        == current_time.astimezone(self.tz).strftime("%d:%H")
+                    ),
                 )
 
                 export_ratedata = self.find_in_dataset(
                     all_octopus_export_rates,
                     export_ratedata,
                     "value_inc_vat",
-                    lambda f: f["start"].strftime("%d:%H:%M")
-                    == current_time.strftime("%d:%H:%M"),
+                    lambda f: (
+                        f["start"].astimezone(self.tz).strftime("%d:%H:%M")
+                        == current_time.astimezone(self.tz).strftime("%d:%H:%M")
+                    ),
                 )
 
                 ratedata = self.find_in_dataset(
                     all_octopus_rates,
                     ratedata,
                     "value_inc_vat",
-                    lambda f: f["start"].strftime("%d:%H:%M")
-                    == current_time.strftime("%d:%H:%M"),
+                    lambda f: (
+                        f["start"].astimezone(self.tz).strftime("%d:%H:%M")
+                        == current_time.astimezone(self.tz).strftime("%d:%H:%M")
+                    ),
                 )
 
                 solardata = self.find_in_dataset(
                     solarcast["data"],
                     solardata,
                     "pv_estimate10",
-                    lambda entry: entry["period_start"].strftime("%d:%H")
-                    == current_time.strftime("%d:%H"),
+                    lambda entry: (
+                        entry["period_start"].strftime("%d:%H")
+                        == current_time.strftime("%d:%H")
+                    ),
                 )
 
                 physics_kwh = self.power_calculator.from_temp_and_time(
@@ -441,7 +460,10 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("hello")
 
     def ceil_dt(self, dt, delta):
-        return dt + (datetime.min - dt) % delta
+        tz = dt.tzinfo
+        naive = dt.replace(tzinfo=None)
+        rounded = naive + (datetime.min - naive) % delta
+        return rounded.replace(tzinfo=tz)
 
     def current_active_slot(self):
         if not self.timeslots or not isinstance(self.timeslots, list):
@@ -476,7 +498,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
     def date_comapre(self, ts):
         now = datetime.now(tz=self.tz)
-        return (
-            ts.start_datetime <= now
-            and (ts.start_datetime + timedelta(minutes=30)) >= now
-        )
+        slot_start = ts.start_datetime
+        if slot_start.tzinfo is None:
+            logging.warning("Naive datetime in timeslot; assuming UTC.")
+            slot_start = slot_start.replace(tzinfo=timezone.utc)
+        slot_start = slot_start.astimezone(self.tz)
+        return slot_start <= now and (slot_start + timedelta(minutes=30)) >= now

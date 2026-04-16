@@ -81,10 +81,6 @@ def test_givenergy_source_name() -> None:
     assert source.source_name == "givenergy"
 
 
-@pytest.mark.xfail(
-    reason="pandas 2+ disallows ambiguous='infer' for scalar Timestamp; source-code known issue",
-    strict=False,
-)
 def test_givenergy_normalise_naive_string() -> None:
     # Naive local — January so London = UTC; result must be UTC-aware
     result = _normalise_to_utc("2024-01-15T02:00:00")

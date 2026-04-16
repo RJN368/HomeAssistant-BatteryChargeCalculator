@@ -1,3 +1,7 @@
+import sys
+import warnings
+from zoneinfo import ZoneInfo
+
 """Unit tests for the BatteryChargeCoordinator."""
 
 from datetime import datetime, timedelta, timezone
@@ -98,6 +102,42 @@ class TestCeilDt:
 
 
 class TestCurrentActiveSlot:
+    def test_naive_datetime_in_slot_warns_and_converts(self, caplog):
+        import logging as stdlib_logging
+
+        coord = _make_coordinator()
+        # Naive datetime (should warn and treat as UTC)
+        naive_dt = datetime(2026, 4, 4, 12, 0, 0)
+        with caplog.at_level(stdlib_logging.WARNING):
+            slot = _make_timeslot(dt=naive_dt)
+        coord.timeslots = [slot]
+        coord.tz = ZoneInfo("Europe/London")
+        # Slot is UTC 12:00 → Europe/London (BST, UTC+1 in April) = 13:00
+        now_london = datetime(2026, 4, 4, 13, 0, 0, tzinfo=ZoneInfo("Europe/London"))
+        with patch(
+            "custom_components.battery_charge_calculator.coordinators.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = now_london
+            result = coord.current_active_slot()
+        assert result is slot
+        assert any("Naive datetime" in r.message for r in caplog.records)
+
+    def test_dst_transition_slot_matching(self):
+        coord = _make_coordinator()
+        # Slot at 01:30 UTC, which is 02:30 BST (DST starts in UK on 2026-03-29)
+        dt_utc = datetime(2026, 3, 29, 1, 30, 0, tzinfo=timezone.utc)
+        slot = _make_timeslot(dt=dt_utc)
+        coord.timeslots = [slot]
+        coord.tz = ZoneInfo("Europe/London")
+        # Simulate now as 02:30 BST — datetime is already tz-aware, no need to set tzinfo
+        now = dt_utc.astimezone(ZoneInfo("Europe/London"))
+        with patch(
+            "custom_components.battery_charge_calculator.coordinators.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = now
+            result = coord.current_active_slot()
+        assert result is slot
+
     def test_returns_none_when_no_timeslots(self):
         coord = _make_coordinator()
         coord.timeslots = []

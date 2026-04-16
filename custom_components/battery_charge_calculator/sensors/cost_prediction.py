@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from datetime import datetime
+from zoneinfo import ZoneInfo
+import logging
 from typing import Any
 
 from homeassistant.components.sensor import RestoreSensor, SensorDeviceClass
@@ -28,13 +30,16 @@ class CostPredictionSensor(CoordinatorEntity, RestoreSensor):
     def native_value(self):
         """Return the predicted end-of-day cost."""
         end_of_day_cost = 0
-        current_day = datetime.now().day
+        current_day = datetime.now(ZoneInfo("Europe/London")).day
         timeslots = getattr(self.coordinator, "timeslots", None)
         if timeslots:
             for timeslot in timeslots:
-                if (
-                    hasattr(timeslot, "start_datetime")
-                    and getattr(timeslot.start_datetime, "day", None) == current_day
-                ):
-                    end_of_day_cost += getattr(timeslot, "cost", 0)
+                if hasattr(timeslot, "start_datetime"):
+                    dt = timeslot.start_datetime
+                    if dt.tzinfo is None:
+                        logging.warning("Naive datetime in timeslot; assuming UTC.")
+                        dt = dt.replace(tzinfo=datetime.timezone.utc)
+                    dt = dt.astimezone(ZoneInfo("Europe/London"))
+                    if dt.day == current_day:
+                        end_of_day_cost += getattr(timeslot, "cost", 0)
         return end_of_day_cost
