@@ -9,7 +9,7 @@ services:
       - "1883:1883"
     volumes:
       - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mosquitto_data:/mosquitto/data
+      #- mosquitto_data:/mosquitto/data
 
   givtcp:
     image: britkat/giv_tcp-ma:latest

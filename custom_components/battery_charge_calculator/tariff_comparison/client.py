@@ -352,7 +352,16 @@ class TariffComparisonClient:
             resp.raise_for_status()
             data = await resp.json()
         agreements: list[dict] = data.get("agreements", [])
+        _LOGGER.debug(
+            "MPAN endpoint response for %s — top-level keys: %s; agreements count: %d",
+            self._export_mpan,
+            list(data.keys()),
+            len(agreements),
+        )
         if not agreements:
+            _LOGGER.debug(
+                "MPAN endpoint returned no agreements for %s", self._export_mpan
+            )
             return None
         now = datetime.now(timezone.utc)
         # Sort descending by valid_from so the most-recent active agreement wins

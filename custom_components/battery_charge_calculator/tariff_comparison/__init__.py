@@ -142,9 +142,39 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         if cache_valid:
             _LOGGER.debug("Tariff cache is fresh — skipping API fetch")
-            return self._build_result_from_cache(
+            result = self._build_result_from_cache(
                 cache, tariff_configs, period_from, period_to
             )
+            # Schedule simulations for any non-current tariff that has no
+            # completed simulation persisted to cache.  Safe to call on
+            # every update — _start_simulations skips already-running tasks.
+            cached_sims: dict = cache.get("simulation_results") or {}
+            non_current_unsimulated = [
+                tc
+                for tc in tariff_configs
+                if not tc.get("is_current", False)
+                and (
+                    tc.get("import_tariff_code", "") not in cached_sims
+                    or cached_sims[tc.get("import_tariff_code", "")].get("status")
+                    != "complete"
+                )
+            ]
+            if non_current_unsimulated:
+                tariff_rates = _rates_from_cache(cache.get("tariff_rates", {}))
+                shared_export_code: str | None = (
+                    cache.get("export_tariff_code") or None
+                )
+                self.hass.async_create_task(
+                    self._start_simulations(
+                        non_current_unsimulated,
+                        tariff_rates,
+                        period_from,
+                        period_to,
+                        result,
+                        shared_export_code=shared_export_code,
+                    )
+                )
+            return result
 
         _LOGGER.info(
             "Tariff cache missing or stale — scheduling background fetch "
@@ -240,23 +270,54 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             # Strategy A: account-based (preferred when account_number is known)
             if account_number:
                 try:
-                    from ..octopus_agile import OctopusAgileRatesClient
+                    from ..octopus_agile import OctopusAgileRatesClient, _active_agreement
 
                     agile_client = OctopusAgileRatesClient(api_key, account_number)
+                    # Strategy A-1: is_export flag
                     await agile_client._find_current_tariffs(session)
                     shared_export_code = agile_client.export_tariff_code
                     if shared_export_code:
                         _LOGGER.debug(
-                            "Export tariff resolved via account API: %s",
+                            "Export tariff resolved via account API (is_export flag): %s",
                             shared_export_code,
                         )
                     else:
-                        _LOGGER.warning(
-                            "Account API returned no export tariff for account %s "
-                            "(export MPAN: %s) — trying MPAN endpoint",
+                        # Strategy A-2: match by export MPAN directly — handles
+                        # accounts where is_export flag is missing or unreliable.
+                        _LOGGER.debug(
+                            "is_export lookup returned no export tariff for account %s "
+                            "— trying MPAN match (export MPAN: %s)",
                             account_number,
                             export_mpan,
                         )
+                        try:
+                            meters = await agile_client._get_electricity_meters(session)
+                            for meter in meters:
+                                if meter.get("mpan") == export_mpan:
+                                    agreement = _active_agreement(
+                                        meter.get("agreements", [])
+                                    )
+                                    if agreement:
+                                        shared_export_code = agreement.get("tariff_code")
+                                        _LOGGER.debug(
+                                            "Export tariff resolved via account API "
+                                            "(MPAN match %s): %s",
+                                            export_mpan,
+                                            shared_export_code,
+                                        )
+                                    break
+                        except Exception as inner_exc:  # noqa: BLE001
+                            _LOGGER.warning(
+                                "Account MPAN-match lookup failed: %s", inner_exc
+                            )
+                        if not shared_export_code:
+                            _LOGGER.warning(
+                                "Account API (both is_export and MPAN-match) returned "
+                                "no export tariff for account %s, export MPAN %s — "
+                                "trying MPAN endpoint fallback",
+                                account_number,
+                                export_mpan,
+                            )
                 except Exception as exc:  # noqa: BLE001
                     _LOGGER.warning(
                         "Account-based export tariff lookup failed — trying MPAN "
