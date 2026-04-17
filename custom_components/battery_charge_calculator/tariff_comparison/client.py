@@ -266,13 +266,18 @@ class TariffComparisonClient:
             _LOGGER.debug("Pre-window seed fetch failed for %s: %s", tariff_code, exc)
             seed_raw = []
 
-        # Prepend seed with valid_from = period_from so forward-fill starts correctly
+        # Prepend seed with valid_from = period_from so forward-fill starts correctly.
+        # valid_to is set to None (unbounded) rather than copying the API row's
+        # valid_to — for Agile the last pre-window slot has valid_to = period_from,
+        # making valid_from == valid_to which causes the scan in
+        # _build_historical_rate_map to reject it (condition: vt is None or vt > slot).
+        # With valid_to=None the seed covers forward until the first real rate.
         combined: list[dict] = []
         for row in seed_raw:
             combined.append(
                 {
                     "valid_from": period_from,
-                    "valid_to": _parse_iso(row.get("valid_to")),
+                    "valid_to": None,
                     "value_inc_vat": float(row["value_inc_vat"]),
                 }
             )
