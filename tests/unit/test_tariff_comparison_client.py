@@ -392,3 +392,195 @@ class TestFetchStandingCharges:
         )
 
         assert charges[0]["valid_from"].tzinfo is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests: seed valid_to fix (Agile midnight-slot regression)
+# ---------------------------------------------------------------------------
+
+
+class TestSeedValidToFix:
+    """Regression tests for the Agile pre-window seed valid_to bug.
+
+    Bug: The last Agile slot before period_from has valid_to == period_from.
+    If the seed copies this valid_to, the seed has valid_from == valid_to
+    (zero-width window) and _build_historical_rate_map rejects it for every
+    slot (condition: vt is None or vt > slot fails when vt == slot).
+
+    Fix: seed valid_to is set to period_from + 30 min, covering only the
+    midnight slot. current_rate persists forward until the first real Agile
+    rate takes over.
+    """
+
+    def test_seed_with_valid_to_equals_valid_from_is_rejected(self):
+        """Regression: zero-width seed (valid_to == valid_from) → midnight slot gets 0."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 3, 1, 1, 0, tzinfo=UTC)  # 2 slots
+
+        # Zero-width seed — this was the old bug
+        raw_rates = [
+            {
+                "valid_from": period_from,
+                "valid_to": period_from,  # valid_to == valid_from → zero-width
+                "value_inc_vat": 17.0,
+            },
+        ]
+
+        rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
+
+        # With a zero-width seed, no rate ever matches → map is empty (bug reproduced)
+        midnight = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        assert rate_map.get(midnight) is None or rate_map.get(midnight, 0.0) == 0.0
+
+    def test_seed_with_valid_to_30min_covers_midnight(self):
+        """Fix: seed valid_to = period_from + 30 min → midnight slot gets the seed rate."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 3, 1, 1, 0, tzinfo=UTC)  # 2 slots
+
+        # Corrected seed — valid_to = period_from + 30 min
+        raw_rates = [
+            {
+                "valid_from": period_from,
+                "valid_to": period_from + timedelta(minutes=30),
+                "value_inc_vat": 17.0,
+            },
+        ]
+
+        rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
+
+        midnight = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        assert rate_map.get(midnight) == pytest.approx(17.0)
+
+    def test_seed_does_not_overwrite_real_agile_rates_after_first_slot(self):
+        """Fix: seed covers only midnight; real Agile rates are used from 00:30 onward."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 3, 1, 2, 0, tzinfo=UTC)  # 4 slots
+
+        raw_rates = [
+            # Seed covering only midnight slot
+            {
+                "valid_from": period_from,
+                "valid_to": period_from + timedelta(minutes=30),
+                "value_inc_vat": 17.0,
+            },
+            # Real Agile rate from 00:30
+            {
+                "valid_from": datetime(2026, 3, 1, 0, 30, tzinfo=UTC),
+                "valid_to": datetime(2026, 3, 1, 1, 0, tzinfo=UTC),
+                "value_inc_vat": 19.0,
+            },
+            # Real Agile rate from 01:00
+            {
+                "valid_from": datetime(2026, 3, 1, 1, 0, tzinfo=UTC),
+                "valid_to": datetime(2026, 3, 1, 1, 30, tzinfo=UTC),
+                "value_inc_vat": 22.0,
+            },
+            # Real Agile rate from 01:30
+            {
+                "valid_from": datetime(2026, 3, 1, 1, 30, tzinfo=UTC),
+                "valid_to": datetime(2026, 3, 1, 2, 0, tzinfo=UTC),
+                "value_inc_vat": 21.0,
+            },
+        ]
+
+        rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
+
+        assert rate_map[datetime(2026, 3, 1, 0, 0, tzinfo=UTC)] == pytest.approx(17.0)
+        assert rate_map[datetime(2026, 3, 1, 0, 30, tzinfo=UTC)] == pytest.approx(19.0)
+        assert rate_map[datetime(2026, 3, 1, 1, 0, tzinfo=UTC)] == pytest.approx(22.0)
+        assert rate_map[datetime(2026, 3, 1, 1, 30, tzinfo=UTC)] == pytest.approx(21.0)
+
+    def test_seed_persists_to_first_real_agile_rate_mid_month(self):
+        """Seed persists through all days before the first real Agile rate entry.
+
+        Simulates the scenario where the Agile rate API only returns data from
+        March 17, but the period starts March 1. The seed rate should fill slots
+        March 1–16 and real rates take over from March 17.
+        """
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2026, 3, 1, 2, 0, tzinfo=UTC)  # 4 slots (proxy for full scenario)
+
+        # Seed: last pre-window rate (e.g. Feb 28 23:30 slot)
+        # valid_to is period_from + 30 min (corrected)
+        seed_rate = 17.0
+        first_real_rate = 19.0
+
+        raw_rates = [
+            {
+                "valid_from": period_from,
+                "valid_to": period_from + timedelta(minutes=30),
+                "value_inc_vat": seed_rate,
+            },
+            # First real Agile rate at 00:30 (represents March 17 in the real scenario)
+            {
+                "valid_from": datetime(2026, 3, 1, 0, 30, tzinfo=UTC),
+                "valid_to": datetime(2026, 3, 1, 2, 0, tzinfo=UTC),
+                "value_inc_vat": first_real_rate,
+            },
+        ]
+
+        rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
+
+        # Midnight covered by seed
+        assert rate_map[datetime(2026, 3, 1, 0, 0, tzinfo=UTC)] == pytest.approx(seed_rate)
+        # 00:30 and beyond use real rates
+        assert rate_map[datetime(2026, 3, 1, 0, 30, tzinfo=UTC)] == pytest.approx(first_real_rate)
+        assert rate_map[datetime(2026, 3, 1, 1, 0, tzinfo=UTC)] == pytest.approx(first_real_rate)
+        assert rate_map[datetime(2026, 3, 1, 1, 30, tzinfo=UTC)] == pytest.approx(first_real_rate)
+
+
+# ---------------------------------------------------------------------------
+# Tests: _rates_cover_period
+# ---------------------------------------------------------------------------
+
+
+class TestRatesCoverPeriod:
+    """Tests for the _rates_cover_period cache-coverage validator."""
+
+    def setup_method(self):
+        from custom_components.battery_charge_calculator.tariff_comparison import (
+            _rates_cover_period,
+        )
+        self._fn = _rates_cover_period
+
+    def _make_rates(self, first_valid_from: datetime) -> dict:
+        return {
+            "unit_rates": [
+                {
+                    "valid_from": first_valid_from,
+                    "valid_to": None,
+                    "value_inc_vat": 20.0,
+                }
+            ],
+            "standing_charges": [],
+        }
+
+    def test_none_returns_false(self):
+        assert self._fn(None, datetime(2026, 3, 1, tzinfo=UTC)) is False
+
+    def test_empty_unit_rates_returns_false(self):
+        assert self._fn({"unit_rates": [], "standing_charges": []}, datetime(2026, 3, 1, tzinfo=UTC)) is False
+
+    def test_rates_starting_at_period_from_returns_true(self):
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        rates = self._make_rates(period_from)
+        assert self._fn(rates, period_from) is True
+
+    def test_rates_starting_before_period_from_returns_true(self):
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        rates = self._make_rates(datetime(2026, 2, 1, 0, 0, tzinfo=UTC))
+        assert self._fn(rates, period_from) is True
+
+    def test_rates_starting_after_period_from_returns_false(self):
+        """Cached rates starting March 17 don't cover a period starting March 1."""
+        period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+        rates = self._make_rates(datetime(2026, 3, 17, 0, 0, tzinfo=UTC))
+        assert self._fn(rates, period_from) is False
+
+    def test_string_valid_from_not_datetime_returns_false(self):
+        """Rates that were not parsed (still strings) return False — forces re-fetch."""
+        rates = {
+            "unit_rates": [{"valid_from": "2026-03-17T00:00:00Z", "value_inc_vat": 20.0}],
+            "standing_charges": [],
+        }
+        assert self._fn(rates, datetime(2026, 3, 1, tzinfo=UTC)) is False

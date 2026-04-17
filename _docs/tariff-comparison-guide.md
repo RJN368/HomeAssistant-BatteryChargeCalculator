@@ -8,7 +8,7 @@ It answers the question: *"Would I have saved money on Octopus Agile vs. my curr
 
 ## What it does
 
-- Fetches your actual import and export readings from the Octopus Energy API (1 months of half-hourly meter data)
+- Fetches your actual import and export readings from the Octopus Energy API (previous complete calendar month of half-hourly meter data)
 - Reprices those readings against the historical unit rates of each tariff you choose to compare
 - Produces a monthly breakdown — import cost, export earnings, standing charges, and net cost — for each tariff
 - Exposes everything as a Home Assistant sensor so you can build a dashboard chart
@@ -51,6 +51,15 @@ Click **Submit** to save.
 
 !!! tip "Region"
     The tariff list is filtered to your meter's regional suffix (e.g. East Midlands = B). The region is detected automatically from your live tariff code.
+
+### Step 4 — Export meter (optional)
+
+If you export electricity (e.g. solar + battery), enter your **Export MPAN** and **export meter serial number** on the next screen. These are used to fetch your actual export readings and the export tariff code from the Octopus API, so export earnings appear in the comparison.
+
+Leave blank to compare import costs only.
+
+!!! tip "Where to find your export MPAN"
+    Your export MPAN is the 13-digit number on your electricity bill or in your Octopus account under "Export meter". It is different from your import MPAN.
 
 ---
 
@@ -165,8 +174,30 @@ The comparison normally updates automatically once a week.
 ## Notes and limitations
 
 - **UK only** — requires an Octopus Energy account with smart meter half-hourly reads available via the Octopus API
-- **12-month rolling window** — the comparison uses the most recent 12 months of meter data
-- **Import only by default** — export comparison is available but requires your export MPAN and serial number to be configured
+- **1-month rolling window** — the comparison covers the previous complete calendar month (e.g. on 17 April 2026 it covers 1 March – 1 April 2026). This ensures all data is settled before calculations run
+- **Import only by default** — export comparison requires your export MPAN and serial number (see Step 4 above)
 - **Standing charges** — included in the net cost calculation. The standing charge for each tariff is fetched from the Octopus API
-- **Simulation accuracy** — the background simulation assumes zero solar generation (future improvement: use Open-Meteo historical solar irradiance). For solar-heavy homes, naive replay may actually be more representative in summer months
+- **Simulation accuracy** — the background simulation re-optimises your battery schedule day-by-day using historical temperatures (Open-Meteo) and the genetic algorithm. Solar is set to zero (no historical solar data available). For solar-heavy homes, naive replay may be more representative in summer months
 - **Data coverage** — the `data_quality_notes` attribute reports what percentage of slots had a direct rate lookup vs. forward-fill. Coverage below 90% may indicate a gap in the Octopus rate history for that tariff
+
+---
+
+## Troubleshooting
+
+### Export earnings show as £0
+
+1. Check that your export MPAN and meter serial are configured (Settings → Integrations → Battery Charge Calculator → Configure → Export Meter step)
+2. Confirm your Octopus account has an active export agreement for that MPAN
+3. After adding the export meter, force a refresh: **Developer Tools → Services → `battery_charge_calculator.refresh_tariff_comparison`**
+
+### Simulation shows rates as 0p for the first half of the month
+
+This can happen if the integration previously cached rates starting from today-minus-one-month instead of the calendar-month start. The integration now detects this automatically and re-fetches. If you see this on an existing install, trigger a manual refresh (above) to force a full re-fetch.
+
+### Results stopped updating
+
+The comparison re-calculates every 7 days by default (configurable). Force an immediate update with:
+
+```yaml
+service: battery_charge_calculator.refresh_tariff_comparison
+```
