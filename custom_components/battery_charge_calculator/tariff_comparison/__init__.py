@@ -412,8 +412,18 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             if not import_code:
                 continue
 
-            # Import rates
-            if import_code not in tariff_rates_cache:
+            # Import rates — fetch fresh if not cached OR if cached rates don't
+            # cover the start of the current period (e.g. stale cache from a
+            # previous fetch that used a different/shorter window).
+            cached_import = tariff_rates_cache.get(import_code)
+            cached_import_ok = _rates_cover_period(cached_import, period_from)
+            if not cached_import_ok:
+                if cached_import is not None:
+                    _LOGGER.info(
+                        "Cached rates for %s don't cover period start %s — re-fetching",
+                        import_code,
+                        period_from.date(),
+                    )
                 try:
                     unit_rates = await client.fetch_unit_rates(
                         session, import_code, period_from, period_to
@@ -433,8 +443,16 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             else:
                 new_tariff_rates[import_code] = tariff_rates_cache[import_code]
 
-            # Export rates (if configured for this tariff)
-            if export_code and export_code not in tariff_rates_cache:
+            # Export rates — same coverage check
+            cached_export = tariff_rates_cache.get(export_code) if export_code else None
+            cached_export_ok = _rates_cover_period(cached_export, period_from)
+            if export_code and not cached_export_ok:
+                if cached_export is not None:
+                    _LOGGER.info(
+                        "Cached export rates for %s don't cover period start %s — re-fetching",
+                        export_code,
+                        period_from.date(),
+                    )
                 try:
                     exp_unit_rates = await client.fetch_unit_rates(
                         session, export_code, period_from, period_to
@@ -755,7 +773,11 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         # the user must delete the tariff cache file and let the coordinator re-fetch.
         if import_raw:
             first_vf = import_raw[0].get("valid_from")
-            if first_vf and hasattr(first_vf, "date") and first_vf.date() > period_from.date():
+            if (
+                first_vf
+                and hasattr(first_vf, "date")
+                and first_vf.date() > period_from.date()
+            ):
                 _LOGGER.warning(
                     "Rate data for %s starts on %s but period starts %s — "
                     "cached rates are missing early slots.  Delete the tariff cache "
@@ -996,6 +1018,28 @@ def _build_simulation_monthly(
             }
         )
     return results
+
+
+def _rates_cover_period(rates_data: dict | None, period_from: datetime) -> bool:
+    """Return True if the cached rates contain a rate that covers period_from.
+
+    Checks whether the first unit_rate entry's valid_from is at or before
+    period_from — i.e. the rates actually start at the beginning of the window.
+    Returns False if rates_data is None, empty, or starts after period_from.
+    """
+    if not rates_data:
+        return False
+    unit_rates = rates_data.get("unit_rates", [])
+    if not unit_rates:
+        return False
+    first = unit_rates[0]
+    vf = first.get("valid_from")
+    if vf is None:
+        return False
+    # vf may be a datetime (fresh fetch) or already parsed from cache
+    if isinstance(vf, datetime):
+        return vf <= period_from
+    return False
 
 
 def _build_power_calculator(opts: dict) -> PowerCalulator:
