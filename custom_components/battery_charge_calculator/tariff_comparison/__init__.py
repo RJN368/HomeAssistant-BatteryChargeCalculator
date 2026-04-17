@@ -748,6 +748,23 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         import_raw = tariff_rates[import_code].get("unit_rates", [])
         sc_raw = tariff_rates[import_code].get("standing_charges", [])
+
+        # Diagnostic: warn if import_raw appears to be missing early slots (stale cache).
+        # For a 31-day Agile period we expect ~1489 entries (seed + 48 slots/day).
+        # If the first entry starts after period_from the cache predates the seed fix —
+        # the user must delete the tariff cache file and let the coordinator re-fetch.
+        if import_raw:
+            first_vf = import_raw[0].get("valid_from")
+            if first_vf and hasattr(first_vf, "date") and first_vf.date() > period_from.date():
+                _LOGGER.warning(
+                    "Rate data for %s starts on %s but period starts %s — "
+                    "cached rates are missing early slots.  Delete the tariff cache "
+                    "file and restart HA to force a fresh fetch.",
+                    import_code,
+                    first_vf.date(),
+                    period_from.date(),
+                )
+
         import_rate_map = _build_historical_rate_map(import_raw, period_from, period_to)
 
         export_rate_map: dict[datetime, float] | None = None

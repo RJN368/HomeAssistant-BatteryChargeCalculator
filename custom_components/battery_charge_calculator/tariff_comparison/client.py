@@ -266,18 +266,31 @@ class TariffComparisonClient:
             _LOGGER.debug("Pre-window seed fetch failed for %s: %s", tariff_code, exc)
             seed_raw = []
 
-        # Prepend seed with valid_from = period_from so forward-fill starts correctly.
-        # valid_to is set to None (unbounded) rather than copying the API row's
-        # valid_to — for Agile the last pre-window slot has valid_to = period_from,
-        # making valid_from == valid_to which causes the scan in
-        # _build_historical_rate_map to reject it (condition: vt is None or vt > slot).
-        # With valid_to=None the seed covers forward until the first real rate.
+        # Prepend seed with valid_from = period_from so the rate-scan in
+        # _build_historical_rate_map has a starting value for period_from.
+        #
+        # valid_to is set to period_from + 30 min (one slot), NOT None and NOT the
+        # API row's valid_to.  Rationale:
+        #
+        #   - For Agile, the last pre-window slot has valid_to = period_from, so
+        #     copying it gives valid_from == valid_to — a zero-width window that the
+        #     scan rejects (condition: vt is None or vt > slot).
+        #
+        #   - Setting valid_to = None would make the seed match every slot forever
+        #     because rate_idx never advances past it, preventing real Agile rates
+        #     from being used for any slot.
+        #
+        #   - Setting valid_to = period_from + 30 min covers only the midnight slot.
+        #     For all subsequent slots the scan advances rate_idx past the seed, and
+        #     the current_rate variable persists forward (acting as forward-fill) until
+        #     the first real rate entry's valid_from is reached.
+        seed_valid_to = period_from + timedelta(minutes=30)
         combined: list[dict] = []
         for row in seed_raw:
             combined.append(
                 {
                     "valid_from": period_from,
-                    "valid_to": None,
+                    "valid_to": seed_valid_to,
                     "value_inc_vat": float(row["value_inc_vat"]),
                 }
             )
