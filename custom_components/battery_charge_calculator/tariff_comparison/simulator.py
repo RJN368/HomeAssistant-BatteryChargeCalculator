@@ -104,10 +104,29 @@ class TariffSimulator:
                 solar_in=0.0,  # no historical solar data
             )
 
+        nonzero_import = sum(1 for v in rate_map_import.values() if v > 0.0)
+        nonzero_export = (
+            sum(1 for v in rate_map_export.values() if v > 0.0)
+            if rate_map_export
+            else 0
+        )
+        _LOGGER.debug(
+            "Simulating %s — import slots with rate: %d/48, export slots with rate: %d/48",
+            date_obj,
+            nonzero_import,
+            nonzero_export,
+        )
+
         timeslots, _ = evaluator.evaluate()
 
         if not timeslots:
-            _LOGGER.debug("GeneticEvaluator returned no timeslots for %s", date_obj)
+            _LOGGER.warning(
+                "GeneticEvaluator returned no timeslots for %s — import_rate_map has %d entries, "
+                "nonzero=%d; check timezone alignment between rate map keys and slot_dt",
+                date_obj,
+                len(rate_map_import),
+                nonzero_import,
+            )
             return {
                 "import_cost_pence": 0.0,
                 "export_earnings_pence": 0.0,
@@ -119,6 +138,13 @@ class TariffSimulator:
         import_cost_pence: float = sum(ts.cost for ts in timeslots if ts.cost > 0.0)
         export_earnings_pence: float = sum(
             -ts.cost for ts in timeslots if ts.cost < 0.0
+        )
+
+        _LOGGER.debug(
+            "Simulated %s → import=%.2fp export=%.2fp",
+            date_obj,
+            import_cost_pence,
+            export_earnings_pence,
         )
 
         return {

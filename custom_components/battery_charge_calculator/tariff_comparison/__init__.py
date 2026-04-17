@@ -832,7 +832,12 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     battery_start_kwh,
                 )
             except Exception as exc:  # noqa: BLE001
-                _LOGGER.debug("Simulation day %s failed: %s — skipping", day_obj, exc)
+                _LOGGER.warning(
+                    "Simulation day %s failed — skipping: %s",
+                    day_obj,
+                    exc,
+                    exc_info=True,
+                )
                 continue
 
             month_key = day_obj.strftime("%Y-%m")
