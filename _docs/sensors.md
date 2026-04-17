@@ -4,9 +4,9 @@ The integration creates the following sensors in Home Assistant:
 
 ---
 
-## Annual Tariff Comparison
+## Monthly Tariff Comparison
 
-**Entity:** `sensor.annual_tariff_comparison`
+**Entity:** `sensor.monthly_tariff_comparison`
 
 **Only created when tariff comparison is enabled in the integration settings.**
 
@@ -34,7 +34,7 @@ Each entry in `tariffs` contains:
 | `annual` | Dict with `import_cost_gbp`, `export_earnings_gbp`, `standing_charges_gbp`, `net_cost_gbp` |
 | `monthly` | List of 12 dicts — one per month — with the same cost fields plus `month` (YYYY-MM) |
 
-See [Annual Tariff Comparison](tariff-comparison-guide.md) for full setup and dashboard examples.
+See [Monthly Tariff Comparison](tariff-comparison-guide.md) for full setup and dashboard examples.
 
 ---
 

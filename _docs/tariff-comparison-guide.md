@@ -1,6 +1,6 @@
-# Annual Tariff Comparison
+# Monthly Tariff Comparison
 
-The **Annual Tariff Comparison** feature shows you what your electricity would have cost over the last 12 months under different Octopus Energy tariffs — using your real half-hourly smart meter data.
+The **Monthly Tariff Comparison** feature shows you what your electricity would have cost over the last 12 months under different Octopus Energy tariffs — using your real half-hourly smart meter data.
 
 It answers the question: *"Would I have saved money on Octopus Agile vs. my current tariff?"*
 
@@ -8,7 +8,7 @@ It answers the question: *"Would I have saved money on Octopus Agile vs. my curr
 
 ## What it does
 
-- Fetches your actual import and export readings from the Octopus Energy API (12 months of half-hourly meter data)
+- Fetches your actual import and export readings from the Octopus Energy API (1 months of half-hourly meter data)
 - Reprices those readings against the historical unit rates of each tariff you choose to compare
 - Produces a monthly breakdown — import cost, export earnings, standing charges, and net cost — for each tariff
 - Exposes everything as a Home Assistant sensor so you can build a dashboard chart
@@ -30,11 +30,11 @@ The `comparison_method` attribute on each tariff entry tells you which method pr
 
 Go to **Settings → Devices & Services**, find **Battery Charge Calculator**, and click **Configure**.
 
-Navigate to the **Annual Tariff Comparison** step (it appears after the ML settings step).
+Navigate to the **Monthly Tariff Comparison** step (it appears after the ML settings step).
 
 ### Step 2 — Enable the feature
 
-Toggle **Enable annual tariff comparison** on.
+Toggle **Enable Monthly Tariff Comparison** on.
 
 ### Step 3 — Pick your tariffs
 
@@ -56,7 +56,7 @@ Click **Submit** to save.
 
 ## The sensor
 
-**Entity:** `sensor.annual_tariff_comparison`
+**Entity:** `sensor.monthly_tariff_comparison`
 
 **State:** Net annual cost (£) for the first tariff in your selection (your baseline).
 
@@ -101,14 +101,14 @@ Install the [ApexCharts card](https://github.com/RomRider/apexcharts-card) from 
 ```yaml
 type: custom:apexcharts-card
 header:
-  title: Annual Tariff Comparison
+  title: Monthly Tariff Comparison
   show: true
 graph_span: 12month
 series_in_graph: true
 all_series_config:
   type: bar
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Net monthly cost
     data_generator: |
       return entity.attributes.tariffs.flatMap(t =>
@@ -140,7 +140,7 @@ data_generator: |
     data: (t.monthly || []).map(m => [new Date(m.month + '-01').getTime(), m.net_cost_gbp])
   }));
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     data_generator: "return [];"
 ```
 

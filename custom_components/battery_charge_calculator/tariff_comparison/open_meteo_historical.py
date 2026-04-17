@@ -9,7 +9,7 @@ See §3.5 of _docs/tariff-comparison.md for the full specification.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import aiohttp
@@ -87,50 +87,3 @@ class OpenMeteoHistoricalClient:
             result[day].append(float(temp))
 
         return result
-
-    def resample_to_30min(
-        self, daily_temps: dict[date, list[float]]
-    ) -> dict[datetime, float]:
-        """Duplicate each hourly temperature into two 30-min slots.
-
-        Returns a ``dict[slot_start_utc, temperature_c]`` for all slots.
-        E.g. temperature at HH:00 → slots at HH:00 and HH:30.
-        """
-        result: dict[datetime, float] = {}
-        for day, hourly in daily_temps.items():
-            for hour_idx, temp in enumerate(hourly):
-                slot_00 = datetime(
-                    day.year, day.month, day.day, hour_idx, 0, tzinfo=timezone.utc
-                )
-                slot_30 = datetime(
-                    day.year, day.month, day.day, hour_idx, 30, tzinfo=timezone.utc
-                )
-                result[slot_00] = temp
-                result[slot_30] = temp
-        return result
-
-    async def fetch(
-        self,
-        session: aiohttp.ClientSession,
-        period_from: date,
-        period_to: date,
-        lat: float | None = None,
-        lon: float | None = None,
-    ) -> dict[date, list[float]]:
-        """Fetch historical temperatures — canonical API (alias of fetch_temperatures).
-
-        Args:
-            session: Active aiohttp ClientSession.
-            period_from: First day of the range (inclusive).
-            period_to: Last day of the range (inclusive).
-            lat: Optional latitude override (uses instance lat if omitted).
-            lon: Optional longitude override (uses instance lon if omitted).
-
-        Returns:
-            Dict mapping each date to a list of 24 hourly temperatures in °C.
-        """
-        if lat is not None:
-            self._lat = lat
-        if lon is not None:
-            self._lon = lon
-        return await self.fetch_temperatures(session, period_from, period_to)

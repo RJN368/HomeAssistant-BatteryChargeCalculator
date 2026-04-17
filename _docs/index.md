@@ -22,6 +22,6 @@ The Battery Charge Calculator is a Home Assistant custom integration that automa
 
 See the [Setup guide](setup.md) to connect your accounts and get started.
 
-To compare what your electricity would have cost on different Octopus tariffs, see [Annual Tariff Comparison](tariff-comparison-guide.md).
+To compare what your electricity would have cost on different Octopus tariffs, see [Monthly Tariff Comparison](tariff-comparison-guide.md).
 
 To enable the machine-learning power forecasting feature, see [Machine Learning](machine-learning.md).

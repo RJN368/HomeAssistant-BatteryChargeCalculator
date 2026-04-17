@@ -58,7 +58,7 @@ Key implementation note: cold-start Case C requires ≥ 400 background slots so 
 
 ---
 
-### 2026-04-16 — Annual Tariff Comparison test suite
+### 2026-04-16 — Monthly Tariff Comparison test suite
 
 **Files created:**
 - `tests/unit/test_tariff_comparison_calculator.py` — 15 tests covering `calculate_tariff_cost`: basic import-only cost, import+export net, 12-month aggregation shape/totals, standing charges (included/excluded/mid-year weighted), forward-fill (rate not zero), coverage_pct pre-fill measurement, DST calendar-day safety, export-only timestamp union, and monetary rounding.

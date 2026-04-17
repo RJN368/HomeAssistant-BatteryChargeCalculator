@@ -1,4 +1,4 @@
-# Annual Tariff Comparison Visualisation — Feature Specification
+# Monthly Tariff Comparison Visualisation — Feature Specification
 
 **Status:** Approved by robert.nash (2026-04-13) — ready for implementation
 **Author:** Keaton (Lead Architect)
@@ -24,7 +24,7 @@
 
 ## 1. Feature Overview
 
-The Annual Tariff Comparison Visualisation allows Robert to see what his electricity costs **would have been** over the previous 12 months under different Octopus Energy import and export tariff combinations, using **real half-hourly meter consumption data** from the Octopus API.
+The Monthly Tariff Comparison Visualisation allows Robert to see what his electricity costs **would have been** over the previous 12 months under different Octopus Energy import and export tariff combinations, using **real half-hourly meter consumption data** from the Octopus API.
 
 Costs are calculated retrospectively: actual recorded grid import and export readings are replayed against the historical unit rates of each configured tariff. The result — a monthly breakdown per tariff — is exposed as a Home Assistant sensor with rich `extra_state_attributes`, designed for rendering as a stacked or grouped bar chart in Lovelace using the [ApexCharts card](https://github.com/RomRider/apexcharts-card).
 
@@ -444,7 +444,7 @@ A lightweight `DataUpdateCoordinator` separate from `BatteryChargeCoordinator`.
 
 ```python
 class TariffComparisonCoordinator(DataUpdateCoordinator):
-    """Coordinator for annual tariff comparison data.
+    """Coordinator for Monthly Tariff Comparison data.
 
     Update interval: weekly (configurable via TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS).
     On first load: immediately fetch data if cache is absent or stale.
@@ -547,7 +547,7 @@ DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT       = False   # until OQ-1 resolved
 
 # Sensor
 TARIFF_COMPARISON_SENSOR              = "battery_charge_calculator.tariff_comparison"
-TARIFF_COMPARISON_SENSOR_NAME         = "Annual Tariff Comparison"
+TARIFF_COMPARISON_SENSOR_NAME         = "Monthly Tariff Comparison"
 
 # Export meter serial (new; added alongside OCTOPUS_METER_SERIAL from D-18)
 OCTOPUS_EXPORT_METER_SERIAL           = "octopus_export_meter_serial"
@@ -557,7 +557,7 @@ OCTOPUS_EXPORT_METER_SERIAL           = "octopus_export_meter_serial"
 
 ```python
 class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
-    """Sensor exposing annual tariff comparison as monthly breakdown attributes."""
+    """Sensor exposing Monthly Tariff Comparison as monthly breakdown attributes."""
 
     _attr_should_poll = False
     _attr_name = const.TARIFF_COMPARISON_SENSOR_NAME
@@ -848,7 +848,7 @@ New `simulation_results` section in the cache JSON (§5.5), keyed by tariff code
 
 ## 7. Sensor Schema
 
-**Entity ID:** `sensor.annual_tariff_comparison`
+**Entity ID:** `sensor.monthly_tariff_comparison`
 **State:** Net annual cost of the first (current) tariff in £ (e.g. `"724.50"`)
 **Unit:** `GBP`
 **Device class:** `monetary`
@@ -948,7 +948,7 @@ The suggested Lovelace card uses the **ApexCharts Card** (HACS) with a grouped b
 ```yaml
 type: custom:apexcharts-card
 header:
-  title: Annual Tariff Comparison — Net Cost (£)
+  title: Monthly Tariff Comparison — Net Cost (£)
   show: true
 graph_span: 12months
 apex_config:
@@ -969,21 +969,21 @@ apex_config:
     shared: true
     intersect: false
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Current (Agile)
     data_generator: |
       return entity.attributes.tariffs
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: m.net_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Intelligent Go
     data_generator: |
       return entity.attributes.tariffs
         .find(t => t.name === 'Intelligent Go')
         .monthly
         .map(m => ({ x: m.month, y: m.net_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Cosy Octopus
     data_generator: |
       return entity.attributes.tariffs
@@ -1011,7 +1011,7 @@ apex_config:
     bar:
       columnWidth: 60%
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Import Cost
     color: "#FF5733"
     data_generator: |
@@ -1019,7 +1019,7 @@ series:
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: m.import_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Export Earnings (negative)
     color: "#28B463"
     data_generator: |
@@ -1027,7 +1027,7 @@ series:
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: -m.export_earnings_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Standing Charges
     color: "#5DADE2"
     data_generator: |

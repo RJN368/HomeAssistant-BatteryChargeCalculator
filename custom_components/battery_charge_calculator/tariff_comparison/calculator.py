@@ -1,4 +1,4 @@
-"""Cost calculation logic for the Annual Tariff Comparison feature.
+"""Cost calculation logic for the Monthly Tariff Comparison feature.
 
 Pure Python — no Home Assistant imports.
 
@@ -8,7 +8,6 @@ and Hockney's implementation notes.
 
 from __future__ import annotations
 
-import calendar
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -124,13 +123,9 @@ def calculate_tariff_cost(
     months_sorted = sorted(set(monthly_import_p) | set(monthly_export_p))
 
     monthly_results: list[dict] = []
-    total_import_gbp = 0.0
-    total_export_gbp = 0.0
-    total_sc_gbp = 0.0
 
     for month_key in months_sorted:
         year, month = int(month_key[:4]), int(month_key[5:7])
-        days_in_month = calendar.monthrange(year, month)[1]
 
         # Standing charge for this month (§6.3 direct sum formula per Hockney)
         sc_gbp = 0.0
@@ -174,10 +169,6 @@ def calculate_tariff_cost(
                 "net_cost_gbp": round(net_gbp, 2),
             }
         )
-
-        total_import_gbp += import_gbp
-        total_export_gbp += export_gbp
-        total_sc_gbp += sc_gbp
 
     coverage_pct = (
         round((direct_hits / total_import_slots) * 100.0, 2)

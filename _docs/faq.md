@@ -82,7 +82,7 @@ The trained model and credentials in `./config/bcc-ml-data/` are preserved.
 
 ---
 
-## Annual Tariff Comparison
+## Monthly Tariff Comparison
 
 ### How does the tariff comparison work?
 
@@ -96,13 +96,13 @@ The comparison runs in two phases. **Naive replay** (available within minutes of
 
 ### The tariff list shows tariffs from the wrong region
 
-The region is detected from your current import tariff code's last letter (e.g. `B` for East Midlands). If this is wrong, check your tariff code in **Settings → Devices & Services → Battery Charge Calculator → Configure → Annual Tariff Comparison**.
+The region is detected from your current import tariff code's last letter (e.g. `B` for East Midlands). If this is wrong, check your tariff code in **Settings → Devices & Services → Battery Charge Calculator → Configure → Monthly Tariff Comparison**.
 
 ### How often does the comparison update?
 
 Once a week by default. You can force an immediate refresh via **Developer Tools → Services → `battery_charge_calculator.refresh_tariff_comparison`**.
 
-### The Annual Tariff Comparison sensor shows `unavailable`
+### The Monthly Tariff Comparison sensor shows `unavailable`
 
 1. Confirm the feature is enabled in the integration settings
 2. Check that your Octopus API key has access to your account's consumption data — test it at `https://api.octopus.energy/v1/accounts/{your-account}/`

@@ -1,6 +1,6 @@
-"""Annual Tariff Comparison sensor.
+"""Monthly Tariff Comparison sensor.
 
-Exposes the annual tariff comparison as monthly breakdown attributes, suitable
+Exposes the Monthly Tariff Comparison as monthly breakdown attributes, suitable
 for rendering as a grouped bar chart in Lovelace using the ApexCharts card.
 
 State value:
@@ -34,7 +34,7 @@ from .. import const
 
 
 class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
-    """Sensor exposing annual tariff comparison as monthly breakdown attributes.
+    """Sensor exposing Monthly Tariff Comparison as monthly breakdown attributes.
 
     The state value is the net annual cost (£) for the first (current) tariff.
     All tariff data — monthly breakdowns, annual totals, coverage, and data

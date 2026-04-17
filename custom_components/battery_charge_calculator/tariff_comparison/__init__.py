@@ -74,7 +74,7 @@ def _period_bounds(now: datetime) -> tuple[datetime, datetime]:
 
 
 class TariffComparisonCoordinator(DataUpdateCoordinator):
-    """Coordinator for annual tariff comparison data.
+    """Coordinator for Monthly Tariff Comparison data.
 
     Update interval: configurable via TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS
     (default 7 days).  On first load the cache is checked; if fresh the API
@@ -161,9 +161,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             ]
             if non_current_unsimulated:
                 tariff_rates = _rates_from_cache(cache.get("tariff_rates", {}))
-                shared_export_code: str | None = (
-                    cache.get("export_tariff_code") or None
-                )
+                shared_export_code: str | None = cache.get("export_tariff_code") or None
                 self.hass.async_create_task(
                     self._start_simulations(
                         non_current_unsimulated,
@@ -270,7 +268,10 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             # Strategy A: account-based (preferred when account_number is known)
             if account_number:
                 try:
-                    from ..octopus_agile import OctopusAgileRatesClient, _active_agreement
+                    from ..octopus_agile import (
+                        OctopusAgileRatesClient,
+                        _active_agreement,
+                    )
 
                     agile_client = OctopusAgileRatesClient(api_key, account_number)
                     # Strategy A-1: is_export flag
@@ -298,7 +299,9 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                                         meter.get("agreements", [])
                                     )
                                     if agreement:
-                                        shared_export_code = agreement.get("tariff_code")
+                                        shared_export_code = agreement.get(
+                                            "tariff_code"
+                                        )
                                         _LOGGER.debug(
                                             "Export tariff resolved via account API "
                                             "(MPAN match %s): %s",
@@ -649,48 +652,11 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         if self._fetch_task and not self._fetch_task.done():
             self._fetch_task.cancel()
             self._fetch_task = None
-        for key, task in list(self._simulation_tasks.items()):
+        for task in list(self._simulation_tasks.values()):
             if not task.done():
                 task.cancel()
         self._simulation_tasks.clear()
         await self.async_refresh()
-
-    async def async_start_simulation(self, tariff_config: dict) -> None:
-        """Queue per-tariff Approach A simulation as a background task.
-
-        Safe to call multiple times — skips if a task is already running for
-        the given import tariff code.
-        """
-        code = tariff_config.get("import_tariff_code", "")
-        if not code:
-            return
-        if code in self._simulation_tasks and not self._simulation_tasks[code].done():
-            _LOGGER.debug("Simulation already in progress for %s — skipping", code)
-            return
-
-        # We need current rate data and period from coordinator.data
-        if not self.data:
-            _LOGGER.warning("Cannot start simulation — coordinator has no data yet")
-            return
-
-        now = datetime.now(timezone.utc)
-        period_from, period_to = _period_bounds(now)
-
-        cache = await self.hass.async_add_executor_job(read_cache, self._config_dir)
-        tariff_rates = _rates_from_cache((cache or {}).get("tariff_rates", {}))
-        shared_export_code: str | None = (cache or {}).get("export_tariff_code") or None
-
-        current_result = copy.deepcopy(self.data)
-        task = self.hass.async_create_task(
-            self._run_tariff_simulation(
-                tariff_config,
-                tariff_rates,
-                period_from,
-                period_to,
-                shared_export_code=shared_export_code,
-            )
-        )
-        self._simulation_tasks[code] = task
 
     async def _start_simulations(
         self,

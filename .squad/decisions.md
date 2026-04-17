@@ -610,7 +610,7 @@ def validate_model_compatibility(model_metadata: dict, current_feature_columns: 
 
 ---
 
-## Annual Tariff Comparison Feature
+## Monthly Tariff Comparison Feature
 *Added: 2026-04-13 — sources: Keaton (architecture), Hockney (maths review)*
 
 ### ADC-1: Separate coordinator (`TariffComparisonCoordinator`)
@@ -781,7 +781,7 @@ $$\text{net\_cost\_gbp}(m) = \text{import\_cost\_gbp}(m) - \text{export\_earning
 
 ---
 
-### Open questions — Annual Tariff Comparison (pending Robert's answers)
+### Open questions — Monthly Tariff Comparison (pending Robert's answers)
 
 | # | Question | Default | Blocking? |
 |---|---|---|---|

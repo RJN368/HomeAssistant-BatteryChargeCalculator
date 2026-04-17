@@ -11,7 +11,7 @@ This Home Assistant addon connects to Octopus Energy to fetch import and export 
 - Calculates the best charge, discharge, and export schedule for your battery
 - Automatically schedules updates in GivEnergy
 - Optimizes for cost savings and energy efficiency
-- **Annual Tariff Comparison** — see what you would have paid on Agile, Go, Flux, or any other Octopus tariff over the last 12 months, using real smart meter data
+- **Monthly Tariff Comparison** — see what you would have paid on Agile, Go, Flux, or any other Octopus tariff over the last 12 months, using real smart meter data
 
 ## Machine Learning Power Estimation
 
