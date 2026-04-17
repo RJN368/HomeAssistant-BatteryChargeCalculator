@@ -800,6 +800,24 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         if total_days == 0:
             return
 
+        # Pre-slice the full-month rate maps into per-day dicts BEFORE the executor
+        # loop starts.  Each executor thread receives its own isolated copy of only
+        # its day's 48 slots — no shared mutable state between the event loop and
+        # any running executor thread.  Slicing by `.date()` is safe for UTC keys:
+        # datetime(2026, 3, 1, 0, 0, tzinfo=utc).date() == date(2026, 3, 1).
+        per_day_import: dict[date, dict[datetime, float]] = {}
+        per_day_export: dict[date, dict[datetime, float] | None] = {}
+        for day_obj in day_range:
+            per_day_import[day_obj] = {
+                k: v for k, v in import_rate_map.items() if k.date() == day_obj
+            }
+            if export_rate_map is not None:
+                per_day_export[day_obj] = {
+                    k: v for k, v in export_rate_map.items() if k.date() == day_obj
+                }
+            else:
+                per_day_export[day_obj] = None
+
         simulator = TariffSimulator()
         monthly_import_pence: dict[str, float] = defaultdict(float)
         monthly_export_pence: dict[str, float] = defaultdict(float)
@@ -823,8 +841,8 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     simulator.simulate_day,
                     day_obj,
                     hourly_temps,
-                    import_rate_map,
-                    export_rate_map,
+                    per_day_import[day_obj],
+                    per_day_export[day_obj],
                     power_calculator,
                     inverter_size_kw,
                     inverter_efficiency,

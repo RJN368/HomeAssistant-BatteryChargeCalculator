@@ -78,20 +78,38 @@ class TariffSimulator:
             battery_capacity_kwh=battery_capacity_kwh,
         )
 
-        # Diagnostic: log the first key in the rate map vs what slot_dt will be
-        if rate_map_import:
-            first_key = min(rate_map_import.keys())
-            midnight_dt = datetime(date_obj.year, date_obj.month, date_obj.day, 0, 0, tzinfo=timezone.utc)
-            midnight_rate = rate_map_import.get(midnight_dt)
-            _LOGGER.debug(
-                "Rate map check for %s: midnight slot_dt=%r tzinfo=%r, "
-                "map first key=%r tzinfo=%r, midnight lookup=%s",
+        # Diagnostic: log what we got in this day's rate map vs what we expect.
+        # rate_map_import is pre-sliced to this day only (48 slots expected).
+        slots_in_map = len(rate_map_import)
+        nonzero_import = sum(1 for v in rate_map_import.values() if v > 0.0)
+        nonzero_export = (
+            sum(1 for v in rate_map_export.values() if v > 0.0)
+            if rate_map_export
+            else 0
+        )
+        midnight_dt = datetime(
+            date_obj.year, date_obj.month, date_obj.day, 0, 0, tzinfo=timezone.utc
+        )
+        midnight_rate = rate_map_import.get(midnight_dt)
+        if slots_in_map < 48 or midnight_rate is None:
+            _LOGGER.warning(
+                "Incomplete rate data for %s: map has %d/48 slots, "
+                "midnight lookup=%s (nonzero import=%d, export=%d). "
+                "Rates for this day may be incomplete.",
                 date_obj,
-                midnight_dt,
-                midnight_dt.tzinfo,
-                first_key,
-                first_key.tzinfo,
+                slots_in_map,
                 f"{midnight_rate}p" if midnight_rate is not None else "MISSING",
+                nonzero_import,
+                nonzero_export,
+            )
+        else:
+            _LOGGER.debug(
+                "Simulating %s: %d/48 slots, midnight=%.4fp, nonzero import=%d, export=%d",
+                date_obj,
+                slots_in_map,
+                midnight_rate,
+                nonzero_import,
+                nonzero_export,
             )
 
         for slot_idx in range(48):

@@ -224,7 +224,7 @@ class GeneticEvaluator:
         """Create the initial population of schedules."""
         population = []
         hash_lookup = {}
-
+        conflict_count = 0
         population.append(self.create_ideal_schedule())
 
         while len(population) < min(self.num_slots, self.population_size):
@@ -241,6 +241,13 @@ class GeneticEvaluator:
             if hash_value not in hash_lookup:
                 hash_lookup[hash_value] = schedule
                 population.append(schedule)
+            else:
+                conflict_count += 1
+                if conflict_count > self.population_size * 2:
+                    self._logging.warning(
+                        "Too many hash conflicts when creating population; this can occur when the number of unique schedules is less than the population size. Proceeding with current population of %d schedules."
+                    )
+                    break
 
         return population
 
