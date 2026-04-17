@@ -161,6 +161,14 @@
                     "octopus_export_meter_serial": "The serial number printed on your export electricity meter."
                 }
             }
+        },
+        "error": {
+            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature.",
+            "tariff_fetch_failed": "Could not fetch available tariffs from Octopus — check your API key and internet connection.",
+            "select_at_least_one": "Please select at least one tariff."
+        }
+    },
+    "options": {
         "step": {
             "init": {
                 "title": "Battery Charge Calculator – Connection & Inverter",
