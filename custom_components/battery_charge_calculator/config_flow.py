@@ -269,6 +269,21 @@ def _tariff_comparison_pick_schema(
     )
 
 
+def _export_meter_schema(
+    export_mpan: str = "",
+    export_meter_serial: str = "",
+) -> vol.Schema:
+    """Schema for the export meter configuration step."""
+    return vol.Schema(
+        {
+            vol.Optional(const.OCTOPUS_EXPORT_MPN, default=export_mpan): cv.string,
+            vol.Optional(
+                const.OCTOPUS_EXPORT_METER_SERIAL, default=export_meter_serial
+            ): cv.string,
+        }
+    )
+
+
 def _validate_tariff_json(tariffs_json: str) -> list[str]:
     """Validate the tariff comparison JSON string.
 
@@ -692,7 +707,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = (
                     _tariff_codes_to_stored_json(selected)
                 )
-                return self._create_entry()
+                return await self.async_step_export_meter()
 
         # --- Fetch available tariffs from Octopus ---
         session = aiohttp_client.async_get_clientsession(self.hass)
@@ -746,6 +761,32 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
 
         options = {**self._main_data, **self._heating_data}
         return self.async_create_entry(title=const.TITLE, data={}, options=options)
+
+    async def async_step_export_meter(self, user_input=None):
+        """Step: configure export meter MPAN and serial for tariff comparison.
+
+        Both fields are optional — if left blank, export earnings will not be
+        included in any tariff comparison.  The export tariff code is resolved
+        automatically from the Octopus account API at fetch time.
+        """
+        if user_input is not None:
+            self._heating_data[const.OCTOPUS_EXPORT_MPN] = user_input.get(
+                const.OCTOPUS_EXPORT_MPN, ""
+            ).strip()
+            self._heating_data[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
+                const.OCTOPUS_EXPORT_METER_SERIAL, ""
+            ).strip()
+            return self._create_entry()
+
+        return self.async_show_form(
+            step_id="export_meter",
+            data_schema=_export_meter_schema(
+                export_mpan=self._heating_data.get(const.OCTOPUS_EXPORT_MPN, ""),
+                export_meter_serial=self._heating_data.get(
+                    const.OCTOPUS_EXPORT_METER_SERIAL, ""
+                ),
+            ),
+        )
 
     def _create_entry(self):
         """Finalise and create the config entry (called from tariff steps)."""
@@ -1127,7 +1168,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 self.options[const.TARIFF_COMPARISON_TARIFFS] = (
                     _tariff_codes_to_stored_json(selected)
                 )
-                return self._save_and_exit()
+                return await self.async_step_export_meter()
 
         session = aiohttp_client.async_get_clientsession(self.hass)
         available_options: list[dict] = []
@@ -1179,3 +1220,24 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         # Do NOT also call async_update_entry — that fires the listener a second time,
         # causing a double-reload race condition.
         return self.async_create_entry(title=const.TITLE, data=self.options)
+
+    async def async_step_export_meter(self, user_input=None):
+        """Step: configure export meter MPAN and serial (options flow)."""
+        if user_input is not None:
+            self.options[const.OCTOPUS_EXPORT_MPN] = user_input.get(
+                const.OCTOPUS_EXPORT_MPN, ""
+            ).strip()
+            self.options[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
+                const.OCTOPUS_EXPORT_METER_SERIAL, ""
+            ).strip()
+            return self._save_and_exit()
+
+        return self.async_show_form(
+            step_id="export_meter",
+            data_schema=_export_meter_schema(
+                export_mpan=self.options.get(const.OCTOPUS_EXPORT_MPN, ""),
+                export_meter_serial=self.options.get(
+                    const.OCTOPUS_EXPORT_METER_SERIAL, ""
+                ),
+            ),
+        )
