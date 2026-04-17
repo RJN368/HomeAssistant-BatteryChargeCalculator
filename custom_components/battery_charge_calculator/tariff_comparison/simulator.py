@@ -78,6 +78,22 @@ class TariffSimulator:
             battery_capacity_kwh=battery_capacity_kwh,
         )
 
+        # Diagnostic: log the first key in the rate map vs what slot_dt will be
+        if rate_map_import:
+            first_key = min(rate_map_import.keys())
+            midnight_dt = datetime(date_obj.year, date_obj.month, date_obj.day, 0, 0, tzinfo=timezone.utc)
+            midnight_rate = rate_map_import.get(midnight_dt)
+            _LOGGER.debug(
+                "Rate map check for %s: midnight slot_dt=%r tzinfo=%r, "
+                "map first key=%r tzinfo=%r, midnight lookup=%s",
+                date_obj,
+                midnight_dt,
+                midnight_dt.tzinfo,
+                first_key,
+                first_key.tzinfo,
+                f"{midnight_rate}p" if midnight_rate is not None else "MISSING",
+            )
+
         for slot_idx in range(48):
             hour = slot_idx // 2
             minute = 30 if slot_idx % 2 else 0
