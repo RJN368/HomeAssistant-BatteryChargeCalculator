@@ -62,6 +62,15 @@ class TariffSimulator:
         Summing costs directly avoids division-by-zero when rates are 0 p/kWh
         and is more numerically stable than back-calculating kWh.
         """
+
+        # Normalize solar_data_30min: None and all-zeros are treated identically
+        if solar_data_30min is None:
+            solar_data_30min = [0.0] * 48
+        elif len(solar_data_30min) < 48:
+            solar_data_30min = list(solar_data_30min) + [0.0] * (
+                48 - len(solar_data_30min)
+            )
+
         # Lazy import to keep module importable without HA deps
         from ..genetic_evaluator import GeneticEvaluator
 

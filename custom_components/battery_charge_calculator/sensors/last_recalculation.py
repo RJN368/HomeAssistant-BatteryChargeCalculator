@@ -14,8 +14,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .. import const
 
-# Human-readable labels for each reason value
-from homeassistant.helpers.translation import async_get_translations
 
 # Translation keys for recalculation reasons
 REASON_TRANSLATION_KEYS = {
@@ -53,14 +51,11 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         """Sync state and attributes from the coordinator."""
         self._attr_native_value = getattr(self.coordinator, "recalculation_time", None)
         reason = getattr(self.coordinator, "recalculation_reason", None)
-        reason_label = None
-        if reason in REASON_TRANSLATION_KEYS:
-            reason_label = self.hass.helpers.translation.async_translate(
-                REASON_TRANSLATION_KEYS[reason]
-            )
+        # Set reason_label to the translation key string for frontend translation
+        reason_label = REASON_TRANSLATION_KEYS.get(reason, reason)
         self._attr_extra_state_attributes = {
             "reason": reason,
-            "reason_label": reason_label if reason_label else reason,
+            "reason_label": reason_label,
         }
 
     @callback
