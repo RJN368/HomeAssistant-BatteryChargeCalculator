@@ -20,12 +20,61 @@ Weather forecast data is used to estimate how much energy your home needs for he
 ### Base load
 Your home's baseline electricity consumption (appliances, lighting, hot water, etc.) is added as a constant or time-varying load on top of the heating load.
 
+
 ### Solar gain
-If you have solar panels, the expected solar generation for the day is subtracted from the demand. Solar gain is estimated from the weather forecast (irradiance/cloud cover).
+If you have solar panels, the expected solar generation for the day is subtracted from the demand. Solar gain can be estimated in two ways:
+
+- **Forecast-based**: Uses weather forecast (irradiance/cloud cover) to estimate solar generation.
+- **Historical-based**: If enabled, the integration fetches your actual historical solar production from Home Assistant’s long-term statistics database. This real data is used to improve the accuracy of the demand forecast, replacing or blending the forecasted solar gain with measured values from previous days with similar conditions. This helps account for local factors (e.g., shading, panel orientation) that weather forecasts alone cannot capture.
+	- The integration queries Home Assistant’s statistics for your solar energy sensor, splits hourly values into half-hour slots, and fills any missing data with zero (safe fallback).
+	- If no historical data is available, the system falls back to forecast-based solar gain.
+
+#### ML and Solar Data
+If the **ML service** is enabled and a trained model is available, the model can use both weather forecasts and historical solar data to produce a blended prediction for net demand. See [Machine Learning](machine-learning.md) for details.
 
 The result is a net demand profile — a half-hourly forecast of how much energy your home will need from the battery or grid at each point in the day.
+# System Architecture
 
-If the **ML service** is enabled and a trained model is available, the physics-based demand forecast is replaced by the ML model's blended prediction. See [Machine Learning](machine-learning.md) for details.
+```mermaid
+flowchart TD
+	HA[Home Assistant Core]
+	BCC[Battery Charge Calculator (Custom Component)]
+	ML[ML Service (optional)]
+	GivTCP[GivTCP (MQTT broker)]
+	Octopus[Octopus API]
+	Meteo[Open-Meteo API]
+	Stats[HA Statistics (Solar History)]
+
+	HA -->|sensors, statistics| BCC
+	BCC -->|fetch rates| Octopus
+	BCC -->|fetch weather| Meteo
+	BCC -->|fetch solar history| Stats
+	BCC -->|optional: demand prediction| ML
+	BCC -->|publish schedule| GivTCP
+	GivTCP -->|controls| HA
+```
+
+# Solar Data Fetch & Simulation Sequence
+
+```mermaid
+sequenceDiagram
+	participant User
+	participant HA as Home Assistant
+	participant BCC as Battery Charge Calculator
+	participant Stats as HA Statistics
+	participant ML as ML Service
+	participant GivTCP
+
+	User->>HA: Triggers simulation
+	HA->>BCC: Calls simulation service
+	BCC->>Stats: Fetch solar history
+	alt ML enabled
+		BCC->>ML: Send demand/solar data for prediction
+		ML-->>BCC: Return blended prediction
+	end
+	BCC->>BCC: Run demand/simulation logic
+	BCC->>GivTCP: Publish schedule (or expose as sensor)
+```
 
 ---
 

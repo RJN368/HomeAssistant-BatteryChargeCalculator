@@ -76,7 +76,7 @@ class MLPowerSurfaceSensor(CoordinatorEntity, SensorEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_name = const.ML_POWER_SURFACE_SENSOR_NAME
+    _attr_translation_key = "ml_power_surface"
     _attr_unique_id = const.ML_POWER_SURFACE_SENSOR
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_icon = "mdi:chart-surface"

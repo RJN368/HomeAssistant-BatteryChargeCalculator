@@ -42,7 +42,7 @@ class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
     """
 
     _attr_should_poll = False
-    _attr_name = const.TARIFF_COMPARISON_SENSOR_NAME
+    _attr_translation_key = "tariff_comparison"
     _attr_unique_id = const.TARIFF_COMPARISON_SENSOR
     _attr_native_unit_of_measurement = "GBP"
     _attr_device_class = SensorDeviceClass.MONETARY

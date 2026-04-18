@@ -26,7 +26,7 @@ class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
         """Initialize the future price sensor."""
         super().__init__(coordinator)
         self.hass = hass
-        self._attr_name = const.BATTERY_PROJECTION_SENSOR_NAME
+        self._attr_translation_key = "battery_projection"
         self._attr_unique_id = const.BATTERY_PROJECTION_SENSOR
 
     @property
