@@ -34,6 +34,7 @@ def _make_stat_row(start: datetime, cumulative_sum: float):
 def _make_hass(stats_return: dict | None = None):
     """Build a minimal hass stub with a recorder instance."""
     recorder_instance = MagicMock()
+
     # async_add_executor_job runs the callable immediately in tests
     async def _executor_job(func, *args):
         return func(*args)
@@ -156,7 +157,9 @@ class TestFetchNormalData:
         rows = []
         cumulative = base_sum
         # seed: hour before window starts
-        rows.append(_make_stat_row(datetime(2026, 2, 28, 23, 0, tzinfo=UTC), cumulative))
+        rows.append(
+            _make_stat_row(datetime(2026, 2, 28, 23, 0, tzinfo=UTC), cumulative)
+        )
         for h in range(24):
             cumulative += hourly_kwh.get(h, 0.0)
             rows.append(
@@ -208,7 +211,9 @@ class TestFetchNormalData:
         assert slots[24] == pytest.approx(0.5)
         assert slots[25] == pytest.approx(0.5)
         # All other slots should be 0
-        assert all(s == pytest.approx(0.0) for i, s in enumerate(slots) if i not in (24, 25))
+        assert all(
+            s == pytest.approx(0.0) for i, s in enumerate(slots) if i not in (24, 25)
+        )
 
     @pytest.mark.asyncio
     async def test_negative_delta_clamped_to_zero(self):
@@ -225,7 +230,7 @@ class TestFetchNormalData:
             _make_stat_row(datetime(2026, 3, 1, 2, 0, tzinfo=UTC), 104.0),
             _make_stat_row(datetime(2026, 3, 1, 3, 0, tzinfo=UTC), 104.0),  # no gen
             _make_stat_row(datetime(2026, 3, 1, 4, 0, tzinfo=UTC), 104.0),  # no gen
-            _make_stat_row(datetime(2026, 3, 1, 5, 0, tzinfo=UTC), 5.0),    # reset!
+            _make_stat_row(datetime(2026, 3, 1, 5, 0, tzinfo=UTC), 5.0),  # reset!
             _make_stat_row(datetime(2026, 3, 1, 6, 0, tzinfo=UTC), 6.5),
         ]
         hass, recorder_instance, _ = _make_hass()
@@ -342,7 +347,9 @@ class TestSimulateDaySolarParam:
         for slot in range(48):
             h, m = divmod(slot, 2)
             minute = 0 if m == 0 else 30
-            slots[datetime(day.year, day.month, day.day, h, minute, tzinfo=timezone.utc)] = rate
+            slots[
+                datetime(day.year, day.month, day.day, h, minute, tzinfo=timezone.utc)
+            ] = rate
         return slots
 
     def test_solar_none_does_not_raise(self):

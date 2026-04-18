@@ -20,6 +20,19 @@ _OPEN_METEO_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 
 class OpenMeteoHistoricalClient:
+    async def fetch(
+        self,
+        session,
+        period_from,
+        period_to,
+    ):
+        """Compat: test suite expects fetch(session, period_from, period_to)."""
+        return await self.fetch_temperatures(
+            session,
+            start_date=period_from,
+            end_date=period_to,
+        )
+
     """Thin client for Open-Meteo historical weather archive.
 
     Returns hourly temperature data resampled to a ``dict[date, list[float]]``
