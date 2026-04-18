@@ -37,6 +37,7 @@ class TariffSimulator:
         inverter_efficiency: float,
         battery_capacity_kwh: float,
         battery_start_kwh: float,
+        solar_data_30min: list[float] | None = None,
     ) -> dict:
         """Simulate one day under the given tariff rates.
 
@@ -44,8 +45,11 @@ class TariffSimulator:
         Builds a fresh GeneticEvaluator for the day, populates it with demand
         estimates from *power_calculator*, and runs the genetic algorithm.
 
-        Solar is set to 0.0 for all slots — historical solar data is not
-        available for the simulation window.
+        *solar_data_30min* is an optional list of 48 kWh values (one per
+        30-min slot) sourced from HA's long-term recorder statistics via
+        :func:`ha_solar_history.fetch_solar_history`.  When provided, each
+        slot receives the real historical generation value; when ``None`` or
+        shorter than 48 entries, missing slots default to 0.0.
 
         Returns:
             ``{"import_cost_pence": float, "export_earnings_pence": float,
@@ -129,13 +133,18 @@ class TariffSimulator:
             )
             import_rate = rate_map_import.get(slot_dt, 0.0)
             export_rate = rate_map_export.get(slot_dt, 0.0) if rate_map_export else 0.0
+            solar_kwh = (
+                float(solar_data_30min[slot_idx])
+                if solar_data_30min and slot_idx < len(solar_data_30min)
+                else 0.0
+            )
 
             evaluator.add_data(
                 start_datetime=slot_dt,
                 import_price=import_rate,
                 export_price=export_rate,
                 demand_in=max(0.0, float(demand_kwh)),
-                solar_in=0.0,  # no historical solar data
+                solar_in=solar_kwh,
             )
 
         nonzero_import = sum(1 for v in rate_map_import.values() if v > 0.0)

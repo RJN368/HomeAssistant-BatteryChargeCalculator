@@ -204,3 +204,10 @@ TARIFF_COMPARISON_SENSOR_NAME = "Monthly Tariff Comparison"
 
 # Export meter serial — new field; added alongside OCTOPUS_METER_SERIAL (D-18)
 OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
+
+# Solar production entity — optional entity_id of a cumulative kWh sensor
+# (e.g. sensor.solar_energy_production).  When set, historical solar data is
+# fetched from HA's long-term statistics and used in tariff comparison simulations
+# so the GeneticEvaluator accounts for solar generation on each simulated day.
+SOLAR_ENERGY_ENTITY = "solar_energy_entity"
+DEFAULT_SOLAR_ENERGY_ENTITY = ""

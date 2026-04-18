@@ -150,15 +150,17 @@
                 }
             },
             "export_meter": {
-                "title": "Export Meter (optional)",
-                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Leave blank to compare import costs only.",
+                "title": "Export Meter & Solar (optional)",
+                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Optionally enter your solar production entity to use historical generation data in simulations.",
                 "data": {
                     "octopus_export_mpn": "Export MPAN",
-                    "octopus_export_meter_serial": "Export meter serial number"
+                    "octopus_export_meter_serial": "Export meter serial number",
+                    "solar_energy_entity": "Solar production entity (optional)"
                 },
                 "data_description": {
                     "octopus_export_mpn": "The 13-digit MPAN for your export meter. Found on your Octopus account or electricity bill.",
-                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter."
+                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter.",
+                    "solar_energy_entity": "Entity ID of your solar cumulative energy sensor (e.g. sensor.solar_energy_production). Must be a total_increasing kWh sensor that appears in the HA Energy dashboard. Leave blank to use zero solar in simulations."
                 }
             }
         },
@@ -319,15 +321,17 @@
                 }
             },
             "export_meter": {
-                "title": "Export Meter (optional)",
-                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Leave blank to compare import costs only.",
+                "title": "Export Meter & Solar (optional)",
+                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Optionally enter your solar production entity to use historical generation data in simulations.",
                 "data": {
                     "octopus_export_mpn": "Export MPAN",
-                    "octopus_export_meter_serial": "Export meter serial number"
+                    "octopus_export_meter_serial": "Export meter serial number",
+                    "solar_energy_entity": "Solar production entity (optional)"
                 },
                 "data_description": {
                     "octopus_export_mpn": "The 13-digit MPAN for your export meter. Found on your Octopus account or electricity bill.",
-                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter."
+                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter.",
+                    "solar_energy_entity": "Entity ID of your solar cumulative energy sensor (e.g. sensor.solar_energy_production). Must be a total_increasing kWh sensor that appears in the HA Energy dashboard. Leave blank to use zero solar in simulations."
                 }
             }
         },

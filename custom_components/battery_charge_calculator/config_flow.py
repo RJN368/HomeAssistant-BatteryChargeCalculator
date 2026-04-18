@@ -272,6 +272,7 @@ def _tariff_comparison_pick_schema(
 def _export_meter_schema(
     export_mpan: str = "",
     export_meter_serial: str = "",
+    solar_energy_entity: str = "",
 ) -> vol.Schema:
     """Schema for the export meter configuration step."""
     return vol.Schema(
@@ -279,6 +280,9 @@ def _export_meter_schema(
             vol.Optional(const.OCTOPUS_EXPORT_MPN, default=export_mpan): cv.string,
             vol.Optional(
                 const.OCTOPUS_EXPORT_METER_SERIAL, default=export_meter_serial
+            ): cv.string,
+            vol.Optional(
+                const.SOLAR_ENERGY_ENTITY, default=solar_energy_entity
             ): cv.string,
         }
     )
@@ -776,6 +780,9 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             self._heating_data[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
                 const.OCTOPUS_EXPORT_METER_SERIAL, ""
             ).strip()
+            self._heating_data[const.SOLAR_ENERGY_ENTITY] = user_input.get(
+                const.SOLAR_ENERGY_ENTITY, ""
+            ).strip()
             return self._create_entry()
 
         return self.async_show_form(
@@ -784,6 +791,9 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 export_mpan=self._heating_data.get(const.OCTOPUS_EXPORT_MPN, ""),
                 export_meter_serial=self._heating_data.get(
                     const.OCTOPUS_EXPORT_METER_SERIAL, ""
+                ),
+                solar_energy_entity=self._heating_data.get(
+                    const.SOLAR_ENERGY_ENTITY, ""
                 ),
             ),
         )
@@ -1230,6 +1240,9 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
             self.options[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
                 const.OCTOPUS_EXPORT_METER_SERIAL, ""
             ).strip()
+            self.options[const.SOLAR_ENERGY_ENTITY] = user_input.get(
+                const.SOLAR_ENERGY_ENTITY, ""
+            ).strip()
             return self._save_and_exit()
 
         return self.async_show_form(
@@ -1239,5 +1252,6 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 export_meter_serial=self.options.get(
                     const.OCTOPUS_EXPORT_METER_SERIAL, ""
                 ),
+                solar_energy_entity=self.options.get(const.SOLAR_ENERGY_ENTITY, ""),
             ),
         )

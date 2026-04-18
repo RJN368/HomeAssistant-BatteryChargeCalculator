@@ -38,6 +38,7 @@ from .cache import (
 )
 from .calculator import calculate_tariff_cost
 from .client import TariffComparisonClient, _build_historical_rate_map
+from .ha_solar_history import fetch_solar_history
 from .open_meteo_historical import OpenMeteoHistoricalClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -827,6 +828,33 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 "Open-Meteo fetch failed for simulation — using 10°C: %s", exc
             )
 
+        # Fetch historical solar data from HA recorder (if entity is configured).
+        # Returns dict[date, list[float]] — 48 half-hourly kWh values per day.
+        # Falls back to empty dict (→ 0.0 solar per slot) on any error.
+        solar_entity_id: str = self._entry.options.get(const.SOLAR_ENERGY_ENTITY, "")
+        solar_data: dict[date, list[float]] = {}
+        if solar_entity_id:
+            try:
+                solar_data = await fetch_solar_history(
+                    self.hass, solar_entity_id, period_from, period_to
+                )
+                solar_days = len(solar_data)
+                _LOGGER.info(
+                    "Fetched historical solar data for %s: %d days of 48-slot generation",
+                    solar_entity_id,
+                    solar_days,
+                )
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Solar history fetch failed for %s — running simulation without solar: %s",
+                    solar_entity_id,
+                    exc,
+                )
+        else:
+            _LOGGER.debug(
+                "No solar entity configured — simulation will use zero solar for all slots"
+            )
+
         # Build day range
         day_range: list[date] = []
         current_day = period_from.date()
@@ -874,6 +902,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
         for day_idx, day_obj in enumerate(day_range):
             hourly_temps = weather_data.get(day_obj, [10.0] * 24)
+            solar_30min = solar_data.get(day_obj)  # None → simulate_day uses 0.0
 
             try:
                 day_result = await self.hass.async_add_executor_job(
@@ -887,6 +916,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     inverter_efficiency,
                     battery_capacity_kwh,
                     battery_start_kwh,
+                    solar_30min,
                 )
             except Exception as exc:  # noqa: BLE001
                 _LOGGER.warning(
