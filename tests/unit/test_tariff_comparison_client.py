@@ -498,7 +498,9 @@ class TestSeedValidToFix:
         March 1–16 and real rates take over from March 17.
         """
         period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
-        period_to = datetime(2026, 3, 1, 2, 0, tzinfo=UTC)  # 4 slots (proxy for full scenario)
+        period_to = datetime(
+            2026, 3, 1, 2, 0, tzinfo=UTC
+        )  # 4 slots (proxy for full scenario)
 
         # Seed: last pre-window rate (e.g. Feb 28 23:30 slot)
         # valid_to is period_from + 30 min (corrected)
@@ -522,11 +524,19 @@ class TestSeedValidToFix:
         rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
 
         # Midnight covered by seed
-        assert rate_map[datetime(2026, 3, 1, 0, 0, tzinfo=UTC)] == pytest.approx(seed_rate)
+        assert rate_map[datetime(2026, 3, 1, 0, 0, tzinfo=UTC)] == pytest.approx(
+            seed_rate
+        )
         # 00:30 and beyond use real rates
-        assert rate_map[datetime(2026, 3, 1, 0, 30, tzinfo=UTC)] == pytest.approx(first_real_rate)
-        assert rate_map[datetime(2026, 3, 1, 1, 0, tzinfo=UTC)] == pytest.approx(first_real_rate)
-        assert rate_map[datetime(2026, 3, 1, 1, 30, tzinfo=UTC)] == pytest.approx(first_real_rate)
+        assert rate_map[datetime(2026, 3, 1, 0, 30, tzinfo=UTC)] == pytest.approx(
+            first_real_rate
+        )
+        assert rate_map[datetime(2026, 3, 1, 1, 0, tzinfo=UTC)] == pytest.approx(
+            first_real_rate
+        )
+        assert rate_map[datetime(2026, 3, 1, 1, 30, tzinfo=UTC)] == pytest.approx(
+            first_real_rate
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -541,6 +551,7 @@ class TestRatesCoverPeriod:
         from custom_components.battery_charge_calculator.tariff_comparison import (
             _rates_cover_period,
         )
+
         self._fn = _rates_cover_period
 
     def _make_rates(self, first_valid_from: datetime) -> dict:
@@ -559,7 +570,13 @@ class TestRatesCoverPeriod:
         assert self._fn(None, datetime(2026, 3, 1, tzinfo=UTC)) is False
 
     def test_empty_unit_rates_returns_false(self):
-        assert self._fn({"unit_rates": [], "standing_charges": []}, datetime(2026, 3, 1, tzinfo=UTC)) is False
+        assert (
+            self._fn(
+                {"unit_rates": [], "standing_charges": []},
+                datetime(2026, 3, 1, tzinfo=UTC),
+            )
+            is False
+        )
 
     def test_rates_starting_at_period_from_returns_true(self):
         period_from = datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
@@ -580,7 +597,9 @@ class TestRatesCoverPeriod:
     def test_string_valid_from_not_datetime_returns_false(self):
         """Rates that were not parsed (still strings) return False — forces re-fetch."""
         rates = {
-            "unit_rates": [{"valid_from": "2026-03-17T00:00:00Z", "value_inc_vat": 20.0}],
+            "unit_rates": [
+                {"valid_from": "2026-03-17T00:00:00Z", "value_inc_vat": 20.0}
+            ],
             "standing_charges": [],
         }
         assert self._fn(rates, datetime(2026, 3, 1, tzinfo=UTC)) is False
