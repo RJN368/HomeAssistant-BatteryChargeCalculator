@@ -9,7 +9,6 @@ from typing import Any
 from homeassistant.components.sensor import RestoreSensor, SensorDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
 from .. import const
 
 

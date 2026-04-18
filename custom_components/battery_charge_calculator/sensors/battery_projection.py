@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo
 import logging
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfEnergy

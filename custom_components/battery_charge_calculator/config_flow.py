@@ -2,24 +2,11 @@
 
 import json
 import logging
-import re
-import voluptuous as vol
-
 import aiohttp
-
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import aiohttp_client, config_validation as cv
-from homeassistant.helpers.selector import (
-    BooleanSelector,
-    SelectSelector,
-    SelectSelectorConfig,
-    TextSelector,
-    TextSelectorConfig,
-    TextSelectorType,
-)
-
+from homeassistant.helpers import aiohttp_client
 from . import const
 from .config_schemas import (
     get_schema,
@@ -30,6 +17,10 @@ from .config_schemas import (
     _heat_loss_report_schema,
     _heat_loss_known_schema,
     _building_estimate_schema,
+    _ml_settings_schema,
+    _tariff_comparison_enable_schema,
+    _tariff_comparison_pick_schema,
+    _export_meter_schema,
 )
 from .octopus_agile import OCTOPUS_API_BASE, OctopusAgileRatesClient
 
@@ -470,8 +461,8 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
         return self.async_show_form(
             step_id="tariff_comparison_pick",
             data_schema=_tariff_comparison_pick_schema(
-                options=available_options,
-                current_codes=default_codes,
+                available_options=available_options,
+                selected=default_codes,
             ),
             errors=errors,
             description_placeholders={
@@ -858,7 +849,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 octopus_meter_serial=self.options.get(
                     const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
                 ),
-                lookback_days=self.options.get(
+                training_lookback_days=self.options.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),
@@ -933,8 +924,8 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="tariff_comparison_pick",
             data_schema=_tariff_comparison_pick_schema(
-                options=available_options,
-                current_codes=default_codes,
+                available_options=available_options,
+                selected=default_codes,
             ),
             errors=errors,
             description_placeholders={"region": region},

@@ -1,3 +1,113 @@
+# Tariff comparison pick schema for config/option flow
+def _tariff_comparison_pick_schema(available_options=None, selected=None):
+    import voluptuous as vol
+    from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+    from . import const
+
+    if available_options is None:
+        available_options = []
+    if selected is None:
+        selected = []
+    return vol.Schema(
+        {
+            vol.Required(
+                const.TARIFF_COMPARISON_TARIFFS, default=selected
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=available_options,
+                    multiple=True,
+                    translation_key="tariff_comparison_tariffs",
+                )
+            ),
+        }
+    )
+
+
+# Export meter schema for config/option flow
+def _export_meter_schema(
+    export_mpan="", export_meter_serial="", solar_energy_entity=""
+):
+    import voluptuous as vol
+    from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
+    from . import const
+
+    return vol.Schema(
+        {
+            vol.Optional(const.OCTOPUS_EXPORT_MPN, default=export_mpan): TextSelector(
+                TextSelectorConfig(type="text")
+            ),
+            vol.Optional(
+                const.OCTOPUS_EXPORT_METER_SERIAL, default=export_meter_serial
+            ): TextSelector(TextSelectorConfig(type="text")),
+            vol.Optional(
+                const.SOLAR_ENERGY_ENTITY, default=solar_energy_entity
+            ): TextSelector(TextSelectorConfig(type="text")),
+        }
+    )
+
+
+# Tariff comparison enable schema for config/option flow
+def _tariff_comparison_enable_schema(enabled=False):
+    import voluptuous as vol
+    from homeassistant.helpers.selector import BooleanSelector
+    from . import const
+
+    return vol.Schema(
+        {
+            vol.Required(
+                const.TARIFF_COMPARISON_ENABLED, default=enabled
+            ): BooleanSelector(),
+        }
+    )
+
+
+# ML settings schema for config/option flow
+def _ml_settings_schema(
+    ml_enabled=False,
+    service_url="",
+    api_key="",
+    tls_fingerprint="",
+    consumption_source="",
+    octopus_mpan="",
+    octopus_meter_serial="",
+    training_lookback_days=30,
+):
+    import voluptuous as vol
+    from homeassistant.helpers.selector import (
+        BooleanSelector,
+        TextSelector,
+        TextSelectorConfig,
+    )
+    from . import const
+
+    return vol.Schema(
+        {
+            vol.Required(const.ML_ENABLED, default=ml_enabled): BooleanSelector(),
+            vol.Optional(const.ML_SERVICE_URL, default=service_url): TextSelector(
+                TextSelectorConfig(type="text")
+            ),
+            vol.Optional(const.ML_SERVICE_API_KEY, default=api_key): TextSelector(
+                TextSelectorConfig(type="text")
+            ),
+            vol.Optional(
+                const.ML_SERVICE_TLS_FINGERPRINT, default=tls_fingerprint
+            ): TextSelector(TextSelectorConfig(type="text")),
+            vol.Optional(
+                const.ML_CONSUMPTION_SOURCE, default=consumption_source
+            ): TextSelector(TextSelectorConfig(type="text")),
+            vol.Optional(const.OCTOPUS_MPN, default=octopus_mpan): TextSelector(
+                TextSelectorConfig(type="text")
+            ),
+            vol.Optional(
+                const.OCTOPUS_METER_SERIAL, default=octopus_meter_serial
+            ): TextSelector(TextSelectorConfig(type="text")),
+            vol.Optional(
+                const.ML_TRAINING_LOOKBACK_DAYS, default=training_lookback_days
+            ): vol.Coerce(int),
+        }
+    )
+
+
 """Schema helper functions for config and options flows."""
 
 import voluptuous as vol
