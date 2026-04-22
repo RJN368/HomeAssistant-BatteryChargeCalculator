@@ -91,6 +91,16 @@ If those same meter reads are replayed against Octopus Go rates (e.g. 7 p/kWh du
 
 ## 3. Data Sources
 
+### 3.7 Tariff Start Date Adjustment (Fair Comparison Window)
+
+When comparing tariffs, if the current tariff started after the beginning of the analysis period, the comparison window is adjusted:
+
+- The start date for all tariff calculations is set to the later of the default window start and the current tariff's `valid_from` date (agreement start).
+- This ensures that all tariffs are compared fairly, only over the period when the current tariff was actually active.
+- Example: If the analysis window is 1 March–31 March 2026, but the current tariff started on 17 March 2026, the comparison for all tariffs will use 17 March–31 March 2026.
+
+This logic is implemented in the coordinator and applies to all tariff calculations and reporting.
+
 All data is fetched from the Octopus Energy REST API. Existing API credentials (`OCTOPUS_APIKEY`, `OCTOPUS_ACCOUNT_NUMBER`, `OCTOPUS_MPN`, `OCTOPUS_EXPORT_MPN`) are reused from the existing config entry — **no new credential fields**.
 
 ### 3.1 Import Consumption — half-hourly meter reads

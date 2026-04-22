@@ -382,7 +382,12 @@ class TestSimulateDaySolarParam:
         assert "export_earnings_pence" in result
 
     def test_solar_48_zeros_same_as_none(self):
-        """Passing 48 zeros should produce the same result as passing None."""
+        """Passing 48 zeros should produce the same result as passing None.
+
+        The optimizer is stochastic, so we seed the RNG before each run.
+        """
+        import random
+
         from custom_components.battery_charge_calculator.tariff_comparison.simulator import (
             TariffSimulator,
         )
@@ -405,7 +410,9 @@ class TestSimulateDaySolarParam:
             battery_capacity_kwh=9.5,
             battery_start_kwh=4.75,
         )
+        random.seed(42)
         result_none = sim.simulate_day(**kwargs, solar_data_30min=None)
+        random.seed(42)
         result_zeros = sim.simulate_day(**kwargs, solar_data_30min=[0.0] * 48)
         assert result_none["import_cost_pence"] == pytest.approx(
             result_zeros["import_cost_pence"], abs=1e-3

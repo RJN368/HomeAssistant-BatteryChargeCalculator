@@ -80,7 +80,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.battery_capacity_kwh = const.DEFAULT_BATTERY_CAPACITY_KWH
 
         super().__init__(
-            hass, _LOGGER, name=const.DOMAIN, update_interval=timedelta(minutes=1)
+            hass,
+            _LOGGER,
+            name=const.DOMAIN,
+            update_interval=timedelta(minutes=1),
+            config_entry=entry,
         )
 
         self._timer_unsub = None

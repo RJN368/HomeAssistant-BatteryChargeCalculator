@@ -95,16 +95,28 @@ def _tariff_codes_from_stored_json(tariffs_json: str) -> list[str]:
     return []
 
 
-def _tariff_codes_to_stored_json(codes: list[str]) -> str:
+def _tariff_codes_to_stored_json(
+    codes: list[str],
+    current_import_tariff_code: str | None = None,
+) -> str:
     """Convert a list of selected tariff codes to the coordinator's JSON format.
 
     Export tariff codes are not stored per-tariff — the coordinator resolves
     the account's current export tariff automatically at fetch time.
     """
+    has_current_match = bool(
+        current_import_tariff_code and current_import_tariff_code in codes
+    )
     return json.dumps(
         [
-            {"import_tariff_code": code, "name": code, "is_current": i == 0}
-            for i, code in enumerate(codes)
+            {
+                "import_tariff_code": code,
+                "name": code,
+                "is_current": bool(
+                    has_current_match and code == current_import_tariff_code
+                ),
+            }
+            for code in codes
         ]
     )
 
@@ -155,6 +167,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
     def __init__(self):
         self._main_data: dict = {}
         self._heating_data: dict = {}
+        self._resolved_current_import_tariff_code: str | None = None
 
     async def async_step_user(self, user_input=None):
         """Step 1 – main settings."""
@@ -416,7 +429,10 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
             else:
                 self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = (
-                    _tariff_codes_to_stored_json(selected)
+                    _tariff_codes_to_stored_json(
+                        selected,
+                        current_import_tariff_code=self._resolved_current_import_tariff_code,
+                    )
                 )
                 return await self.async_step_export_meter()
 
@@ -432,6 +448,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 client = OctopusAgileRatesClient(api_key, account)
                 await client._find_current_tariffs(session)  # noqa: SLF001
                 current_code = client.import_tariff_code
+                self._resolved_current_import_tariff_code = current_code
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("Could not resolve current tariff code: %s", exc)
 
@@ -532,6 +549,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
         self.options = dict(config_entry.options)
+        self._resolved_current_import_tariff_code: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -883,7 +901,10 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
             else:
                 self.options[const.TARIFF_COMPARISON_TARIFFS] = (
-                    _tariff_codes_to_stored_json(selected)
+                    _tariff_codes_to_stored_json(
+                        selected,
+                        current_import_tariff_code=self._resolved_current_import_tariff_code,
+                    )
                 )
                 return await self.async_step_export_meter()
 
@@ -898,6 +919,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 client = OctopusAgileRatesClient(api_key, account)
                 await client._find_current_tariffs(session)  # noqa: SLF001
                 current_code = client.import_tariff_code
+                self._resolved_current_import_tariff_code = current_code
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("Could not resolve current tariff code: %s", exc)
 

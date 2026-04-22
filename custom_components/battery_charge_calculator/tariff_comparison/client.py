@@ -14,6 +14,8 @@ from typing import Any
 
 import aiohttp
 
+from ..octopus_agile import _active_agreement
+
 _LOGGER = logging.getLogger(__name__)
 
 _OCTOPUS_BASE = "https://api.octopus.energy/v1"
@@ -381,23 +383,65 @@ class TariffComparisonClient:
                 "MPAN endpoint returned no agreements for %s", self._export_mpan
             )
             return None
-        now = datetime.now(timezone.utc)
-        # Sort descending by valid_from so the most-recent active agreement wins
-        for agreement in sorted(
-            agreements, key=lambda a: a.get("valid_from", ""), reverse=True
-        ):
-            valid_from_str = agreement.get("valid_from")
-            valid_to_str = agreement.get("valid_to")
-            if not valid_from_str:
-                continue
-            valid_from = datetime.fromisoformat(valid_from_str)
-            if valid_from.tzinfo is None:
-                valid_from = valid_from.replace(tzinfo=timezone.utc)
-            valid_to = None
-            if valid_to_str:
-                valid_to = datetime.fromisoformat(valid_to_str)
-                if valid_to.tzinfo is None:
-                    valid_to = valid_to.replace(tzinfo=timezone.utc)
-            if valid_from <= now and (valid_to is None or valid_to > now):
-                return agreement.get("tariff_code")
+        agreement = _active_agreement(agreements)
+        return agreement.get("tariff_code") if agreement else None
+
+    async def fetch_import_tariff_start_date(
+        self,
+        session: aiohttp.ClientSession,
+        tariff_code: str,
+        account_number: str | None = None,
+    ) -> datetime | None:
+        """Resolve the agreement start date (valid_from) for a specific import tariff.
+
+        Preferred source is the account endpoint (contains electricity meter
+        points with agreements). Falls back to the import MPAN endpoint for
+        backwards compatibility.
+
+        Returns matching agreement valid_from in UTC, or None when no matching
+        agreement exists.
+        """
+        # 1) Preferred: account endpoint (reliable agreements payload)
+        if account_number:
+            account_url = f"{_OCTOPUS_BASE}/accounts/{account_number}/"
+            async with session.get(account_url, auth=self._auth) as resp:
+                resp.raise_for_status()
+                account_data = await resp.json()
+
+            properties = account_data.get("properties", [])
+            now = datetime.now(timezone.utc)
+            matches: list[tuple[datetime, datetime | None]] = []
+
+            for prop in properties:
+                for meter in prop.get("electricity_meter_points", []):
+                    if str(meter.get("mpan")) != str(self._mpan):
+                        continue
+                    for agreement in meter.get("agreements", []):
+                        if agreement.get("tariff_code") != tariff_code:
+                            continue
+                        valid_from = _parse_iso(agreement.get("valid_from"))
+                        valid_to = _parse_iso(agreement.get("valid_to"))
+                        if valid_from is None:
+                            continue
+                        matches.append((valid_from, valid_to))
+
+            # Prefer currently-active agreement; otherwise newest matching agreement.
+            active = [
+                vf for vf, vt in matches if vf <= now and (vt is None or vt > now)
+            ]
+            if active:
+                return max(active)
+            if matches:
+                return max(vf for vf, _ in matches)
+
+        # 2) Fallback: MPAN endpoint (may omit agreements on some accounts)
+        mpan_url = f"{_OCTOPUS_BASE}/electricity-meter-points/{self._mpan}/"
+        async with session.get(mpan_url, auth=self._auth) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+
+        agreements: list[dict] = data.get("agreements", [])
+        for agreement in agreements:
+            if agreement.get("tariff_code") == tariff_code:
+                return _parse_iso(agreement.get("valid_from"))
         return None

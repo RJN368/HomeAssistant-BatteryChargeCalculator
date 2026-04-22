@@ -1,5 +1,6 @@
 """Unit tests for the config_flow module."""
 
+import json
 from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
@@ -8,6 +9,7 @@ from custom_components.battery_charge_calculator import const
 from custom_components.battery_charge_calculator.config_flow import (
     BatteryChargCalculatorConfigFlow,
     BatteryChargCalculatorFlowHandler,
+    _tariff_codes_to_stored_json,
     get_schema,
     estimate_heat_loss,
 )
@@ -145,6 +147,26 @@ class TestEstimateHeatLoss:
     def test_returns_positive_value(self):
         result = estimate_heat_loss(100, "1930_1975", "cavity_uninsulated", "double")
         assert result > 0
+
+
+class TestTariffCodesToStoredJson:
+    def test_sets_current_by_matching_resolved_import_code(self):
+        stored = _tariff_codes_to_stored_json(
+            ["E-1R-A", "E-1R-B", "E-1R-C"],
+            current_import_tariff_code="E-1R-B",
+        )
+        data = json.loads(stored)
+
+        assert [item["is_current"] for item in data] == [False, True, False]
+
+    def test_sets_no_current_when_resolved_code_not_in_selection(self):
+        stored = _tariff_codes_to_stored_json(
+            ["E-1R-A", "E-1R-B"],
+            current_import_tariff_code="E-1R-Z",
+        )
+        data = json.loads(stored)
+
+        assert [item["is_current"] for item in data] == [False, False]
 
     def test_larger_house_higher_heat_loss(self):
         small = estimate_heat_loss(50, "1930_1975", "cavity_uninsulated", "double")

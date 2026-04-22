@@ -4,7 +4,7 @@ Fetches current import and export tariff rates and standing charges
 for the account, regardless of tariff type.
 """
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
 
@@ -27,8 +27,19 @@ def _product_code_from_tariff_code(tariff_code: str) -> str:
 
 
 def _active_agreement(agreements: list[dict]) -> dict | None:
-    """Return the currently active agreement from a list, or None."""
-    now = datetime.now(UTC)
+    """Return the currently active agreement, or None."""
+    return _active_agreement_at(agreements, datetime.now(UTC))
+
+
+def _active_agreement_at(agreements: list[dict], now: datetime) -> dict | None:
+    """Return the active agreement at ``now``, or None.
+
+    An agreement is active when its date range contains ``now``:
+      valid_from <= now  AND  (valid_to is null  OR  valid_to > now)
+
+    ``valid_to: null`` means the agreement is open-ended (still running).
+    Returns the first matching agreement in the order provided by the API.
+    """
     for agreement in agreements:
         valid_from_str = agreement.get("valid_from")
         valid_to_str = agreement.get("valid_to")
@@ -77,7 +88,7 @@ def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
         for k in ("start", "end"):
             dt = r[k]
             if dt.tzinfo is None:
-                _LOGGER.warning(f"Naive datetime detected in rate {k}; assuming UTC.")
+                _LOGGER.warning("Naive datetime detected in rate %s; assuming UTC.", k)
                 r[k] = dt.replace(tzinfo=UTC)
             # Always convert to Europe/London for slot logic
             r[k] = r[k].astimezone(ZoneInfo("Europe/London"))
@@ -129,7 +140,12 @@ def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
 class OctopusAgileRatesClient:
     """Client for fetching Octopus Energy electricity tariff rates."""
 
-    def __init__(self, api_key: str, account_number: str) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        account_number: str,
+        tariff_cache_ttl: timedelta = timedelta(minutes=30),
+    ) -> None:
         """Initialise the client with API credentials."""
         self.api_key = api_key
         self.account_number = account_number
@@ -137,6 +153,9 @@ class OctopusAgileRatesClient:
         self.export_tariff_code: str | None = None
         self.import_product_code: str | None = None
         self.export_product_code: str | None = None
+        self._tariff_cache_ttl = tariff_cache_ttl
+        self._tariffs_last_resolved_at: datetime | None = None
+        self._tariffs_refresh_after: datetime | None = None
 
     def _auth(self) -> aiohttp.BasicAuth:
         """Return basic auth for API requests."""
@@ -150,27 +169,78 @@ class OctopusAgileRatesClient:
             data = await resp.json()
             return data["properties"][0]["electricity_meter_points"]
 
-    async def _find_current_tariffs(self, session: aiohttp.ClientSession) -> None:
+    async def refresh_current_tariffs(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        now: datetime | None = None,
+        force_refresh: bool = False,
+    ) -> None:
+        """Public wrapper around current-tariff resolution.
+
+        Keeps internal caching behavior while allowing callers and tests to
+        request deterministic re-resolution points.
+        """
+        await self._find_current_tariffs(session, now=now, force_refresh=force_refresh)
+
+    async def _find_current_tariffs(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        now: datetime | None = None,
+        force_refresh: bool = False,
+    ) -> None:
         """Resolve current import and export tariff codes from active agreements.
 
         Uses the is_export flag on each meter point to distinguish import from
         export. Selects the active agreement based on valid_from/valid_to dates,
         with no tariff-name string matching.
         """
-        if (
-            self.import_product_code is not None
-            and self.export_product_code is not None
-        ):
+        now_dt = now or datetime.now(UTC)
+        has_cached_tariffs = (
+            self.import_tariff_code is not None
+            or self.export_tariff_code is not None
+            or self.import_product_code is not None
+            or self.export_product_code is not None
+        )
+        ttl_valid = self._tariffs_last_resolved_at is not None and now_dt < (
+            self._tariffs_last_resolved_at + self._tariff_cache_ttl
+        )
+        boundary_valid = (
+            self._tariffs_refresh_after is None or now_dt < self._tariffs_refresh_after
+        )
+
+        if not force_refresh and has_cached_tariffs and ttl_valid and boundary_valid:
             return
 
         meters = await self._get_electricity_meters(session)
+        next_boundary_candidates: list[datetime] = []
+
+        # Reset cache before rebuilding so stale values don't survive if account state changes.
+        self.import_tariff_code = None
+        self.export_tariff_code = None
+        self.import_product_code = None
+        self.export_product_code = None
+
         for meter in meters:
             is_export = meter.get("is_export", False)
-            agreement = _active_agreement(meter.get("agreements", []))
+            agreement = _active_agreement_at(meter.get("agreements", []), now_dt)
             if agreement is None:
                 continue
             tariff_code = agreement["tariff_code"]
             product_code = _product_code_from_tariff_code(tariff_code)
+
+            valid_to_str = agreement.get("valid_to")
+            if valid_to_str:
+                valid_to = datetime.fromisoformat(valid_to_str)
+                if valid_to.tzinfo is None:
+                    _LOGGER.warning(
+                        "Naive datetime detected in agreement valid_to; assuming UTC."
+                    )
+                    valid_to = valid_to.replace(tzinfo=UTC)
+                if valid_to > now_dt:
+                    next_boundary_candidates.append(valid_to)
+
             if is_export:
                 self.export_tariff_code = tariff_code
                 self.export_product_code = product_code
@@ -178,9 +248,20 @@ class OctopusAgileRatesClient:
                 self.import_tariff_code = tariff_code
                 self.import_product_code = product_code
 
+        self._tariffs_last_resolved_at = now_dt
+        ttl_boundary = now_dt + self._tariff_cache_ttl
+        next_boundary = (
+            min(next_boundary_candidates) if next_boundary_candidates else None
+        )
+        self._tariffs_refresh_after = (
+            min(ttl_boundary, next_boundary)
+            if next_boundary is not None
+            else ttl_boundary
+        )
+
     async def fetch_standing_charge(self, session: aiohttp.ClientSession) -> float:
         """Fetch the current standing charge (p/day) for the import tariff."""
-        await self._find_current_tariffs(session)
+        await self.refresh_current_tariffs(session)
         url = (
             f"{OCTOPUS_API_BASE}/products/{self.import_product_code}"
             f"/electricity-tariffs/{self.import_tariff_code}/standing-charges/"
@@ -206,7 +287,7 @@ class OctopusAgileRatesClient:
         Returns:
             List of dicts with keys: start, end, value_inc_vat (£/kWh).
         """
-        await self._find_current_tariffs(session)
+        await self.refresh_current_tariffs(session)
         product_code = self.export_product_code if export else self.import_product_code
         tariff_code = self.export_tariff_code if export else self.import_tariff_code
         url = (

@@ -11,16 +11,36 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from unittest.mock import MagicMock
 
 # conftest installs HA stubs before any integration import
 from custom_components.battery_charge_calculator.tariff_comparison import (
     TariffComparisonCoordinator,
+    _select_current_tariff_config,
 )
 
 UTC = timezone.utc
 
 # Shorthand: call _calculate_all as a plain function (self is never used in body)
 _calculate_all = TariffComparisonCoordinator._calculate_all
+
+
+class TestCurrentTariffSelectionValidation:
+    def test_select_current_tariff_returns_none_when_multiple_marked_current(
+        self, caplog
+    ):
+        """Warn and skip selection when multiple tariffs are marked current."""
+        tariff_configs = [
+            {"import_tariff_code": "TARIFF-A", "is_current": True},
+            {"import_tariff_code": "TARIFF-B", "is_current": True},
+            {"import_tariff_code": "TARIFF-C", "is_current": False},
+        ]
+
+        with caplog.at_level("WARNING"):
+            selected = _select_current_tariff_config(tariff_configs)
+
+        assert selected is None
+        assert "Multiple tariffs are marked is_current" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +186,9 @@ class TestExportEarnings:
         entry = result["tariffs"][0]
         assert entry["export_tariff_code"] == export_code
         # 1.0 + 0.8 = 1.8 kWh * 15 p/kWh = 27 p = £0.27
-        assert entry["monthly"][0]["export_earnings_gbp"] == pytest.approx(0.27, abs=0.01)
+        assert entry["monthly"][0]["export_earnings_gbp"] == pytest.approx(
+            0.27, abs=0.01
+        )
         assert entry["monthly"][0]["export_earnings_gbp"] == pytest.approx(
             0.27, abs=0.01
         )

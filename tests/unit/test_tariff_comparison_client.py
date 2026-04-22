@@ -490,6 +490,89 @@ class TestSeedValidToFix:
         assert rate_map[datetime(2026, 3, 1, 1, 0, tzinfo=UTC)] == pytest.approx(22.0)
         assert rate_map[datetime(2026, 3, 1, 1, 30, tzinfo=UTC)] == pytest.approx(21.0)
 
+
+# ---------------------------------------------------------------------------
+# Tests: fetch_import_tariff_start_date
+# ---------------------------------------------------------------------------
+
+
+class TestFetchImportTariffStartDate:
+    async def test_uses_account_endpoint_when_account_number_provided(self):
+        """Uses account endpoint electricity_meter_points agreements when account number is provided."""
+        account_response = {
+            "properties": [
+                {
+                    "electricity_meter_points": [
+                        {
+                            "mpan": "1000000000001",
+                            "agreements": [
+                                {
+                                    "tariff_code": "E-1R-AGILE-FLEX-22-11-25-B",
+                                    "valid_from": "2026-03-17T00:00:00+00:00",
+                                    "valid_to": None,
+                                }
+                            ],
+                        }
+                    ]
+                }
+            ]
+        }
+        session = _mock_session_get([account_response])
+        client = _make_client(mpan="1000000000001")
+
+        start_dt = await client.fetch_import_tariff_start_date(
+            session,
+            "E-1R-AGILE-FLEX-22-11-25-B",
+            account_number="A-12345678",
+        )
+
+        assert start_dt == datetime(2026, 3, 17, 0, 0, tzinfo=UTC)
+
+    async def test_returns_matching_agreement_valid_from(self):
+        """Returns valid_from for the matching tariff_code agreement."""
+        response = {
+            "agreements": [
+                {
+                    "tariff_code": "E-1R-OTHER-24-01-01-B",
+                    "valid_from": "2026-02-01T00:00:00+00:00",
+                    "valid_to": None,
+                },
+                {
+                    "tariff_code": "E-1R-AGILE-FLEX-22-11-25-B",
+                    "valid_from": "2026-03-17T00:00:00+00:00",
+                    "valid_to": None,
+                },
+            ]
+        }
+        session = _mock_session_get([response])
+        client = _make_client()
+
+        start_dt = await client.fetch_import_tariff_start_date(
+            session, "E-1R-AGILE-FLEX-22-11-25-B"
+        )
+
+        assert start_dt == datetime(2026, 3, 17, 0, 0, tzinfo=UTC)
+
+    async def test_returns_none_when_tariff_code_not_found(self):
+        """Returns None when no agreement matches the requested tariff_code."""
+        response = {
+            "agreements": [
+                {
+                    "tariff_code": "E-1R-OTHER-24-01-01-B",
+                    "valid_from": "2026-02-01T00:00:00+00:00",
+                    "valid_to": None,
+                }
+            ]
+        }
+        session = _mock_session_get([response])
+        client = _make_client()
+
+        start_dt = await client.fetch_import_tariff_start_date(
+            session, "E-1R-AGILE-FLEX-22-11-25-B"
+        )
+
+        assert start_dt is None
+
     def test_seed_persists_to_first_real_agile_rate_mid_month(self):
         """Seed persists through all days before the first real Agile rate entry.
 

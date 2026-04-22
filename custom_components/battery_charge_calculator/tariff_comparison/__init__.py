@@ -44,6 +44,23 @@ from .open_meteo_historical import OpenMeteoHistoricalClient
 _LOGGER = logging.getLogger(__name__)
 
 
+def _select_current_tariff_config(tariff_configs: list[dict]) -> dict | None:
+    """Return current tariff config when exactly one entry is flagged current.
+
+    Ambiguous config (multiple ``is_current`` entries) returns ``None`` so we
+    do not silently pick the wrong tariff from list order.
+    """
+    current_tariffs = [tc for tc in tariff_configs if tc.get("is_current", False)]
+    if not current_tariffs:
+        return None
+    if len(current_tariffs) > 1:
+        _LOGGER.warning(
+            "Multiple tariffs are marked is_current; skipping current-tariff selection for this run.",
+        )
+        return None
+    return current_tariffs[0]
+
+
 def _target_data_year(now: datetime) -> str:
     """Return the data_year key for the rolling 1-month window.
 
@@ -93,10 +110,11 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{const.DOMAIN}_tariff_comparison",
             update_interval=timedelta(days=interval_days),
+            config_entry=entry,
         )
         self._entry = entry
         self._config_dir: str = hass.config.config_dir
-        self._force_refresh = False
+        self._force_refresh = True
         # Active per-tariff simulation background tasks keyed by import tariff code
         self._simulation_tasks: dict[str, asyncio.Task] = {}
         # Background fetch task (only one at a time)
@@ -258,6 +276,33 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             export_meter_serial=export_serial,
         )
 
+        # --- ADJUST PERIOD BASED ON CURRENT TARIFF START DATE ---
+        # Find the current tariff (is_current True)
+        current_tariff = _select_current_tariff_config(tariff_configs)
+        effective_period_from = period_from
+        if current_tariff:
+            import_code = current_tariff.get("import_tariff_code", "")
+            if import_code:
+                try:
+                    start_date = await client.fetch_import_tariff_start_date(
+                        session, import_code, account_number=account_number
+                    )
+                    if start_date and start_date > period_from:
+                        effective_period_from = start_date
+                        _LOGGER.info(
+                            "Current tariff %s started after period_from (%s > %s), adjusting comparison window.",
+                            import_code,
+                            start_date.date(),
+                            period_from.date(),
+                        )
+                except Exception as exc:
+                    _LOGGER.warning(
+                        "Failed to fetch current tariff start date: %s", exc
+                    )
+
+        # All subsequent fetches/calculations use effective_period_from
+        period_from = effective_period_from
+
         # ── 0. Resolve the account's current export tariff code (shared) ─
         # All comparison tariffs use the same export tariff — the one actually
         # on the account.  Two resolution strategies in priority order:
@@ -276,7 +321,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
 
                     agile_client = OctopusAgileRatesClient(api_key, account_number)
                     # Strategy A-1: is_export flag
-                    await agile_client._find_current_tariffs(session)
+                    await agile_client._find_current_tariffs(session)  # noqa: SLF001
                     shared_export_code = agile_client.export_tariff_code
                     if shared_export_code:
                         _LOGGER.debug(
@@ -293,7 +338,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                             export_mpan,
                         )
                         try:
-                            meters = await agile_client._get_electricity_meters(session)
+                            meters = await agile_client._get_electricity_meters(session)  # noqa: SLF001
                             for meter in meters:
                                 if meter.get("mpan") == export_mpan:
                                     agreement = _active_agreement(
