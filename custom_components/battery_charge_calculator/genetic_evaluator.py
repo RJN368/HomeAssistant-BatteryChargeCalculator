@@ -184,7 +184,9 @@ class GeneticEvaluator:
                 timeslot.cost -= timeslot.export_price * solar_exported
 
         elif action == "export":
-            discharge_amount = min(self.max_discharge - net_demand, battery)
+            # Clamp discharge to avoid impossible negative values when demand
+            # exceeds inverter discharge capability.
+            discharge_amount = max(0.0, min(self.max_discharge - net_demand, battery))
             battery = battery - discharge_amount
             timeslot.cost = (
                 timeslot.export_price * (discharge_amount - net_demand)
@@ -225,9 +227,19 @@ class GeneticEvaluator:
         population = []
         hash_lookup = {}
         conflict_count = 0
-        population.append(self.create_ideal_schedule())
+        ideal_schedule = self.create_ideal_schedule()
+        population.append(ideal_schedule)
+        hash_lookup[hashlib.md5(str(ideal_schedule).encode()).hexdigest()] = (
+            ideal_schedule
+        )
 
-        while len(population) < min(self.num_slots, self.population_size):
+        export_schedule = self.create_export_ideal_schedule()
+        export_hash = hashlib.md5(str(export_schedule).encode()).hexdigest()
+        if export_hash not in hash_lookup:
+            hash_lookup[export_hash] = export_schedule
+            population.append(export_schedule)
+
+        while len(population) < self.population_size:
             schedule = []
             for i in range(self.num_slots):
                 if self.timeslots[i].import_price <= 0:
@@ -245,11 +257,26 @@ class GeneticEvaluator:
                 conflict_count += 1
                 if conflict_count > self.population_size * 2:
                     self._logging.warning(
-                        "Too many hash conflicts when creating population; this can occur when the number of unique schedules is less than the population size. Proceeding with current population of %d schedules."
+                        "Too many hash conflicts when creating population; "
+                        "this can occur when the number of unique schedules is less than "
+                        "the population size. Proceeding with current population of %d schedules.",
+                        self.population_size,
                     )
                     break
 
         return population
+
+    def create_export_ideal_schedule(self):
+        """Create a schedule that opportunistically favors strong export windows."""
+        schedule = ["discharge" for _ in range(self.num_slots)]
+
+        for i, slot in enumerate(self.timeslots):
+            if slot.import_price <= 0:
+                schedule[i] = "charge"
+            elif slot.export_price > slot.import_price:
+                schedule[i] = "export"
+
+        return schedule
 
     def evaluate(self):
         """Run the genetic algorithm and return the best schedule and cost."""
@@ -277,6 +304,7 @@ class GeneticEvaluator:
 
             population = children
 
+        population = sorted(population, key=self.evaluate_schedule)
         optimal_schedule = population[0]
         optimal_cost = self.evaluate_schedule(optimal_schedule)
 
