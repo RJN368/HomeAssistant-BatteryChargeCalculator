@@ -342,6 +342,7 @@
         }
     },
     "entity": {
+        "sensor": {
         "battery_soc": {
             "name": "Battery SOC",
             "state": {
@@ -398,6 +399,7 @@
             "state": {
                 "unit_of_measurement": "GBP"
             }
+        }
         }
     },
     "last_recalculation": {
