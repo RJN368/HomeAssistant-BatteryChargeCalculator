@@ -8,7 +8,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from . import const
-from .coordinators import BatteryChargeCoordinator
+from .coordinators import BatteryChargeCoordinator, async_setup_tariff_coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +66,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(
         const.DOMAIN, "trigger_ml_training", handle_trigger_ml_training
+    )
+
+    # Tariff comparison coordinator (created before platform setup so sensor.py can find it)
+    await async_setup_tariff_coordinator(hass, entry)
+
+    async def _handle_refresh_tariff_comparison(call):
+        """Handle the refresh_tariff_comparison service call."""
+        for key, value in hass.data.get(const.DOMAIN, {}).items():
+            if key.endswith("_tariff"):
+                await value.async_refresh_now()
+
+    hass.services.async_register(
+        const.DOMAIN,
+        "refresh_tariff_comparison",
+        _handle_refresh_tariff_comparison,
     )
 
     await coordinator.async_config_entry_first_refresh()

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from custom_components.battery_charge_calculator.genetic_evaluator import (
     GeneticEvaluator,
     Timeslot,
@@ -108,6 +109,147 @@ class TestChargeSolarSurplusFullBattery(unittest.TestCase):
             places=2,
             msg=f"Expected export credit ≈{expected_cost:.4f}, got {ts.cost:.4f}",
         )
+
+
+class TestExportModeRegression(unittest.TestCase):
+    def test_export_mode_does_not_negative_discharge_when_demand_high(self):
+        """Export mode must not increase battery due to negative discharge amounts."""
+        ev = _evaluator()
+        ts = _slot(import_price=0.32, export_price=0.08, demand=5.0, solar=0.0)
+        start_battery = 3.0
+
+        next_battery = ev._evaluate_single_slot(ts, "export", start_battery)
+
+        self.assertLessEqual(next_battery, start_battery)
+
+
+class TestEvaluateFinalSelectionRegression(unittest.TestCase):
+    def test_evaluate_selects_best_from_final_generation(self):
+        """Final selected schedule must be the best child, not just the first child generated."""
+        ev = _evaluator()
+        ev.population_size = 4
+        ev.generations = 1
+        ev.timeslots = [
+            _slot(0.2, 0.1, 0.0, 0.0),
+            _slot(0.2, 0.1, 0.0, 0.0),
+            _slot(0.2, 0.1, 0.0, 0.0),
+        ]
+        ev.num_slots = len(ev.timeslots)
+
+        best_parent = ["export", "export", "export"]
+        second_parent = ["charge", "charge", "charge"]
+        base_population = [
+            best_parent,
+            second_parent,
+            ["discharge", "discharge", "discharge"],
+            ["charge", "export", "discharge"],
+        ]
+
+        score_map = {
+            tuple(best_parent): 0.0,
+            tuple(second_parent): 10.0,
+            ("discharge", "discharge", "discharge"): 50.0,
+            ("charge", "export", "discharge"): 20.0,
+            ("charge", "charge", "export"): 9.0,
+            ("export", "charge", "charge"): 1.0,
+        }
+
+        sample_sequence = [
+            [second_parent, best_parent],
+            [best_parent, second_parent],
+            [second_parent, best_parent],
+            [best_parent, second_parent],
+        ]
+        sample_iter = iter(sample_sequence)
+
+        with (
+            patch.object(ev, "create_population", return_value=base_population),
+            patch.object(
+                ev, "evaluate_schedule", side_effect=lambda s: score_map[tuple(s)]
+            ),
+            patch.object(ev, "_log_schedule"),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.sample",
+                side_effect=lambda _parents, _k: next(sample_iter),
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.randint",
+                side_effect=[2, 1, 2, 1],
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.random",
+                return_value=1.0,
+            ),
+        ):
+            _timeslots, optimal_cost = ev.evaluate()
+
+        self.assertEqual(optimal_cost, 1.0)
+
+
+class TestExportFocusedScheduling(unittest.TestCase):
+    def test_create_export_ideal_schedule_prefers_export_then_charge_then_discharge(
+        self,
+    ):
+        ev = _evaluator()
+        ev.timeslots = [
+            _slot(import_price=0.10, export_price=0.30, demand=0.0, solar=0.0),
+            _slot(import_price=-0.01, export_price=0.05, demand=0.0, solar=0.0),
+            _slot(import_price=0.25, export_price=0.10, demand=0.0, solar=0.0),
+        ]
+        ev.num_slots = len(ev.timeslots)
+
+        schedule = ev.create_export_ideal_schedule()
+
+        self.assertEqual(schedule, ["export", "charge", "discharge"])
+
+    def test_export_seed_can_outperform_import_focused_seed(self):
+        """When export prices dominate and battery has energy, export schedule should win."""
+        ev = GeneticEvaluator(battery_start=9.0, standing_charge=0.0)
+        ev.timeslots = [
+            _slot(import_price=0.05, export_price=0.40, demand=0.0, solar=0.0),
+            _slot(import_price=0.05, export_price=0.40, demand=0.0, solar=0.0),
+            _slot(import_price=0.05, export_price=0.40, demand=0.0, solar=0.0),
+        ]
+        ev.num_slots = len(ev.timeslots)
+
+        export_schedule = ev.create_export_ideal_schedule()
+        import_focused_schedule = ev.create_ideal_schedule()
+
+        export_cost = ev.evaluate_schedule(export_schedule)
+        import_focused_cost = ev.evaluate_schedule(import_focused_schedule)
+
+        self.assertLess(
+            export_cost,
+            import_focused_cost,
+            msg=(
+                f"Expected export-focused schedule to be cheaper. "
+                f"export_cost={export_cost:.4f}, import_focused_cost={import_focused_cost:.4f}"
+            ),
+        )
+
+
+class TestEvaluateExportsInHighExportWindow(unittest.TestCase):
+    def test_evaluate_marks_export_action_for_best_plan(self):
+        """End-to-end evaluate should pick a plan with export actions when export rates dominate."""
+        ev = GeneticEvaluator(battery_start=9.0, standing_charge=0.0)
+        ev.generations = 0
+        ev.timeslots = [
+            _slot(import_price=0.05, export_price=0.40, demand=0.0, solar=0.0),
+            _slot(import_price=0.06, export_price=0.35, demand=0.0, solar=0.0),
+            _slot(import_price=0.05, export_price=0.30, demand=0.0, solar=0.0),
+        ]
+        ev.num_slots = len(ev.timeslots)
+
+        export_plan = ["export", "export", "discharge"]
+        non_export_plan = ["charge", "discharge", "charge"]
+
+        with patch.object(
+            ev, "create_population", return_value=[non_export_plan, export_plan]
+        ):
+            timeslots, _optimal_cost = ev.evaluate()
+
+        self.assertIsNotNone(timeslots)
+        self.assertIn("export", [slot.charge_option for slot in timeslots])
 
 
 if __name__ == "__main__":

@@ -128,10 +128,46 @@
                     "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
+            },
+            "tariff_comparison": {
+                "title": "Monthly Tariff Comparison",
+                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last month of real meter data.",
+                "data": {
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison"
+                },
+                "data_description": {
+                    "tariff_comparison_enabled": "When enabled, a new sensor will be created showing monthly cost breakdowns for each selected tariff."
+                }
+            },
+            "tariff_comparison_pick": {
+                "title": "Select Tariffs to Compare",
+                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Monthly Tariff Comparison sensor.",
+                "data": {
+                    "tariff_comparison_tariffs": "Tariffs to compare"
+                },
+                "data_description": {
+                    "tariff_comparison_tariffs": "Select one or more tariffs. Your current tariff should be included so you can see what you actually paid vs. what you would have paid."
+                }
+            },
+            "export_meter": {
+                "title": "Export Meter & Solar (optional)",
+                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Optionally enter your solar production entity to use historical generation data in simulations.",
+                "data": {
+                    "octopus_export_mpn": "Export MPAN",
+                    "octopus_export_meter_serial": "Export meter serial number",
+                    "solar_energy_entity": "Solar production entity (optional)"
+                },
+                "data_description": {
+                    "octopus_export_mpn": "The 13-digit MPAN for your export meter. Found on your Octopus account or electricity bill.",
+                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter.",
+                    "solar_energy_entity": "Entity ID of your solar cumulative energy sensor (e.g. sensor.solar_energy_production). Must be a total_increasing kWh sensor that appears in the HA Energy dashboard. Leave blank to use zero solar in simulations."
+                }
             }
         },
         "error": {
-            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
+            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature.",
+            "tariff_fetch_failed": "Could not fetch available tariffs from Octopus — check your API key and internet connection.",
+            "select_at_least_one": "Please select at least one tariff."
         }
     },
     "options": {
@@ -263,10 +299,115 @@
                     "octopus_meter_serial": "Serial number printed on your electricity meter. Required when source is Octopus or Both.",
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
+            },
+            "tariff_comparison": {
+                "title": "Monthly Tariff Comparison",
+                "description": "Enable this to compare your electricity costs across different Octopus tariffs using the last month of real meter data.",
+                "data": {
+                    "tariff_comparison_enabled": "Enable monthly tariff comparison"
+                },
+                "data_description": {
+                    "tariff_comparison_enabled": "When enabled, a new sensor will be created showing monthly cost breakdowns for each selected tariff."
+                }
+            },
+            "tariff_comparison_pick": {
+                "title": "Select Tariffs to Compare",
+                "description": "Choose the Octopus import tariffs you want to compare. Your current tariff ({region} region) is pre-selected. Results appear in the Monthly Tariff Comparison sensor.",
+                "data": {
+                    "tariff_comparison_tariffs": "Tariffs to compare"
+                },
+                "data_description": {
+                    "tariff_comparison_tariffs": "Select one or more tariffs. Your current tariff should be included so you can see what you actually paid vs. what you would have paid."
+                }
+            },
+            "export_meter": {
+                "title": "Export Meter & Solar (optional)",
+                "description": "Enter your export MPAN and meter serial to include export earnings in tariff comparisons. Optionally enter your solar production entity to use historical generation data in simulations.",
+                "data": {
+                    "octopus_export_mpn": "Export MPAN",
+                    "octopus_export_meter_serial": "Export meter serial number",
+                    "solar_energy_entity": "Solar production entity (optional)"
+                },
+                "data_description": {
+                    "octopus_export_mpn": "The 13-digit MPAN for your export meter. Found on your Octopus account or electricity bill.",
+                    "octopus_export_meter_serial": "The serial number printed on your export electricity meter.",
+                    "solar_energy_entity": "Entity ID of your solar cumulative energy sensor (e.g. sensor.solar_energy_production). Must be a total_increasing kWh sensor that appears in the HA Energy dashboard. Leave blank to use zero solar in simulations."
+                }
             }
         },
         "error": {
-            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature."
+            "invalid_design_temps": "Indoor temperature must be higher than outdoor design temperature.",
+            "tariff_fetch_failed": "Could not fetch available tariffs from Octopus — check your API key and internet connection.",
+            "select_at_least_one": "Please select at least one tariff."
+        }
+    },
+    "entity": {
+        "battery_soc": {
+            "name": "Battery SOC",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "battery_projection": {
+            "name": "Battery Charge Projection",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "battery_charge_slots": {
+            "name": "Battery Charge Slots"
+        },
+        "est_power_demand": {
+            "name": "Estimated Power Demand",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "cost_prediction": {
+            "name": "Cost Prediction",
+            "state": {
+                "unit_of_measurement": "GBP"
+            }
+        },
+        "annual_forecast": {
+            "name": "Annual Energy Forecast",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "daily_power_forecast": {
+            "name": "Daily Power Forecast",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "ml_model_status": {
+            "name": "ML Power Model Status"
+        },
+        "ml_power_surface": {
+            "name": "ML Power Surface",
+            "state": {
+                "unit_of_measurement": "kWh"
+            }
+        },
+        "last_recalculation": {
+            "name": "Charge Slots Last Recalculated"
+        },
+        "tariff_comparison": {
+            "name": "Monthly Tariff Comparison",
+            "state": {
+                "unit_of_measurement": "GBP"
+            }
+        }
+    },
+    "last_recalculation": {
+        "reason": {
+            "initial_setup": "Initial setup",
+            "no_plan": "No existing plan",
+            "plan_expiring": "Plan expiring soon",
+            "battery_deviation": "Battery level deviation",
+            "no_active_slot": "No active slot found",
+            "manual": "Manual trigger"
         }
     },
     "selector": {

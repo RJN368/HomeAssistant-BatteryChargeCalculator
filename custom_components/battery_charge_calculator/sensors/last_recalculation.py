@@ -14,14 +14,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .. import const
 
-# Human-readable labels for each reason value
-_REASON_LABELS: dict[str, str] = {
-    const.REPLAN_REASON_INITIAL_SETUP: "Initial setup",
-    const.REPLAN_REASON_NO_PLAN: "No existing plan",
-    const.REPLAN_REASON_PLAN_EXPIRING: "Plan expiring soon",
-    const.REPLAN_REASON_BATTERY_DEVIATION: "Battery level deviation",
-    const.REPLAN_REASON_NO_ACTIVE_SLOT: "No active slot found",
-    const.REPLAN_REASON_MANUAL: "Manual trigger",
+
+# Translation keys for recalculation reasons
+REASON_TRANSLATION_KEYS = {
+    const.REPLAN_REASON_INITIAL_SETUP: "last_recalculation.reason.initial_setup",
+    const.REPLAN_REASON_NO_PLAN: "last_recalculation.reason.no_plan",
+    const.REPLAN_REASON_PLAN_EXPIRING: "last_recalculation.reason.plan_expiring",
+    const.REPLAN_REASON_BATTERY_DEVIATION: "last_recalculation.reason.battery_deviation",
+    const.REPLAN_REASON_NO_ACTIVE_SLOT: "last_recalculation.reason.no_active_slot",
+    const.REPLAN_REASON_MANUAL: "last_recalculation.reason.manual",
 }
 
 
@@ -37,7 +38,7 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_name = const.LAST_RECALCULATION_SENSOR_NAME
+    _attr_translation_key = "last_recalculation"
     _attr_unique_id = const.LAST_RECALCULATION_SENSOR
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
@@ -50,9 +51,11 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         """Sync state and attributes from the coordinator."""
         self._attr_native_value = getattr(self.coordinator, "recalculation_time", None)
         reason = getattr(self.coordinator, "recalculation_reason", None)
+        # Set reason_label to the translation key string for frontend translation
+        reason_label = REASON_TRANSLATION_KEYS.get(reason, reason)
         self._attr_extra_state_attributes = {
             "reason": reason,
-            "reason_label": _REASON_LABELS.get(reason, reason) if reason else None,
+            "reason_label": reason_label,
         }
 
     @callback

@@ -50,7 +50,7 @@ class MLModelStatusSensor(CoordinatorEntity, SensorEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_name = const.ML_MODEL_STATUS_SENSOR_NAME
+    _attr_translation_key = "ml_model_status"
     _attr_unique_id = const.ML_MODEL_STATUS_SENSOR
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:

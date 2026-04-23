@@ -1,6 +1,6 @@
-# Annual Tariff Comparison Visualisation — Feature Specification
+# Monthly Tariff Comparison Visualisation — Feature Specification
 
-**Status:** Draft — awaiting Robert's review
+**Status:** Approved by robert.nash (2026-04-13) — ready for implementation
 **Author:** Keaton (Lead Architect)
 **Date:** 2026-04-13
 **Implements:** Feature request by robert.nash
@@ -24,11 +24,43 @@
 
 ## 1. Feature Overview
 
-The Annual Tariff Comparison Visualisation allows Robert to see what his electricity costs **would have been** over the previous 12 months under different Octopus Energy import and export tariff combinations, using **real half-hourly meter consumption data** from the Octopus API.
+The Monthly Tariff Comparison Visualisation allows Robert to see what his electricity costs **would have been** over the previous 12 months under different Octopus Energy import and export tariff combinations, using **real half-hourly meter consumption data** from the Octopus API.
 
 Costs are calculated retrospectively: actual recorded grid import and export readings are replayed against the historical unit rates of each configured tariff. The result — a monthly breakdown per tariff — is exposed as a Home Assistant sensor with rich `extra_state_attributes`, designed for rendering as a stacked or grouped bar chart in Lovelace using the [ApexCharts card](https://github.com/RomRider/apexcharts-card).
 
 **Why this matters:** UK electricity tariffs vary significantly. Agile Octopus, Intelligent Octopus Go, and standard variable tariffs have radically different unit rate profiles. A household with a solar + battery system may save hundreds of pounds per year by choosing the optimal tariff — but verifying this requires replaying 17,520 half-hourly readings against each tariff's full year of rates. This feature automates that entirely.
+
+---
+
+## ⚠️ Consumption Data Validity — The Tariff Optimisation Problem
+
+> **Design issue raised by robert.nash — 2026-04-13**
+
+The "replay actual meter reads against each tariff" approach described in §1 has a fundamental validity problem when the user's battery system is actively optimised for the current tariff.
+
+### The problem
+
+The battery charge/discharge/export schedule is recalculated **every 30 minutes** by `GeneticEvaluator.run()` specifically for the active tariff's rate profile. On Agile, this means the system charges during the cheapest half-hour slots (often 2–5 p/kWh at 2–4 am) and exports during the most expensive slots (30–50 p/kWh at peak). The Octopus import and export meter reads therefore reflect **Agile-optimised behaviour**.
+
+If those same meter reads are replayed against Octopus Go rates (e.g. 7 p/kWh during the fixed 23:30–05:30 overnight window, 24 p/kWh flat outside), the comparison is invalid:
+
+- On Go, the system would have charged during the **fixed overnight window** — not Agile's dynamic cheap slots, which may fall at different times or overlap only partially.
+- Discharge and export timing would be different because the rate incentive profile differs.
+- Result: replaying Agile-optimised meter reads against Go rates **misrepresents what Go would actually cost**, biasing the comparison in favour of the current tariff.
+
+> *Robert's words (2026-04-13):*
+> "When comparing tariffs we want the real energy use but ironically this will be polluted by the fact that the system is tuned to be optimised for the tariff that it is on. Therefore we may need to use predicted use for the non active tariff.
+> ie comparing last years agile with charge, discharge and export periods with Octopus Go would not be accurate as the charge, discharge and export periods would be different."
+
+### Three viable approaches
+
+| Approach | Description | Accuracy | Complexity |
+|---|---|---|---|
+| **A — Simulation** | For each non-current tariff: fetch that day's historical rates + Open-Meteo weather → run `PowerCalculator.calculate()` → run `GeneticEvaluator.run()` → derive simulated grid import/export → apply tariff rates | High | High (365 × genetic evaluator runs per non-current tariff) |
+| **B — Base-load isolation** | Decompose meter reads into tariff-independent base load + battery arbitrage component; re-simulate only the arbitrage for each non-current tariff's rates | Medium | Medium (requires estimating base load from combined meter + battery history data) |
+| **C — Naive replay with disclosure** | Use real meter reads for all tariffs; prominently flag that non-current tariff costs reflect current-tariff-optimised behaviour | Low (but transparent) | Minimal |
+
+**Selected approach (confirmed by robert.nash, 2026-04-13): A + C combined.** Approach C (naive replay with disclosure) delivers immediate results from day one. Approach A (full `GeneticEvaluator` simulation using Open-Meteo historical weather) runs as a background task and progressively replaces naive replay data per non-current tariff as simulation completes. See [§6.7](#67-consumption-data-model) for the full pipeline and state-transition model.
 
 ---
 
@@ -52,9 +84,22 @@ Costs are calculated retrospectively: actual recorded grid import and export rea
 ### US-6 — On-demand refresh
 > As Robert, I want a Home Assistant service call (`battery_charge_calculator.refresh_tariff_comparison`) that triggers an immediate fresh data fetch and recalculation, rather than waiting for the next scheduled refresh.
 
+### US-7 — Data validity disclosure
+> As Robert, I want the sensor to clearly indicate whether non-current tariff costs are based on real meter reads, simulated schedules, or base-load isolation — and where those costs may be unreliable due to tariff-optimised consumption — so I know how much to trust the comparison and can make an informed tariff switching decision.
+
 ---
 
 ## 3. Data Sources
+
+### 3.7 Tariff Start Date Adjustment (Fair Comparison Window)
+
+When comparing tariffs, if the current tariff started after the beginning of the analysis period, the comparison window is adjusted:
+
+- The start date for all tariff calculations is set to the later of the default window start and the current tariff's `valid_from` date (agreement start).
+- This ensures that all tariffs are compared fairly, only over the period when the current tariff was actually active.
+- Example: If the analysis window is 1 March–31 March 2026, but the current tariff started on 17 March 2026, the comparison for all tariffs will use 17 March–31 March 2026.
+
+This logic is implemented in the coordinator and applies to all tariff calculations and reporting.
 
 All data is fetched from the Octopus Energy REST API. Existing API credentials (`OCTOPUS_APIKEY`, `OCTOPUS_ACCOUNT_NUMBER`, `OCTOPUS_MPN`, `OCTOPUS_EXPORT_MPN`) are reused from the existing config entry — **no new credential fields**.
 
@@ -153,7 +198,41 @@ Standing charges can change mid-year (e.g. fixed-term tariff rollover). The calc
 
 **Export tariffs:** Export tariffs do not have standing charges. Standing charges are only fetched for import tariffs.
 
-### 3.5 API Rate Limits and Call Volume
+### 3.5 Open-Meteo Historical Weather API
+
+Used by the Approach A simulation pipeline (§6.7) to source historical hourly temperatures for each day in the comparison window.
+
+**Endpoint:**
+```
+GET https://archive-api.open-meteo.com/v1/archive
+    ?latitude={hass.config.latitude}
+    &longitude={hass.config.longitude}
+    &start_date={YYYY-MM-DD}
+    &end_date={YYYY-MM-DD}
+    &hourly=temperature_2m
+    &timezone=UTC
+```
+
+**Authentication:** None required. Free public API, no key needed.
+
+**Fetch strategy:** Request the full 12-month window in a single API call. Response contains ~8,760 hourly rows per year — lightweight and fast (< 5 seconds typical).
+
+**Response fields used:**
+
+| Field | Type | Notes |
+|---|---|---|
+| `hourly.time` | list of ISO-8601 strings | Hourly timestamps (UTC) |
+| `hourly.temperature_2m` | list of floats | °C; one value per hour |
+
+**Resampling to 30-minute slots:** Each hourly value is duplicated into both 30-minute slots within that hour before passing to `PowerCalculator.calculate()`. E.g. `temperature_2m[i]` → slots at `HH:00` and `HH:30`.
+
+**Cache key:** `open_meteo_{period_from_date}_{period_to_date}`. Stored in the same JSON cache file as tariff rates (§5.5). Not re-fetched unless the rolling window advances past the cached range.
+
+**`OpenMeteoHistoricalClient`:** New thin client in `tariff_comparison/open_meteo_historical.py`. Accepts `lat`/`lon` from `hass.config.latitude`/`hass.config.longitude`; returns a `dict[date, list[float]]` mapping each date to its 24 hourly temperatures.
+
+---
+
+### 3.6 API Rate Limits and Call Volume
 
 For a 12-month comparison with N configured tariffs:
 
@@ -164,7 +243,8 @@ For a 12-month comparison with N configured tariffs:
 | Import unit rates per tariff | N | 1–2 calls per tariff (pagination) |
 | Export unit rates per tariff | N | As above; 0 if no export tariffs |
 | Import standing charges per tariff | N | Typically 1 call per tariff |
-| **Total for N=4 tariff pairs** | **~11–14** | Well within Octopus API limits |
+| Open-Meteo historical temperature (full year) | 1 | Free; no auth; cached after first fetch |
+| **Total for N=4 tariff pairs** | **~12–15** | Well within Octopus API limits |
 
 After initial fetch, all data is cached to disk (§5.5) and is **not re-fetched on every coordinator update**.
 
@@ -255,7 +335,8 @@ custom_components/battery_charge_calculator/
 │   ├── __init__.py              — package init; exports TariffComparisonCoordinator
 │   ├── client.py                — TariffComparisonClient (Octopus historical data)
 │   ├── calculator.py            — cost calculation; returns monthly breakdown dicts
-│   └── cache.py                 — JSON disk cache with atomic write
+│   ├── cache.py                 — JSON disk cache with atomic write
+│   └── open_meteo_historical.py — OpenMeteoHistoricalClient (historical weather, free, no auth)
 └── sensors/
     └── tariff_comparison.py     — TariffComparisonSensor
 ```
@@ -373,7 +454,7 @@ A lightweight `DataUpdateCoordinator` separate from `BatteryChargeCoordinator`.
 
 ```python
 class TariffComparisonCoordinator(DataUpdateCoordinator):
-    """Coordinator for annual tariff comparison data.
+    """Coordinator for Monthly Tariff Comparison data.
 
     Update interval: weekly (configurable via TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS).
     On first load: immediately fetch data if cache is absent or stale.
@@ -476,7 +557,7 @@ DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT       = False   # until OQ-1 resolved
 
 # Sensor
 TARIFF_COMPARISON_SENSOR              = "battery_charge_calculator.tariff_comparison"
-TARIFF_COMPARISON_SENSOR_NAME         = "Annual Tariff Comparison"
+TARIFF_COMPARISON_SENSOR_NAME         = "Monthly Tariff Comparison"
 
 # Export meter serial (new; added alongside OCTOPUS_METER_SERIAL from D-18)
 OCTOPUS_EXPORT_METER_SERIAL           = "octopus_export_meter_serial"
@@ -486,7 +567,7 @@ OCTOPUS_EXPORT_METER_SERIAL           = "octopus_export_meter_serial"
 
 ```python
 class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
-    """Sensor exposing annual tariff comparison as monthly breakdown attributes."""
+    """Sensor exposing Monthly Tariff Comparison as monthly breakdown attributes."""
 
     _attr_should_poll = False
     _attr_name = const.TARIFF_COMPARISON_SENSOR_NAME
@@ -653,11 +734,131 @@ For a user actively shifting load on Agile, the per-slot formula may yield impor
 for illustrating the unit conversion and net formula; it should not be used as a
 validation check against the per-slot implementation. -->
 
+### 6.7 Consumption data model
+
+This section formalises how consumption data is sourced per tariff using the **A+C combined pipeline**, as directed by robert.nash.
+
+#### Current tariff (`is_current: true`)
+
+Always uses **real half-hourly meter reads** from the Octopus API (§3.1). No simulation or approximation applied. `comparison_method = "real_meter_reads"`. Unchanged.
+
+#### Non-current tariffs — the A+C combined pipeline
+
+Non-current tariffs automatically progress through three phases.
+
+**Phase 1 — Approach C (immediate, always available)**
+
+Computed on the first coordinator update after data is fetched. Real meter reads are replayed against each non-current tariff's historical rates. No additional data dependencies. Results are immediately available in the sensor.
+
+```
+comparison_method = "naive_replay"
+simulation_progress_pct = 0.0
+data_quality_notes = ["Consumption data reflects system behaviour optimised for the
+  current tariff. Non-current tariff costs may be understated or overstated compared
+  to what they would actually be on this tariff. Simulation in progress."]
+```
+
+**Phase 2 — Approach A simulation (background task, progressive)**
+
+Immediately after Phase 1 completes, the coordinator queues a simulation job for every non-current tariff that does not have a completed `"simulation"` result in the cache. Each job runs entirely in background and never blocks the event loop.
+
+Per-job steps:
+
+1. **Fetch Open-Meteo historical temperatures** (§3.5) for the full 12-month window in one API call. Result cached as `open_meteo_{period_from}_{period_to}`. Subsequent tariffs reuse the same cached temperature data — only one Open-Meteo fetch per year window regardless of N tariffs.
+
+2. **Iterate day by day** (up to 365 iterations) through the comparison window. For each day:
+
+   a. Slice 24 hourly temperatures into 48 × 30-min slots (duplicate each hourly value).
+
+   b. Look up that day's historical unit rates from the rate map already in cache (§5.5) — no additional API call.
+
+   c. Run `PowerCalculator.calculate(temp_slots)` → half-hourly household power demand. Uses the same `PowerCalculator` instance as the main coordinator, with the same heat loss / heating config.
+
+   d. Run `GeneticEvaluator.run(demand_forecast, tariff_rates, battery_config)` → optimised `timeslots` for that day under that tariff's rates.
+
+   e. Derive simulated grid import/export from the returned `timeslots`:
+      - `import_kwh += slot.kwh` for each slot with `charge_option == 'charge'`
+      - `export_kwh += slot.export_kwh` for each slot with `charge_option == 'export'`
+      - Discharge/idle slots: household demand served from battery; grid import ≈ `base_load_kwh_per_30min` from config.
+
+   f. Apply that day's tariff rates to simulated import/export values → accumulate into monthly cost buckets.
+
+   All `PowerCalculator.calculate()` and `GeneticEvaluator.run()` calls are wrapped in `hass.async_add_executor_job()` (D-5 compliance — CPU-bound work off the event loop). Days are processed sequentially within a tariff to avoid thread contention.
+
+3. **Progress reporting:** After every 30 days of simulation, the coordinator calls `async_set_updated_data()` to push a partial update to the sensor. `simulation_progress_pct` advances from 0 → 100 in ~12 steps.
+
+   ```
+   comparison_method = "simulation_in_progress"
+   simulation_progress_pct = 42.0   (example: 153 of 365 days complete)
+   data_quality_notes = ["Simulation 42% complete. Showing naive replay data until
+     simulation finishes."]
+   ```
+
+4. **Completion:** When all 365 days for a tariff are simulated, write results to cache (new `simulation_results` section — see below), update the tariff's sensor data to Approach A values, and fire a final coordinator update.
+
+   ```
+   comparison_method = "simulation"
+   simulation_progress_pct = 100.0
+   data_quality_notes = []
+   ```
+
+**Phase 3 — Simulation complete (subsequent restarts)**
+
+Once simulation is cached for a `(tariff_code, data_year)` key, coordinator restarts load from cache instantly. No re-simulation unless:
+- Service `refresh_tariff_comparison` is called (force flag).
+- The rolling `data_year` in the cache no longer matches the current target window.
+- The tariff configuration changes (new tariff code added or modified).
+
+#### Performance expectations
+
+| Task | Expected duration | Runs on |
+|---|---|---|
+| Phase 1 — Approach C (all tariffs) | < 10 seconds | First coordinator update |
+| Open-Meteo fetch (full year, once) | < 5 seconds | Async; shared across all tariffs |
+| `GeneticEvaluator.run()` per day | 100–500 ms (existing) | Executor thread, per D-5 |
+| Full simulation for one non-current tariff (365 days) | ~1–3 minutes | Background; non-blocking |
+| Full simulation for N=4 non-current tariffs (sequential) | ~4–12 minutes total | Background; non-blocking |
+
+Robert sees Approach C data within seconds. Approach A data replaces it progressively over ~4–12 minutes. The sensor is useful from the moment the integration first loads.
+
+#### Cache additions for simulation results
+
+New `simulation_results` section in the cache JSON (§5.5), keyed by tariff code:
+
+```json
+"simulation_results": {
+  "E-1R-INTELLI-VAR-22-10-01-B": {
+    "status": "complete",
+    "completed_at": "2026-04-13T10:15:00Z",
+    "data_year": "2025-04",
+    "monthly": [
+      {
+        "month": "2025-04",
+        "import_kwh_simulated": 210.5,
+        "export_kwh_simulated": 52.3,
+        "import_cost_gbp": 38.20,
+        "export_earnings_gbp": 11.40,
+        "standing_charge_gbp": 13.91,
+        "net_cost_gbp": 40.71
+      }
+    ],
+    "annual": {
+      "import_cost_gbp": 443.10,
+      "export_earnings_gbp": 143.20,
+      "standing_charges_gbp": 169.21,
+      "net_cost_gbp": 469.11
+    }
+  }
+}
+```
+
+`status` values: `"in_progress"`, `"complete"`.
+
 ---
 
 ## 7. Sensor Schema
 
-**Entity ID:** `sensor.annual_tariff_comparison`
+**Entity ID:** `sensor.monthly_tariff_comparison`
 **State:** Net annual cost of the first (current) tariff in £ (e.g. `"724.50"`)
 **Unit:** `GBP`
 **Device class:** `monetary`
@@ -679,6 +880,8 @@ validation check against the per-slot implementation. -->
       "export_tariff_code": "E-1R-AGILE-OUTGOING-19-05-13-B",
       "is_current": true,
       "include_standing_charges": true,
+      "comparison_method": "real_meter_reads",
+      "data_quality_notes": [],
       "coverage_pct": 99.7,
       "monthly": [
         {
@@ -709,6 +912,11 @@ validation check against the per-slot implementation. -->
       "export_tariff_code": "E-1R-AGILE-OUTGOING-19-05-13-B",
       "is_current": false,
       "include_standing_charges": true,
+      "comparison_method": "simulation_in_progress",
+      "simulation_progress_pct": 42.0,
+      "data_quality_notes": [
+        "Simulation 42% complete. Currently showing naive replay data. Values will update as simulation finishes."
+      ],
       "coverage_pct": 100.0,
       "monthly": [ "..." ],
       "annual": {
@@ -730,6 +938,13 @@ validation check against the per-slot implementation. -->
 - `monthly` array always has exactly 12 entries, in ascending calendar month order.
 - All monetary values are rounded to 2 decimal places (`round(value, 2)`).
 - `coverage_pct` is `float` in range `[0.0, 100.0]`. Values below 95.0 trigger `coverage_warning: true` at the top level.
+- `comparison_method` values per tariff entry:
+  - `"real_meter_reads"` — current tariff; actual meter data.
+  - `"naive_replay"` — non-current tariff; Phase 1 (Approach C); simulation not yet started.
+  - `"simulation_in_progress"` — non-current tariff; Phase 2 (Approach A running); naive replay data shown; `simulation_progress_pct` is 0–100.
+  - `"simulation"` — non-current tariff; Phase 3 (Approach A complete); accurate simulated data; `data_quality_notes` is empty.
+- `simulation_progress_pct` is `float` in range `[0.0, 100.0]`. Present on all non-current tariff entries. `0.0` when in `naive_replay` state; `100.0` when in `simulation` state.
+- `data_quality_notes` is an array of zero or more strings per tariff entry. Empty (`[]`) for the current tariff and for fully-simulated non-current tariffs. Non-empty during Phase 1 and Phase 2. The Lovelace card **must** render these notes visibly (e.g. as a footnote or tooltip on the comparison chart) when non-empty.
 - `export_meter_serial_missing: true` when export comparison was requested but no export meter serial is configured. Export earnings will be 0.0 for all tariffs in this case.
 
 ---
@@ -743,7 +958,7 @@ The suggested Lovelace card uses the **ApexCharts Card** (HACS) with a grouped b
 ```yaml
 type: custom:apexcharts-card
 header:
-  title: Annual Tariff Comparison — Net Cost (£)
+  title: Monthly Tariff Comparison — Net Cost (£)
   show: true
 graph_span: 12months
 apex_config:
@@ -764,21 +979,21 @@ apex_config:
     shared: true
     intersect: false
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Current (Agile)
     data_generator: |
       return entity.attributes.tariffs
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: m.net_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Intelligent Go
     data_generator: |
       return entity.attributes.tariffs
         .find(t => t.name === 'Intelligent Go')
         .monthly
         .map(m => ({ x: m.month, y: m.net_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Cosy Octopus
     data_generator: |
       return entity.attributes.tariffs
@@ -806,7 +1021,7 @@ apex_config:
     bar:
       columnWidth: 60%
 series:
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Import Cost
     color: "#FF5733"
     data_generator: |
@@ -814,7 +1029,7 @@ series:
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: m.import_cost_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Export Earnings (negative)
     color: "#28B463"
     data_generator: |
@@ -822,7 +1037,7 @@ series:
         .find(t => t.is_current)
         .monthly
         .map(m => ({ x: m.month, y: -m.export_earnings_gbp }));
-  - entity: sensor.annual_tariff_comparison
+  - entity: sensor.monthly_tariff_comparison
     name: Standing Charges
     color: "#5DADE2"
     data_generator: |
@@ -852,6 +1067,7 @@ The following are explicitly excluded from v1:
 | Automatic tariff recommendation engine | Robert chooses which tariffs to compare; no automated "best tariff" ranking logic |
 | Standing charge comparison for export tariffs | Export tariffs do not have standing charges; no action required |
 | Retroactive comparison for years prior to 12 months ago | Only the most recent 12 complete months are supported per refresh |
+| Approach B — base-load isolation | Requires estimating base load from combined meter + battery SOC history; accuracy gain over Approach C is marginal if battery SOC data is incomplete. Dropped in favour of full Approach A simulation (§6.7). |
 
 ---
 
@@ -921,6 +1137,22 @@ The following require Robert's input before implementation begins.
 **Impact:** Minor. The rolling window approach (always ending at the first of the current month) ensures all 12 months in the window are complete. This is the recommended approach with no proration needed.
 
 **Recommendation:** Use the rolling window approach as specced. Mark this question as resolved unless Robert has a specific preference for calendar-year alignment.
+
+---
+
+### OQ-7 — Consumption data model approach ✅ RESOLVED
+
+**Raised by:** robert.nash (2026-04-13)
+**Resolved by:** robert.nash (2026-04-13) — *"let's focus the feature on Approach A and C combined"*
+
+**Decision:** Use the **A+C combined pipeline** as fully specified in §6.7.
+
+- **Approach C** (naive replay) delivers immediate results from day one — no waiting, no additional complexity.
+- **Approach A** (full `GeneticEvaluator` simulation using Open-Meteo historical weather) runs as a background task, progressively replacing naive replay data per non-current tariff as simulation completes (~4–12 minutes for a full year of N=4 tariffs).
+- **Approach B** (base-load isolation) is explicitly dropped.
+- `comparison_method` transitions per tariff: `naive_replay` → `simulation_in_progress` → `simulation`.
+
+No further action required. Implementation can proceed on both phases simultaneously.
 
 ---
 

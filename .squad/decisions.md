@@ -610,7 +610,7 @@ def validate_model_compatibility(model_metadata: dict, current_feature_columns: 
 
 ---
 
-## Annual Tariff Comparison Feature
+## Monthly Tariff Comparison Feature
 *Added: 2026-04-13 — sources: Keaton (architecture), Hockney (maths review)*
 
 ### ADC-1: Separate coordinator (`TariffComparisonCoordinator`)
@@ -746,7 +746,42 @@ $$\text{net\_cost\_gbp}(m) = \text{import\_cost\_gbp}(m) - \text{export\_earning
 
 ---
 
-### Open questions — Annual Tariff Comparison (pending Robert's answers)
+### D-TC-1: v1 uses Approach C — naive replay with honest disclosure
+
+*Added: 2026-04-13 — source: Keaton (amendment), raised by robert.nash*
+
+**Decision:** For all non-current tariffs in v1, real meter reads are replayed against each tariff's historical rates directly. The limitation is disclosed explicitly in sensor attributes:
+
+- `comparison_method: "naive_replay"` per non-current tariff entry in sensor `extra_state_attributes`.
+- `data_quality_notes` array includes a plain-English warning string per non-current tariff.
+- The Lovelace ApexCharts card **must** render `data_quality_notes` visibly (footnote or tooltip on the chart) — this is a functional requirement, not cosmetic.
+
+**Rationale:** Delivers the feature without delay. Full simulation (Approach A) requires 365 × `GeneticEvaluator` runs per non-current tariff per year, an `OpenMeteoHistoricalClient`, and background task orchestration — significant additional scope. Honest disclosure ensures Robert is not misled; the directional bias (current tariff looks comparatively better because its consumption pattern was optimised for it) is a known, flagged artefact.
+
+*Decided by: Keaton — 2026-04-13*
+
+---
+
+### D-TC-2: v2 upgrade target is Approach A — full battery schedule simulation
+
+*Added: 2026-04-13 — source: Keaton (amendment)*
+
+**Decision:** The v2 upgrade path from Approach C to full simulation (Approach A) is fully specified in §6.7 of `_docs/tariff-comparison.md`. Required additions:
+
+1. `OpenMeteoHistoricalClient` — fetches `archive-api.open-meteo.com/v1/archive` for historical hourly temperature; free, no auth, same lat/lon as ML feature.
+2. Per-day `PowerCalculator.calculate()` + `GeneticEvaluator.run()` calls via `hass.async_add_executor_job()` (consistent with D-5).
+3. Background task accumulating simulated import/export per day → monthly cost aggregation.
+4. On completion: `comparison_method` updated to `"simulation"`; `data_quality_notes` cleared; results cached to disk.
+
+**Why not Approach B (base-load isolation):** Accuracy gain is marginal unless 12-month battery SOC history is reliably available (uncertain). Adds complexity without the rigour of full simulation. Not recommended for v2.
+
+**No architectural changes required:** `GeneticEvaluator`, `PowerCalculator`, and Open-Meteo access are all existing or straightforward additions. Upgrade is additive only.
+
+*Decided by: Keaton — 2026-04-13*
+
+---
+
+### Open questions — Monthly Tariff Comparison (pending Robert's answers)
 
 | # | Question | Default | Blocking? |
 |---|---|---|---|
@@ -756,6 +791,7 @@ $$\text{net\_cost\_gbp}(m) = \text{import\_cost\_gbp}(m) - \text{export\_earning
 | OQ-4 | Standing charges: included by default? | Yes | No |
 | OQ-5 | Update interval: weekly or monthly? | Weekly | No |
 | OQ-6 | Partial month handling at window boundary? | Rolling window avoids it | No |
+| OQ-7 | Consumption data model for non-current tariffs: Approach A (simulation), B (base-load isolation), or C (naive replay with disclosure)? | Approach C for v1; Approach A for v2 | No (C is safe default) |
 
 All defaults are safe; implementation can proceed without Robert's answers.
 

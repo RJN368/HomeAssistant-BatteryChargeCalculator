@@ -65,9 +65,44 @@ def _install_ha_stubs() -> None:
     cv.string = str
     cv.boolean = bool
     cv.positive_int = int
-    cv.config_entry_only_config_schema = lambda domain: (lambda config: config)
-    _stub("homeassistant.helpers.update_coordinator")
+    cv.config_entry_only_config_schema = lambda domain: lambda config: config
+    _uc = _stub("homeassistant.helpers.update_coordinator")
+
+    class UpdateFailed(Exception):
+        pass
+
+    class DataUpdateCoordinator:
+        def __init__(
+            self,
+            hass=None,
+            logger=None,
+            name=None,
+            update_interval=None,
+            update_method=None,
+        ):
+            self.hass = hass
+            self.name = name
+            self.data = None
+
+    class CoordinatorEntity:
+        def __init__(self, coordinator):
+            self.coordinator = coordinator
+
+    _uc.UpdateFailed = UpdateFailed
+    _uc.DataUpdateCoordinator = DataUpdateCoordinator
+    _uc.CoordinatorEntity = CoordinatorEntity
+    sys.modules["homeassistant.helpers.update_coordinator"].UpdateFailed = UpdateFailed
+    sys.modules[
+        "homeassistant.helpers.update_coordinator"
+    ].DataUpdateCoordinator = DataUpdateCoordinator
+    sys.modules[
+        "homeassistant.helpers.update_coordinator"
+    ].CoordinatorEntity = CoordinatorEntity
+
     _stub("homeassistant.helpers.aiohttp_client")
+    # Provide a no-op stub for async_get_clientsession used in config_flow
+    aiohttp_client_mod = sys.modules["homeassistant.helpers.aiohttp_client"]
+    aiohttp_client_mod.async_get_clientsession = lambda hass: None
     _stub("homeassistant.helpers.event")
     dr = _stub("homeassistant.helpers.device_registry")
     _stub("homeassistant.helpers.entity_registry")
@@ -88,8 +123,34 @@ def _install_ha_stubs() -> None:
         def __call__(self, value):
             return value
 
+    class TextSelectorConfig:
+        def __init__(self, type=None, multiline=False, **kwargs):
+            self.type = type
+            self.multiline = multiline
+
+    class TextSelector:
+        def __init__(self, config=None):
+            self.config = config
+
+        def __call__(self, value):
+            return value
+
+    class TextSelectorType:
+        TEXT = "text"
+
+    class BooleanSelector:
+        def __init__(self, config=None):
+            self.config = config
+
+        def __call__(self, value):
+            return value
+
     selector.SelectSelector = SelectSelector
     selector.SelectSelectorConfig = SelectSelectorConfig
+    selector.TextSelector = TextSelector
+    selector.TextSelectorConfig = TextSelectorConfig
+    selector.TextSelectorType = TextSelectorType
+    selector.BooleanSelector = BooleanSelector
 
     # homeassistant.util.*
     _stub("homeassistant.util")
@@ -197,7 +258,7 @@ def _install_ha_stubs() -> None:
 
     # async_track_time_interval — stub that returns a cancellation callable
     sys.modules["homeassistant.helpers.event"].async_track_time_interval = (
-        lambda hass, callback, interval: (lambda: None)
+        lambda hass, callback, interval: lambda: None
     )
 
     # async_get_clientsession stub
@@ -207,8 +268,8 @@ def _install_ha_stubs() -> None:
 
     # device_registry stub
     dr_mock = MagicMock()
-    sys.modules["homeassistant.helpers.device_registry"].async_get = (
-        lambda hass: dr_mock
+    sys.modules["homeassistant.helpers.device_registry"].async_get = lambda hass: (
+        dr_mock
     )
 
 

@@ -1,220 +1,123 @@
 """Config flow for the battery_manager component."""
 
-import voluptuous as vol
-
+import json
+import logging
+import aiohttp
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
-
+from homeassistant.helpers import aiohttp_client
 from . import const
+from .config_schemas import (
+    get_schema,
+    _heating_type_schema,
+    _heating_interpolation_schema,
+    _heating_electric_schema,
+    _heat_loss_method_schema,
+    _heat_loss_report_schema,
+    _heat_loss_known_schema,
+    _building_estimate_schema,
+    _ml_settings_schema,
+    _tariff_comparison_enable_schema,
+    _tariff_comparison_pick_schema,
+    _export_meter_schema,
+)
+from .octopus_agile import OCTOPUS_API_BASE, OctopusAgileRatesClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 # ─────────────────────────── schema helpers ──────────────────────────────────
 
 
-def get_schema(
-    serialno="",
-    apitoken="",
-    octopus_account_number="",
-    octopus_api_key="",
-    simulate=False,
-    inverter_size_kw=const.DEFAULT_INVERTER_SIZE_KW,
-    inverter_efficiency=const.DEFAULT_INVERTER_EFFICIENCY,
-    battery_capacity_kwh=const.DEFAULT_BATTERY_CAPACITY_KWH,
-    base_load=const.DEFAULT_BASE_LOAD_KWH_30MIN,
-    # legacy heating params accepted but ignored – heating has its own steps
-    **_kwargs,
-):
-    """Main/grid settings schema (Step 1).  Heating is configured separately."""
-    return vol.Schema(
-        {
-            vol.Required(const.GIVENERGY_SERIAL_NUMBER, default=serialno): cv.string,
-            vol.Required(const.GIVENERGY_API_TOKEN, default=apitoken): cv.string,
-            vol.Required(
-                const.OCTOPUS_ACCOUNT_NUMBER, default=octopus_account_number
-            ): cv.string,
-            vol.Required(const.OCTOPUS_APIKEY, default=octopus_api_key): cv.string,
-            vol.Required(const.SIMULATE_ONLY, default=simulate): cv.boolean,
-            vol.Required(
-                const.INVERTER_SIZE_KW, default=inverter_size_kw
-            ): const.cv_float,
-            vol.Required(
-                const.INVERTER_EFFICIENCY, default=inverter_efficiency
-            ): const.cv_float,
-            vol.Optional(
-                const.BATTERY_CAPACITY_KWH, default=battery_capacity_kwh
-            ): const.cv_float,
-            vol.Optional(const.BASE_LOAD_KWH_30MIN, default=base_load): const.cv_float,
-        }
-    )
+# Implementation moved to config_schemas.py
+async def _fetch_available_tariffs(
+    session: aiohttp.ClientSession, region_letter: str
+) -> list[dict]:
+    """Fetch available Octopus import tariff products and convert to SelectSelector options.
 
-
-def _heating_type_schema(heating_type=const.DEFAULT_HEATING_TYPE):
-    return vol.Schema(
-        {
-            vol.Required(const.HEATING_TYPE, default=heating_type): SelectSelector(
-                SelectSelectorConfig(
-                    options=const.HEATING_TYPES,
-                    translation_key="heating_type",
-                )
-            ),
-        }
-    )
-
-
-def _heating_interpolation_schema(known_points=const.DEFAULT_HEATING_KNOWN_POINTS):
-    return vol.Schema(
-        {
-            vol.Optional(const.HEATING_KNOWN_POINTS, default=known_points): cv.string,
-        }
-    )
-
-
-def _heating_electric_schema(
-    cop=const.DEFAULT_HEATING_COP,
-    indoor_temp=const.DEFAULT_HEATING_INDOOR_TEMP,
-    flow_temp=const.DEFAULT_HEATING_FLOW_TEMP,
-):
-    """COP, indoor target temp, and heat pump flow temperature.
-
-    flow_temp: the temperature the heating system delivers to radiators/UFH.
-    Used to calculate how COP varies with outdoor temperature.
-    Typical values: 45-55°C for radiators, 35-40°C for underfloor heating.
-    Only affects shape of the power curve when COP > 1.
+    Uses the public (no-auth) Octopus products API. Filters out prepay, business,
+    and restricted products. Each result maps to a regional tariff code of the form
+    E-1R-{product_code}-{region_letter}.
     """
-    return vol.Schema(
-        {
-            vol.Optional(const.HEATING_COP, default=cop): const.cv_float,
-            vol.Optional(
-                const.HEATING_INDOOR_TEMP, default=indoor_temp
-            ): const.cv_float,
-            vol.Optional(const.HEATING_FLOW_TEMP, default=flow_temp): const.cv_float,
-        }
-    )
+    url = f"{OCTOPUS_API_BASE}/products/"
+    params: dict = {"is_prepay": "false", "is_business": "false"}
+    options: list[dict] = []
+
+    while url:
+        try:
+            async with session.get(url, params=params) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Failed to fetch Octopus products: %s", exc)
+            break
+
+        for product in data.get("results", []):
+            if product.get("is_restricted", False):
+                continue
+            if product.get("direction", "IMPORT") == "EXPORT":
+                continue
+            code = product.get("code", "")
+            if not code:
+                continue
+            name = product.get("display_name") or product.get("full_name") or code
+            tariff_code = f"E-1R-{code}-{region_letter}"
+            options.append({"label": name, "value": tariff_code})
+
+        url = data.get("next")
+        params = {}
+
+    return options
 
 
-def _heat_loss_method_schema(method=const.HEAT_LOSS_METHOD_KNOWN):
-    """Ask the user whether they know their heat loss or want to estimate it."""
-    return vol.Schema(
-        {
-            vol.Required(const.HEAT_LOSS_METHOD, default=method): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        const.HEAT_LOSS_METHOD_KNOWN,
-                        const.HEAT_LOSS_METHOD_REPORT,
-                        const.HEAT_LOSS_METHOD_ESTIMATE,
-                    ],
-                    translation_key="heat_loss_method",
-                )
-            ),
-        }
-    )
+def _tariff_codes_from_stored_json(tariffs_json: str) -> list[str]:
+    """Extract import_tariff_code values from the stored JSON string.
 
-
-def _heat_loss_report_schema(
-    watts=const.DEFAULT_HEAT_LOSS_REPORT_WATTS,
-    outdoor_temp=const.DEFAULT_HEAT_LOSS_REPORT_OUTDOOR_TEMP,
-    indoor_temp=const.DEFAULT_HEAT_LOSS_REPORT_INDOOR_TEMP,
-):
-    """Fields matching a standard heat loss survey report."""
-    return vol.Schema(
-        {
-            vol.Required(const.HEAT_LOSS_REPORT_WATTS, default=watts): const.cv_float,
-            vol.Required(
-                const.HEAT_LOSS_REPORT_OUTDOOR_TEMP, default=outdoor_temp
-            ): const.cv_float,
-            vol.Required(
-                const.HEAT_LOSS_REPORT_INDOOR_TEMP, default=indoor_temp
-            ): const.cv_float,
-        }
-    )
-
-
-def _heat_loss_known_schema(heat_loss=const.DEFAULT_HEATING_HEAT_LOSS):
-    """Single field: the known heat loss in W/°C."""
-    return vol.Schema(
-        {
-            vol.Required(const.HEATING_HEAT_LOSS, default=heat_loss): const.cv_float,
-        }
-    )
-
-
-def _building_estimate_schema(
-    floor_area=const.DEFAULT_BUILDING_FLOOR_AREA,
-    age=const.DEFAULT_BUILDING_AGE,
-    wall_type=const.DEFAULT_BUILDING_WALL_TYPE,
-    glazing=const.DEFAULT_BUILDING_GLAZING,
-):
-    return vol.Schema(
-        {
-            vol.Optional(const.BUILDING_FLOOR_AREA, default=floor_area): const.cv_float,
-            vol.Optional(const.BUILDING_AGE, default=age): SelectSelector(
-                SelectSelectorConfig(
-                    options=const.BUILDING_AGE_BANDS,
-                    translation_key="building_age",
-                )
-            ),
-            vol.Optional(const.BUILDING_WALL_TYPE, default=wall_type): SelectSelector(
-                SelectSelectorConfig(
-                    options=const.BUILDING_WALL_TYPES,
-                    translation_key="building_wall_type",
-                )
-            ),
-            vol.Optional(const.BUILDING_GLAZING, default=glazing): SelectSelector(
-                SelectSelectorConfig(
-                    options=const.BUILDING_GLAZING_TYPES,
-                    translation_key="building_glazing",
-                )
-            ),
-        }
-    )
-
-
-def _ml_settings_schema(
-    ml_enabled: bool = False,
-    service_url: str = const.DEFAULT_ML_SERVICE_URL,
-    api_key: str = const.DEFAULT_ML_SERVICE_API_KEY,
-    tls_fingerprint: str = const.DEFAULT_ML_SERVICE_TLS_FINGERPRINT,
-    consumption_source: str = const.DEFAULT_ML_CONSUMPTION_SOURCE,
-    octopus_mpan: str = "",
-    octopus_meter_serial: str = const.DEFAULT_OCTOPUS_METER_SERIAL,
-    lookback_days: int = const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
-) -> vol.Schema:
-    """Schema for the ML power estimation settings step.
-
-    Points to an external BCC ML Service instance.  All fields default to
-    safe values so existing config entries continue to work unchanged (D-16).
+    Handles both the old dict-list format and a bare list of code strings.
     """
-    return vol.Schema(
-        {
-            vol.Optional(const.ML_ENABLED, default=ml_enabled): cv.boolean,
-            vol.Optional(const.ML_SERVICE_URL, default=service_url): cv.string,
-            vol.Optional(const.ML_SERVICE_API_KEY, default=api_key): cv.string,
-            vol.Optional(
-                const.ML_SERVICE_TLS_FINGERPRINT, default=tls_fingerprint
-            ): cv.string,
-            vol.Optional(
-                const.ML_CONSUMPTION_SOURCE, default=consumption_source
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        const.ML_CONSUMPTION_SOURCE_GIVENERGY,
-                        const.ML_CONSUMPTION_SOURCE_OCTOPUS,
-                        const.ML_CONSUMPTION_SOURCE_BOTH,
-                    ],
-                    translation_key="ml_consumption_source",
-                )
-            ),
-            vol.Optional(const.OCTOPUS_MPN, default=octopus_mpan): cv.string,
-            vol.Optional(
-                const.OCTOPUS_METER_SERIAL, default=octopus_meter_serial
-            ): cv.string,
-            vol.Optional(
-                const.ML_TRAINING_LOOKBACK_DAYS, default=lookback_days
-            ): vol.All(vol.Coerce(int), vol.Range(min=14, max=730)),
-        }
+    if not tariffs_json:
+        return []
+    try:
+        data = json.loads(tariffs_json)
+        if isinstance(data, list):
+            codes = []
+            for item in data:
+                if isinstance(item, str):
+                    codes.append(item)
+                elif isinstance(item, dict):
+                    code = item.get("import_tariff_code", "")
+                    if code:
+                        codes.append(code)
+            return codes
+    except json.JSONDecodeError, TypeError:
+        pass
+    return []
+
+
+def _tariff_codes_to_stored_json(
+    codes: list[str],
+    current_import_tariff_code: str | None = None,
+) -> str:
+    """Convert a list of selected tariff codes to the coordinator's JSON format.
+
+    Export tariff codes are not stored per-tariff — the coordinator resolves
+    the account's current export tariff automatically at fetch time.
+    """
+    has_current_match = bool(
+        current_import_tariff_code and current_import_tariff_code in codes
+    )
+    return json.dumps(
+        [
+            {
+                "import_tariff_code": code,
+                "name": code,
+                "is_current": bool(
+                    has_current_match and code == current_import_tariff_code
+                ),
+            }
+            for code in codes
+        ]
     )
 
 
@@ -264,6 +167,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
     def __init__(self):
         self._main_data: dict = {}
         self._heating_data: dict = {}
+        self._resolved_current_import_tariff_code: str | None = None
 
     async def async_step_user(self, user_input=None):
         """Step 1 – main settings."""
@@ -457,7 +361,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             # Also update self.options to ensure persistence if options flow is used later
             if hasattr(self, "options"):
                 self.options.update(ml_settings)
-            return self._create_entry()
+            return await self.async_step_tariff_comparison()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -487,7 +391,139 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             ),
         )
 
+    async def async_step_tariff_comparison(self, user_input=None):
+        """Step: enable/disable tariff comparison.
+
+        A simple toggle. If enabled, proceeds to the tariff picker step
+        which fetches available tariffs from the Octopus API and lets the
+        user select from a graphical list.
+        """
+        if user_input is not None:
+            enabled = user_input.get(const.TARIFF_COMPARISON_ENABLED, False)
+            self._heating_data[const.TARIFF_COMPARISON_ENABLED] = enabled
+            if enabled:
+                return await self.async_step_tariff_comparison_pick()
+            # Feature disabled — store empty list and finish
+            self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = "[]"
+            return self._create_entry()
+
+        return self.async_show_form(
+            step_id="tariff_comparison",
+            data_schema=_tariff_comparison_enable_schema(
+                enabled=self._heating_data.get(const.TARIFF_COMPARISON_ENABLED, False),
+            ),
+        )
+
+    async def async_step_tariff_comparison_pick(self, user_input=None):
+        """Step: pick tariffs from a live list fetched from Octopus.
+
+        Fetches the product catalogue on first display (user_input is None).
+        The user's current tariff is pre-selected. On submit, stores the
+        selection as the coordinator-compatible JSON format.
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            selected: list[str] = user_input.get(const.TARIFF_COMPARISON_TARIFFS, [])
+            if not selected:
+                errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
+            else:
+                self._heating_data[const.TARIFF_COMPARISON_TARIFFS] = (
+                    _tariff_codes_to_stored_json(
+                        selected,
+                        current_import_tariff_code=self._resolved_current_import_tariff_code,
+                    )
+                )
+                return await self.async_step_export_meter()
+
+        # --- Fetch available tariffs from Octopus ---
+        session = aiohttp_client.async_get_clientsession(self.hass)
+        available_options: list[dict] = []
+        current_code: str | None = None
+
+        try:
+            api_key = self._main_data.get(const.OCTOPUS_APIKEY, "")
+            account = self._main_data.get(const.OCTOPUS_ACCOUNT_NUMBER, "")
+            if api_key and account:
+                client = OctopusAgileRatesClient(api_key, account)
+                await client._find_current_tariffs(session)  # noqa: SLF001
+                current_code = client.import_tariff_code
+                self._resolved_current_import_tariff_code = current_code
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not resolve current tariff code: %s", exc)
+
+        region = current_code[-1] if current_code else "A"
+        try:
+            available_options = await _fetch_available_tariffs(session, region)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not fetch tariff list: %s", exc)
+            errors["base"] = "tariff_fetch_failed"
+
+        # Pre-select current tariff (and any previously saved codes)
+        existing_codes = _tariff_codes_from_stored_json(
+            self._heating_data.get(const.TARIFF_COMPARISON_TARIFFS, "")
+        )
+        default_codes = existing_codes or ([current_code] if current_code else [])
+
+        # Ensure pre-selected codes appear in the options list (in case the
+        # live fetch failed or the saved code is not in the current catalogue)
+        option_values = {o["value"] for o in available_options}
+        for code in default_codes:
+            if code and code not in option_values:
+                available_options.insert(
+                    0,
+                    {"label": f"{code} (your current tariff)", "value": code},
+                )
+
+        return self.async_show_form(
+            step_id="tariff_comparison_pick",
+            data_schema=_tariff_comparison_pick_schema(
+                available_options=available_options,
+                selected=default_codes,
+            ),
+            errors=errors,
+            description_placeholders={
+                "region": region,
+            },
+        )
+
+        options = {**self._main_data, **self._heating_data}
+        return self.async_create_entry(title=const.TITLE, data={}, options=options)
+
+    async def async_step_export_meter(self, user_input=None):
+        """Step: configure export meter MPAN and serial for tariff comparison.
+
+        Both fields are optional — if left blank, export earnings will not be
+        included in any tariff comparison.  The export tariff code is resolved
+        automatically from the Octopus account API at fetch time.
+        """
+        if user_input is not None:
+            self._heating_data[const.OCTOPUS_EXPORT_MPN] = user_input.get(
+                const.OCTOPUS_EXPORT_MPN, ""
+            ).strip()
+            self._heating_data[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
+                const.OCTOPUS_EXPORT_METER_SERIAL, ""
+            ).strip()
+            self._heating_data[const.SOLAR_ENERGY_ENTITY] = user_input.get(
+                const.SOLAR_ENERGY_ENTITY, ""
+            ).strip()
+            return self._create_entry()
+
+        return self.async_show_form(
+            step_id="export_meter",
+            data_schema=_export_meter_schema(
+                export_mpan=self._heating_data.get(const.OCTOPUS_EXPORT_MPN, ""),
+                export_meter_serial=self._heating_data.get(
+                    const.OCTOPUS_EXPORT_METER_SERIAL, ""
+                ),
+                solar_energy_entity=self._heating_data.get(
+                    const.SOLAR_ENERGY_ENTITY, ""
+                ),
+            ),
+        )
+
     def _create_entry(self):
+        """Finalise and create the config entry (called from tariff steps)."""
         options = {**self._main_data, **self._heating_data}
         return self.async_create_entry(title=const.TITLE, data={}, options=options)
 
@@ -513,6 +549,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
         self.options = dict(config_entry.options)
+        self._resolved_current_import_tariff_code: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -807,7 +844,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             )
-            return self._save_and_exit()
+            return await self.async_step_tariff_comparison()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -830,11 +867,90 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 octopus_meter_serial=self.options.get(
                     const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
                 ),
-                lookback_days=self.options.get(
+                training_lookback_days=self.options.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),
             ),
+        )
+
+    async def async_step_tariff_comparison(self, user_input=None):
+        """Step: enable/disable tariff comparison (options flow)."""
+        if user_input is not None:
+            enabled = user_input.get(const.TARIFF_COMPARISON_ENABLED, False)
+            self.options[const.TARIFF_COMPARISON_ENABLED] = enabled
+            if enabled:
+                return await self.async_step_tariff_comparison_pick()
+            self.options[const.TARIFF_COMPARISON_TARIFFS] = "[]"
+            return self._save_and_exit()
+
+        return self.async_show_form(
+            step_id="tariff_comparison",
+            data_schema=_tariff_comparison_enable_schema(
+                enabled=self.options.get(const.TARIFF_COMPARISON_ENABLED, False),
+            ),
+        )
+
+    async def async_step_tariff_comparison_pick(self, user_input=None):
+        """Step: pick tariffs from a live Octopus product list (options flow)."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            selected: list[str] = user_input.get(const.TARIFF_COMPARISON_TARIFFS, [])
+            if not selected:
+                errors[const.TARIFF_COMPARISON_TARIFFS] = "select_at_least_one"
+            else:
+                self.options[const.TARIFF_COMPARISON_TARIFFS] = (
+                    _tariff_codes_to_stored_json(
+                        selected,
+                        current_import_tariff_code=self._resolved_current_import_tariff_code,
+                    )
+                )
+                return await self.async_step_export_meter()
+
+        session = aiohttp_client.async_get_clientsession(self.hass)
+        available_options: list[dict] = []
+        current_code: str | None = None
+
+        try:
+            api_key = self.options.get(const.OCTOPUS_APIKEY, "")
+            account = self.options.get(const.OCTOPUS_ACCOUNT_NUMBER, "")
+            if api_key and account:
+                client = OctopusAgileRatesClient(api_key, account)
+                await client._find_current_tariffs(session)  # noqa: SLF001
+                current_code = client.import_tariff_code
+                self._resolved_current_import_tariff_code = current_code
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not resolve current tariff code: %s", exc)
+
+        region = current_code[-1] if current_code else "A"
+        try:
+            available_options = await _fetch_available_tariffs(session, region)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Could not fetch tariff list: %s", exc)
+            errors["base"] = "tariff_fetch_failed"
+
+        existing_codes = _tariff_codes_from_stored_json(
+            self.options.get(const.TARIFF_COMPARISON_TARIFFS, "")
+        )
+        default_codes = existing_codes or ([current_code] if current_code else [])
+
+        option_values = {o["value"] for o in available_options}
+        for code in default_codes:
+            if code and code not in option_values:
+                available_options.insert(
+                    0,
+                    {"label": f"{code} (your current tariff)", "value": code},
+                )
+
+        return self.async_show_form(
+            step_id="tariff_comparison_pick",
+            data_schema=_tariff_comparison_pick_schema(
+                available_options=available_options,
+                selected=default_codes,
+            ),
+            errors=errors,
+            description_placeholders={"region": region},
         )
 
     def _save_and_exit(self):
@@ -843,3 +959,28 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         # Do NOT also call async_update_entry — that fires the listener a second time,
         # causing a double-reload race condition.
         return self.async_create_entry(title=const.TITLE, data=self.options)
+
+    async def async_step_export_meter(self, user_input=None):
+        """Step: configure export meter MPAN and serial (options flow)."""
+        if user_input is not None:
+            self.options[const.OCTOPUS_EXPORT_MPN] = user_input.get(
+                const.OCTOPUS_EXPORT_MPN, ""
+            ).strip()
+            self.options[const.OCTOPUS_EXPORT_METER_SERIAL] = user_input.get(
+                const.OCTOPUS_EXPORT_METER_SERIAL, ""
+            ).strip()
+            self.options[const.SOLAR_ENERGY_ENTITY] = user_input.get(
+                const.SOLAR_ENERGY_ENTITY, ""
+            ).strip()
+            return self._save_and_exit()
+
+        return self.async_show_form(
+            step_id="export_meter",
+            data_schema=_export_meter_schema(
+                export_mpan=self.options.get(const.OCTOPUS_EXPORT_MPN, ""),
+                export_meter_serial=self.options.get(
+                    const.OCTOPUS_EXPORT_METER_SERIAL, ""
+                ),
+                solar_energy_entity=self.options.get(const.SOLAR_ENERGY_ENTITY, ""),
+            ),
+        )

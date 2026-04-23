@@ -19,6 +19,7 @@ from .sensors import (
     LastRecalculationSensor,
     MLModelStatusSensor,
     MLPowerSurfaceSensor,
+    TariffComparisonSensor,
     TimeSlotSensor,
 )
 
@@ -41,4 +42,10 @@ async def async_setup_entry(
         entities.append(MLModelStatusSensor(hass, coordinator))
         entities.append(AnnualForecastSensor(hass, coordinator))
         entities.append(MLPowerSurfaceSensor(hass, coordinator))
+
+    if config_entry.options.get(const.TARIFF_COMPARISON_ENABLED, False):
+        tc_coordinator = hass.data[const.DOMAIN].get(config_entry.entry_id + "_tariff")
+        if tc_coordinator:
+            entities.append(TariffComparisonSensor(hass, tc_coordinator))
+
     async_add_entities(entities)

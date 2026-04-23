@@ -4,6 +4,40 @@ The integration creates the following sensors in Home Assistant:
 
 ---
 
+## Monthly Tariff Comparison
+
+**Entity:** `sensor.monthly_tariff_comparison`
+
+**Only created when tariff comparison is enabled in the integration settings.**
+
+Shows what your electricity would have cost over the last 12 months under each configured Octopus tariff, using your real half-hourly smart meter reads.
+
+**State:** Net annual cost (£) for the first tariff in your selection (your baseline).
+
+**Attributes:**
+
+| Attribute | Description |
+|-----------|-------------|
+| `tariffs` | List of per-tariff result objects (see below) |
+| `data_year` | The 12-month period this comparison covers |
+| `last_updated` | ISO-8601 UTC timestamp of the last successful calculation |
+
+Each entry in `tariffs` contains:
+
+| Field | Description |
+|-------|-------------|
+| `label` | Human-readable tariff name |
+| `import_tariff_code` | Octopus tariff code (e.g. `E-1R-AGILE-FLEX-22-11-25-B`) |
+| `comparison_method` | `real_meter_reads`, `naive_replay`, `simulation_in_progress`, or `simulation` |
+| `simulation_progress_pct` | 0–100; how far through the background simulation |
+| `data_quality_notes` | Rate map coverage percentage and any data gaps |
+| `annual` | Dict with `import_cost_gbp`, `export_earnings_gbp`, `standing_charges_gbp`, `net_cost_gbp` |
+| `monthly` | List of 12 dicts — one per month — with the same cost fields plus `month` (YYYY-MM) |
+
+See [Monthly Tariff Comparison](tariff-comparison-guide.md) for full setup and dashboard examples.
+
+---
+
 ## Battery Charge Projection
 
 **Entity:** `sensor.battery_charge_projection`

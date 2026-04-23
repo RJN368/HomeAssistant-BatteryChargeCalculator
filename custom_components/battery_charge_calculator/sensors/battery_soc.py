@@ -21,7 +21,7 @@ class BatterySocSensor(CoordinatorEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_name = "Battery SOC"
+    _attr_translation_key = "battery_soc"
     _attr_unique_id = "battery_charge_calculator_soc_kwh"
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:

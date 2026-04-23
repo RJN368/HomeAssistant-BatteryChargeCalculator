@@ -1,3 +1,5 @@
+# Required for Home Assistant test fixtures
+pytest-homeassistant-custom-component>=0.12.0
 pytest
 pytest-asyncio
 pytest-cov

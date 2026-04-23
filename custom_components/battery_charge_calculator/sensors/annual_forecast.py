@@ -45,7 +45,7 @@ class AnnualForecastSensor(CoordinatorEntity, SensorEntity):
     """
 
     _attr_should_poll = False
-    _attr_name = const.ANNUAL_FORECAST_SENSOR_NAME
+    _attr_translation_key = "annual_forecast"
     _attr_unique_id = const.ANNUAL_FORECAST_SENSOR
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_icon = "mdi:chart-bar"

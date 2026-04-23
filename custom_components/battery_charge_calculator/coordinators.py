@@ -80,7 +80,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         self.battery_capacity_kwh = const.DEFAULT_BATTERY_CAPACITY_KWH
 
         super().__init__(
-            hass, _LOGGER, name=const.DOMAIN, update_interval=timedelta(minutes=1)
+            hass,
+            _LOGGER,
+            name=const.DOMAIN,
+            update_interval=timedelta(minutes=1),
+            config_entry=entry,
         )
 
         self._timer_unsub = None
@@ -107,6 +111,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     "ML enabled but ML_SERVICE_URL or ML_SERVICE_API_KEY is not set — "
                     "ML power estimation disabled until the service is configured."
                 )
+
+        # Tariff Comparison Coordinator (lazy — created in async_setup_entry if enabled)
+        self.tariff_coordinator = None
 
     def _build_ml_service_config(self, entry, hass=None) -> dict:
         """Build the config dict sent to POST /configure on the ML service."""
@@ -513,3 +520,22 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             slot_start = slot_start.replace(tzinfo=timezone.utc)
         slot_start = slot_start.astimezone(self.tz)
         return slot_start <= now and (slot_start + timedelta(minutes=30)) >= now
+
+
+async def async_setup_tariff_coordinator(hass, entry) -> None:
+    """Create and register TariffComparisonCoordinator if tariff comparison is enabled.
+
+    Called from ``__init__.async_setup_entry`` after the main coordinator is ready.
+    Stores the coordinator under ``hass.data[DOMAIN][entry_id + "_tariff"]`` so that
+    ``sensor.py:async_setup_entry`` can retrieve it when registering the sensor.
+    """
+    from . import const  # avoid circular at module level
+
+    if not entry.options.get(const.TARIFF_COMPARISON_ENABLED, False):
+        return
+
+    from .tariff_comparison import TariffComparisonCoordinator
+
+    coordinator = TariffComparisonCoordinator(hass, entry)
+    hass.data[const.DOMAIN][entry.entry_id + "_tariff"] = coordinator
+    await coordinator.async_config_entry_first_refresh()

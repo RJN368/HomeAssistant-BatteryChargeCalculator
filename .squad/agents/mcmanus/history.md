@@ -55,3 +55,21 @@ Added 20 unit tests across two new files:
 - `TestReturnsBoolSeries::test_returns_bool_series` — return type and index validated
 
 Key implementation note: cold-start Case C requires ≥ 400 background slots so the flat block value (3.0 kWh) represents < 2% of total, pushing p98 below _COLD_START_FLOOR_KWH (2.5 kWh) so that 3.0 > 2.5 = True. With < 400 slots the flat block value equals p98 and is never a candidate.
+
+---
+
+### 2026-04-16 — Monthly Tariff Comparison test suite
+
+**Files created:**
+- `tests/unit/test_tariff_comparison_calculator.py` — 15 tests covering `calculate_tariff_cost`: basic import-only cost, import+export net, 12-month aggregation shape/totals, standing charges (included/excluded/mid-year weighted), forward-fill (rate not zero), coverage_pct pre-fill measurement, DST calendar-day safety, export-only timestamp union, and monetary rounding.
+- `tests/unit/test_tariff_comparison_client.py` — 11 tests covering `TariffComparisonClient` (fetch_consumption pagination, export-MPAN guard, fetch_unit_rates seed prepend, sorted results) and `_build_historical_rate_map` (fixed 1-day, full 17 520-slot year, Agile bands, forward-fill not zero, UTC-aware keys) and `fetch_standing_charges` (parsed datetimes, UTC-aware).
+- `tests/unit/test_tariff_comparison_cache.py` — 10 tests covering `TariffComparisonCache`: is_fresh (fresh/stale/wrong-year/missing/boundary), save+load round-trip, missing file returns None, corrupt JSON returns None, no .tmp left after atomic write, overwrite updates content.
+- `tests/unit/test_open_meteo_client.py` — 8 tests covering `OpenMeteoHistoricalClient`: 3-day response, 24 floats per key, value correctness, HTTP 500/404 raises, keys are `datetime.date` not strings, full date coverage, single-day, lat/lon passed to API.
+
+**Key patterns from Hockney's critical notes encoded as tests:**
+1. `test_missing_slot_uses_previous_rate_not_zero` — forward-fill must produce previous rate (not 0).
+2. `test_coverage_pct_measured_before_forward_fill` — coverage_pct < 100 when gaps exist.
+3. `test_january_uses_calendar_days_not_slot_count_divided_by_48` — standing charge days are calendar days.
+4. `test_pure_export_only_slot_is_counted` — export-only timestamps included in union loop.
+
+**Modules tested do not exist yet** — these are TDD tests written ahead of implementation by Dallas/Fenster.

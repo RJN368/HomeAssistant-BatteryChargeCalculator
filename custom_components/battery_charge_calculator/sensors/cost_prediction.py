@@ -9,7 +9,6 @@ from typing import Any
 from homeassistant.components.sensor import RestoreSensor, SensorDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
 from .. import const
 
 
@@ -18,6 +17,7 @@ class CostPredictionSensor(CoordinatorEntity, RestoreSensor):
 
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_should_poll = False
+    _attr_translation_key = "cost_prediction"
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the sensor."""

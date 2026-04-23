@@ -1,3 +1,4 @@
+TITLE = "Battery Charge Calculator"
 import voluptuous as vol
 
 cv_float = vol.All(vol.Coerce(float))
@@ -25,7 +26,6 @@ HEATING_FLOW_TEMP = "heating_flow_temp"
 HEATING_KNOWN_POINTS = "heating_known_points"
 
 # Valid heating types: 'none', 'interpolation', 'electric'
-# ('heatpump' kept as internal constant for backwards compat — COP > 1 achieves the same effect)
 HEATING_TYPE_NONE = "none"
 HEATING_TYPE_INTERPOLATION = "interpolation"
 HEATING_TYPE_ELECTRIC = "electric"
@@ -35,7 +35,6 @@ HEATING_TYPES = [
     HEATING_TYPE_INTERPOLATION,
     HEATING_TYPE_ELECTRIC,
 ]
-
 DEFAULT_HEATING_TYPE = HEATING_TYPE_INTERPOLATION
 DEFAULT_HEATING_COP = 1.0
 DEFAULT_HEATING_INDOOR_TEMP = 20.0
@@ -76,8 +75,6 @@ BUILDING_WALL_TYPES = [
     "cavity_insulated",
     "modern_insulated",
 ]
-BUILDING_GLAZING_TYPES = ["single", "double", "triple"]
-BUILDING_AGE_BANDS = ["pre_1930", "1930_1975", "1975_2000", "post_2000"]
 
 DEFAULT_BUILDING_FLOOR_AREA = 100.0
 DEFAULT_BUILDING_AGE = "1930_1975"
@@ -85,9 +82,7 @@ DEFAULT_BUILDING_WALL_TYPE = "cavity_uninsulated"
 DEFAULT_BUILDING_GLAZING = "double"
 
 VERSION = "3.3.7"
-
 DOMAIN = "battery_charge_calculator"
-TITLE = "Battery Charge Calculator"
 BATTERY_SCHEDULE_DATA_ID = "battery_schedule"
 BATTERY_PROJECTION_SENSOR = "battery_charge_calculator.battery_projection_sensor"
 BATTERY_PROJECTION_SENSOR_NAME = "Battery Charge Projection"
@@ -113,7 +108,6 @@ STATE_COMPLETED = "completed"
 ATTR_START = "start"
 ATTR_STOP = "stop"
 ATTR_TIMESLOTS = "timeslots"
-ATTR_ENABLED = "enabled"
 
 # ─────────────────────────── ML Power Estimation ─────────────────────────────
 # Feature introduced 2026-04-10. All keys default to safe values so existing
@@ -175,3 +169,39 @@ DAILY_POWER_FORECAST_SENSOR = "battery_charge_calculator.daily_power_forecast"
 DAILY_POWER_FORECAST_SENSOR_NAME = "Daily Power Forecast"
 ML_POWER_SURFACE_SENSOR = "battery_charge_calculator.ml_power_surface"
 ML_POWER_SURFACE_SENSOR_NAME = "ML Power Surface"
+
+# ─────────────────────────── Tariff Comparison ───────────────────────────────
+# Feature introduced 2026-04-16.  All keys default to safe values so existing
+# config entries without tariff comparison settings continue to work unchanged.
+
+# Master switch — defaults to False so the feature is never activated unexpectedly
+TARIFF_COMPARISON_ENABLED = "tariff_comparison_enabled"
+
+# Tariff list — stored as a JSON string (list of tariff objects per §4.2)
+TARIFF_COMPARISON_TARIFFS = "tariff_comparison_tariffs"
+
+# Update / cache age thresholds (integer days)
+TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS = "tariff_comparison_update_interval_days"
+TARIFF_COMPARISON_CACHE_MAX_AGE_DAYS = "tariff_comparison_cache_max_age_days"
+
+# Whether to include export earnings in the comparison (False until OQ-1 resolved)
+TARIFF_COMPARISON_INCLUDE_EXPORT = "tariff_comparison_include_export"
+
+# Defaults
+DEFAULT_TARIFF_COMPARISON_UPDATE_INTERVAL_DAYS = 7
+DEFAULT_TARIFF_COMPARISON_CACHE_MAX_AGE_DAYS = 7
+DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT = False
+
+# Sensor identifiers
+TARIFF_COMPARISON_SENSOR = "battery_charge_calculator.tariff_comparison"
+TARIFF_COMPARISON_SENSOR_NAME = "Monthly Tariff Comparison"
+
+# Export meter serial — new field; added alongside OCTOPUS_METER_SERIAL (D-18)
+OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
+
+# Solar production entity — optional entity_id of a cumulative kWh sensor
+# (e.g. sensor.solar_energy_production).  When set, historical solar data is
+# fetched from HA's long-term statistics and used in tariff comparison simulations
+# so the GeneticEvaluator accounts for solar generation on each simulated day.
+SOLAR_ENERGY_ENTITY = "solar_energy_entity"
+DEFAULT_SOLAR_ENERGY_ENTITY = ""

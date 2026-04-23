@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo
 import logging
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfEnergy
@@ -26,7 +27,7 @@ class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
         """Initialize the future price sensor."""
         super().__init__(coordinator)
         self.hass = hass
-        self._attr_name = const.BATTERY_PROJECTION_SENSOR_NAME
+        self._attr_translation_key = "battery_projection"
         self._attr_unique_id = const.BATTERY_PROJECTION_SENSOR
 
     @property

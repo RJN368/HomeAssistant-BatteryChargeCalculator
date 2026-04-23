@@ -54,7 +54,7 @@ class EstimatedPowerDemandSensor(CoordinatorEntity, SensorEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_name = const.EST_POWER_DEMAND_SENSOR_NAME
+    _attr_translation_key = "est_power_demand"
     _attr_unique_id = const.EST_POWER_DEMAND_SENSOR
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
