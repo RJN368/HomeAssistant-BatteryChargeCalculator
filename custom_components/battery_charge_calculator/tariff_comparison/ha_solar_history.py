@@ -20,12 +20,33 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _row_field(row: Any, key: str) -> Any:
+    """Return a field from a statistics row (dict or object-style)."""
+    if isinstance(row, dict):
+        return row.get(key)
+    return getattr(row, key, None)
+
+
+def _row_start_to_utc_datetime(value: Any) -> datetime | None:
+    """Normalize StatisticsRow['start'] into a timezone-aware UTC datetime."""
+    if isinstance(value, datetime):
+        dt = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    if isinstance(value, (float, int)):
+        return datetime.fromtimestamp(float(value), tz=timezone.utc)
+
+    return None
 
 
 async def fetch_solar_history(
@@ -50,9 +71,6 @@ async def fetch_solar_history(
     """
     try:
         from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.statistics import (
-            statistics_during_period,
-        )
     except ImportError:
         _LOGGER.warning("HA recorder component not available — solar history disabled")
         return {}
@@ -87,21 +105,24 @@ async def fetch_solar_history(
 
     # Convert cumulative sum → per-hour kWh by differencing consecutive rows.
     # Rows are ordered ascending by start time.
-    # StatisticsRow attributes: start (datetime), sum (float | None)
+    # StatisticsRow may be dict-like (HA TypedDict) or object-like in tests.
     hourly_kwh: dict[datetime, float] = {}
     prev_sum: float | None = None
 
     for row in rows:
-        current_sum = row.sum
+        raw_sum = _row_field(row, "sum")
+        current_sum = float(raw_sum) if raw_sum is not None else None
         if current_sum is None:
             prev_sum = None
             continue
         if prev_sum is not None:
             delta = max(0.0, current_sum - prev_sum)  # clamp to 0 (never negative)
-            # row.start is the start of this hour slot
-            hour_start = row.start.astimezone(timezone.utc).replace(
-                second=0, microsecond=0, minute=0
-            )
+            # row start can be datetime or unix timestamp depending on HA internals
+            row_start = _row_start_to_utc_datetime(_row_field(row, "start"))
+            if row_start is None:
+                prev_sum = current_sum
+                continue
+            hour_start = row_start.replace(second=0, microsecond=0, minute=0)
             hourly_kwh[hour_start] = delta
         prev_sum = current_sum
 

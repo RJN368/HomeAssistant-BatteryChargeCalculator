@@ -98,6 +98,7 @@ def _build_historical_rate_map(
     # Normalise to 30-min boundary
     if slot.minute not in (0, 30):
         slot = slot.replace(minute=0 if slot.minute < 30 else 30)
+    window_start = slot
 
     rate_map: dict[datetime, float] = {}
     current_rate: float | None = None
@@ -128,7 +129,7 @@ def _build_historical_rate_map(
     gap_count = 0
 
     all_slots = sorted(rate_map.keys())
-    expected = period_from
+    expected = window_start
     filled: dict[datetime, float] = {}
 
     for s in all_slots:
@@ -152,6 +153,11 @@ def _build_historical_rate_map(
             gap_start = None
             gap_count = 0
         expected = s + timedelta(minutes=30)
+
+    # Fill any trailing slots after the final explicit rate.
+    while expected < period_to and last_known is not None:
+        filled[expected] = last_known
+        expected = expected + timedelta(minutes=30)
 
     return filled
 
@@ -267,6 +273,29 @@ class TariffComparisonClient:
         except Exception as exc:  # noqa: BLE001
             _LOGGER.debug("Pre-window seed fetch failed for %s: %s", tariff_code, exc)
             seed_raw = []
+
+        # Some fixed tariffs return no in-window rows and no pre-window seed
+        # when the comparison window predates the tariff start. Fall back to
+        # the latest known unit rate and treat it as constant for the window.
+        if not raw and not seed_raw:
+            latest_params = {
+                "page_size": 1,
+            }
+            try:
+                latest_raw = await _paginate(session, url, latest_params)
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.debug(
+                    "Latest-rate fallback fetch failed for %s: %s", tariff_code, exc
+                )
+                latest_raw = []
+
+            if latest_raw:
+                seed_raw = latest_raw
+                _LOGGER.info(
+                    "No historical unit rates in window for %s; using latest known rate "
+                    "as fixed-rate fallback",
+                    tariff_code,
+                )
 
         # Prepend seed with valid_from = period_from so the rate-scan in
         # _build_historical_rate_map has a starting value for period_from.

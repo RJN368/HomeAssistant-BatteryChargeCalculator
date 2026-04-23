@@ -219,6 +219,30 @@ class TestFetchUnitRates:
         valid_froms = [r["valid_from"] for r in rates]
         assert valid_froms == sorted(valid_froms)
 
+    async def test_fetch_unit_rates_fallbacks_to_latest_when_window_has_no_rows(self):
+        """When period/seed fetches are empty, latest rate fallback should still return one row."""
+        TARIFF = "E-1R-OE-FIX-12M-26-04-21-B"
+        main_response = {"results": [], "next": None}
+        seed_response = {"results": [], "next": None}
+        latest_response = {
+            "results": [
+                {
+                    "valid_from": "2026-04-21T00:00:00Z",
+                    "valid_to": None,
+                    "value_inc_vat": 24.7,
+                }
+            ],
+            "next": None,
+        }
+        session = _mock_session_get([main_response, seed_response, latest_response])
+        client = _make_client()
+
+        rates = await client.fetch_unit_rates(session, TARIFF, PERIOD_FROM, PERIOD_TO)
+
+        assert session.get.call_count >= 3
+        assert len(rates) == 1
+        assert rates[0]["value_inc_vat"] == pytest.approx(24.7)
+
 
 # ---------------------------------------------------------------------------
 # Tests: _build_historical_rate_map
@@ -338,6 +362,23 @@ class TestBuildHistoricalRateMap:
             assert key.tzinfo is not None, f"Key {key!r} is not timezone-aware"
             # Confirm UTC (utcoffset == 0)
             assert key.utcoffset().total_seconds() == 0, f"Key {key!r} is not UTC"
+
+    def test_seed_only_row_fills_entire_window(self):
+        """A seed-only row (valid for first slot) must forward-fill to period end."""
+        period_from = datetime(2025, 6, 1, 0, 0, tzinfo=UTC)
+        period_to = datetime(2025, 6, 2, 0, 0, tzinfo=UTC)
+        raw_rates = [
+            {
+                "valid_from": period_from,
+                "valid_to": period_from + timedelta(minutes=30),
+                "value_inc_vat": 28.5,
+            }
+        ]
+
+        rate_map = _build_historical_rate_map(raw_rates, period_from, period_to)
+
+        assert len(rate_map) == 48
+        assert all(v == pytest.approx(28.5) for v in rate_map.values())
 
 
 # ---------------------------------------------------------------------------

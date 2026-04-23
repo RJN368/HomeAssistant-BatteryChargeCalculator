@@ -189,6 +189,37 @@ class TestFetchNormalData:
             assert len(day_slots) == 48
 
     @pytest.mark.asyncio
+    async def test_dict_style_statistics_rows_are_supported(self):
+        """HA returns dict-style StatisticsRow; fetch_solar_history must parse it."""
+        from custom_components.battery_charge_calculator.tariff_comparison.ha_solar_history import (
+            fetch_solar_history,
+        )
+
+        rows = [
+            {
+                "start": datetime(2026, 2, 28, 23, 0, tzinfo=UTC),
+                "sum": 100.0,
+            },
+            {
+                "start": datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
+                "sum": 101.0,
+            },
+        ]
+        hass, recorder_instance, _ = _make_hass()
+        with _patch_recorder(recorder_instance, {ENTITY_ID: rows}):
+            result = await fetch_solar_history(
+                hass,
+                ENTITY_ID,
+                datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
+                datetime(2026, 3, 2, 0, 0, tzinfo=UTC),
+            )
+
+        assert date(2026, 3, 1) in result
+        # 1.0 kWh for the first hour -> split into 0.5 + 0.5
+        assert result[date(2026, 3, 1)][0] == pytest.approx(0.5)
+        assert result[date(2026, 3, 1)][1] == pytest.approx(0.5)
+
+    @pytest.mark.asyncio
     async def test_hourly_split_into_two_30min_halves(self):
         """Each hourly kWh must appear in two equal 30-min half-slots."""
         from custom_components.battery_charge_calculator.tariff_comparison.ha_solar_history import (
