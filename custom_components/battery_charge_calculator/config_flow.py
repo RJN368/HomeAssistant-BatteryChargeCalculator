@@ -384,7 +384,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 octopus_meter_serial=self._heating_data.get(
                     const.OCTOPUS_METER_SERIAL, const.DEFAULT_OCTOPUS_METER_SERIAL
                 ),
-                lookback_days=self._heating_data.get(
+                training_lookback_days=self._heating_data.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
                 ),

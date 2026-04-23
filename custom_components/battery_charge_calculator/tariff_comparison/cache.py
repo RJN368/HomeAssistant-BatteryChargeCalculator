@@ -84,7 +84,7 @@ def is_cache_fresh(cache: dict[str, Any], max_age_days: int) -> bool:
             generated_at = generated_at.replace(tzinfo=timezone.utc)
         age = datetime.now(timezone.utc) - generated_at
         return age.days < max_age_days
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return False
 
 

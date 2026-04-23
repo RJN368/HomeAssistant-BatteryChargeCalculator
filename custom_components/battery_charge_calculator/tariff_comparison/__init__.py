@@ -1138,7 +1138,7 @@ def _build_power_calculator(opts: dict) -> PowerCalulator:
     if known_points_raw and isinstance(known_points_raw, str):
         try:
             known_points = json.loads(known_points_raw)
-        except json.JSONDecodeError, ValueError:
+        except (json.JSONDecodeError, ValueError):
             known_points = None
 
     return PowerCalulator(
