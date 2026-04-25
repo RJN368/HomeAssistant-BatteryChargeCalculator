@@ -15,24 +15,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .. import const
 
 
-# Translation keys for recalculation reasons
-REASON_TRANSLATION_KEYS = {
-    const.REPLAN_REASON_INITIAL_SETUP: "last_recalculation.reason.initial_setup",
-    const.REPLAN_REASON_NO_PLAN: "last_recalculation.reason.no_plan",
-    const.REPLAN_REASON_PLAN_EXPIRING: "last_recalculation.reason.plan_expiring",
-    const.REPLAN_REASON_BATTERY_DEVIATION: "last_recalculation.reason.battery_deviation",
-    const.REPLAN_REASON_NO_ACTIVE_SLOT: "last_recalculation.reason.no_active_slot",
-    const.REPLAN_REASON_MANUAL: "last_recalculation.reason.manual",
-}
-
-
 class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
     """Diagnostic sensor reporting when and why charge slots were last recalculated.
 
     State: ISO8601 timestamp of the last recalculation (or None if not yet run).
     Attributes:
         reason        — machine-readable reason key (e.g. "battery_deviation")
-        reason_label  — human-readable description of the reason
+        reason_label  — translation-aware reason value for frontend display
     """
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
@@ -51,11 +40,9 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         """Sync state and attributes from the coordinator."""
         self._attr_native_value = getattr(self.coordinator, "recalculation_time", None)
         reason = getattr(self.coordinator, "recalculation_reason", None)
-        # Set reason_label to the translation key string for frontend translation
-        reason_label = REASON_TRANSLATION_KEYS.get(reason, reason)
         self._attr_extra_state_attributes = {
             "reason": reason,
-            "reason_label": reason_label,
+            "reason_label": reason,
         }
 
     @callback

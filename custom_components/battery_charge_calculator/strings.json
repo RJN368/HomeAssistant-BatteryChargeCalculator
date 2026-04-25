@@ -343,73 +343,79 @@
     },
     "entity": {
         "sensor": {
-        "battery_soc": {
-            "name": "Battery SOC",
-            "state": {
-                "unit_of_measurement": "kWh"
+            "battery_soc": {
+                "name": "Battery SOC",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "battery_projection": {
+                "name": "Battery Charge Projection",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "battery_charge_slots": {
+                "name": "Battery Charge Slots"
+            },
+            "est_power_demand": {
+                "name": "Estimated Power Demand",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "cost_prediction": {
+                "name": "Cost Prediction",
+                "state": {
+                    "unit_of_measurement": "GBP"
+                }
+            },
+            "annual_forecast": {
+                "name": "Annual Energy Forecast",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "daily_power_forecast": {
+                "name": "Daily Power Forecast",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "ml_model_status": {
+                "name": "ML Power Model Status"
+            },
+            "ml_power_surface": {
+                "name": "ML Power Surface",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "last_recalculation": {
+                "name": "Charge Slots Last Recalculated",
+                "state_attributes": {
+                    "reason": {
+                        "name": "Reason"
+                    },
+                    "reason_label": {
+                        "name": "Reason",
+                        "state": {
+                            "initial_setup": "Initial setup",
+                            "no_plan": "No existing plan",
+                            "plan_expiring": "Plan expiring soon",
+                            "battery_deviation": "Battery level deviation",
+                            "no_active_slot": "No active slot found",
+                            "manual": "Manual trigger"
+                        }
+                    }
+                }
+            },
+            "tariff_comparison": {
+                "name": "Monthly Tariff Comparison",
+                "state": {
+                    "unit_of_measurement": "GBP"
+                }
             }
-        },
-        "battery_projection": {
-            "name": "Battery Charge Projection",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "battery_charge_slots": {
-            "name": "Battery Charge Slots"
-        },
-        "est_power_demand": {
-            "name": "Estimated Power Demand",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "cost_prediction": {
-            "name": "Cost Prediction",
-            "state": {
-                "unit_of_measurement": "GBP"
-            }
-        },
-        "annual_forecast": {
-            "name": "Annual Energy Forecast",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "daily_power_forecast": {
-            "name": "Daily Power Forecast",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "ml_model_status": {
-            "name": "ML Power Model Status"
-        },
-        "ml_power_surface": {
-            "name": "ML Power Surface",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "last_recalculation": {
-            "name": "Charge Slots Last Recalculated"
-        },
-        "tariff_comparison": {
-            "name": "Monthly Tariff Comparison",
-            "state": {
-                "unit_of_measurement": "GBP"
-            }
-        }
-        }
-    },
-    "last_recalculation": {
-        "reason": {
-            "initial_setup": "Initial setup",
-            "no_plan": "No existing plan",
-            "plan_expiring": "Plan expiring soon",
-            "battery_deviation": "Battery level deviation",
-            "no_active_slot": "No active slot found",
-            "manual": "Manual trigger"
         }
     },
     "selector": {

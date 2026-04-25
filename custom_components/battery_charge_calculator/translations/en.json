@@ -392,7 +392,23 @@
             }
         },
         "last_recalculation": {
-            "name": "Charge Slots Last Recalculated"
+            "name": "Charge Slots Last Recalculated",
+            "state_attributes": {
+                "reason": {
+                    "name": "Reason"
+                },
+                "reason_label": {
+                    "name": "Reason",
+                    "state": {
+                        "initial_setup": "Initial setup",
+                        "no_plan": "No existing plan",
+                        "plan_expiring": "Plan expiring soon",
+                        "battery_deviation": "Battery level deviation",
+                        "no_active_slot": "No active slot found",
+                        "manual": "Manual trigger"
+                    }
+                }
+            }
         },
         "tariff_comparison": {
             "name": "Monthly Tariff Comparison",
@@ -400,16 +416,6 @@
                 "unit_of_measurement": "GBP"
             }
         }
-        }
-    },
-    "last_recalculation": {
-        "reason": {
-            "initial_setup": "Initial setup",
-            "no_plan": "No existing plan",
-            "plan_expiring": "Plan expiring soon",
-            "battery_deviation": "Battery level deviation",
-            "no_active_slot": "No active slot found",
-            "manual": "Manual trigger"
         }
     },
     "selector": {
