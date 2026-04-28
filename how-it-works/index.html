@@ -14,7 +14,7 @@
         <link rel="prev" href="../sensors/">
       
       
-        <link rel="next" href="../machine-learning/">
+        <link rel="next" href="../tariff-comparison-guide/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -404,6 +404,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Solar gain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ml-and-solar-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML and Solar Data
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -411,46 +426,30 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#3-run-the-genetic-algorithm" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Run the genetic algorithm
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-send-the-schedule-to-givenergy-via-mqtt" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. Send the schedule to GivEnergy via MQTT
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-schedule-refresh" class="md-nav__link">
-    <span class="md-ellipsis">
-      5. Schedule refresh
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-ml-model-refresh-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. ML model refresh (optional)
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tariff-comparison-guide/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -585,46 +584,25 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Solar gain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ml-and-solar-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      ML and Solar Data
+    </span>
+  </a>
+  
 </li>
         
       </ul>
     </nav>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#3-run-the-genetic-algorithm" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Run the genetic algorithm
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-send-the-schedule-to-givenergy-via-mqtt" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. Send the schedule to GivEnergy via MQTT
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-schedule-refresh" class="md-nav__link">
-    <span class="md-ellipsis">
-      5. Schedule refresh
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-ml-model-refresh-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. ML model refresh (optional)
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -659,9 +637,55 @@
 <h3 id="base-load">Base load<a class="headerlink" href="#base-load" title="Permanent link">#</a></h3>
 <p>Your home's baseline electricity consumption (appliances, lighting, hot water, etc.) is added as a constant or time-varying load on top of the heating load.</p>
 <h3 id="solar-gain">Solar gain<a class="headerlink" href="#solar-gain" title="Permanent link">#</a></h3>
-<p>If you have solar panels, the expected solar generation for the day is subtracted from the demand. Solar gain is estimated from the weather forecast (irradiance/cloud cover).</p>
+<p>If you have solar panels, the expected solar generation for the day is subtracted from the demand. Solar gain can be estimated in two ways:</p>
+<ul>
+<li><strong>Forecast-based</strong>: Uses weather forecast (irradiance/cloud cover) to estimate solar generation.</li>
+<li><strong>Historical-based</strong>: If enabled, the integration fetches your actual historical solar production from Home Assistant’s long-term statistics database. This real data is used to improve the accuracy of the demand forecast, replacing or blending the forecasted solar gain with measured values from previous days with similar conditions. This helps account for local factors (e.g., shading, panel orientation) that weather forecasts alone cannot capture.<ul>
+<li>The integration queries Home Assistant’s statistics for your solar energy sensor, splits hourly values into half-hour slots, and fills any missing data with zero (safe fallback).</li>
+<li>If no historical data is available, the system falls back to forecast-based solar gain.</li>
+</ul>
+</li>
+</ul>
+<h4 id="ml-and-solar-data">ML and Solar Data<a class="headerlink" href="#ml-and-solar-data" title="Permanent link">#</a></h4>
+<p>If the <strong>ML service</strong> is enabled and a trained model is available, the model can use both weather forecasts and historical solar data to produce a blended prediction for net demand. See <a href="../machine-learning/">Machine Learning</a> for details.</p>
 <p>The result is a net demand profile — a half-hourly forecast of how much energy your home will need from the battery or grid at each point in the day.</p>
-<p>If the <strong>ML service</strong> is enabled and a trained model is available, the physics-based demand forecast is replaced by the ML model's blended prediction. See <a href="../machine-learning/">Machine Learning</a> for details.</p>
+<h1 id="system-architecture">System Architecture<a class="headerlink" href="#system-architecture" title="Permanent link">#</a></h1>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    HA[Home Assistant Core]
+    BCC[Battery Charge Calculator (Custom Component)]
+    ML[ML Service (optional)]
+    GivTCP[GivTCP (MQTT broker)]
+    Octopus[Octopus API]
+    Meteo[Open-Meteo API]
+    Stats[HA Statistics (Solar History)]
+
+    HA --&gt;|sensors, statistics| BCC
+    BCC --&gt;|fetch rates| Octopus
+    BCC --&gt;|fetch weather| Meteo
+    BCC --&gt;|fetch solar history| Stats
+    BCC --&gt;|optional: demand prediction| ML
+    BCC --&gt;|publish schedule| GivTCP
+    GivTCP --&gt;|controls| HA
+</code></pre></div>
+<h1 id="solar-data-fetch-simulation-sequence">Solar Data Fetch &amp; Simulation Sequence<a class="headerlink" href="#solar-data-fetch-simulation-sequence" title="Permanent link">#</a></h1>
+<div class="highlight"><pre><span></span><code>sequenceDiagram
+    participant User
+    participant HA as Home Assistant
+    participant BCC as Battery Charge Calculator
+    participant Stats as HA Statistics
+    participant ML as ML Service
+    participant GivTCP
+
+    User-&gt;&gt;HA: Triggers simulation
+    HA-&gt;&gt;BCC: Calls simulation service
+    BCC-&gt;&gt;Stats: Fetch solar history
+    alt ML enabled
+        BCC-&gt;&gt;ML: Send demand/solar data for prediction
+        ML--&gt;&gt;BCC: Return blended prediction
+    end
+    BCC-&gt;&gt;BCC: Run demand/simulation logic
+    BCC-&gt;&gt;GivTCP: Publish schedule (or expose as sensor)
+</code></pre></div>
 <hr />
 <h2 id="3-run-the-genetic-algorithm">3. Run the genetic algorithm<a class="headerlink" href="#3-run-the-genetic-algorithm" title="Permanent link">#</a></h2>
 <p>A <strong>genetic algorithm</strong> searches for the optimal battery schedule. It evolves a population of candidate schedules over multiple generations, selecting and combining the best-performing ones.</p>

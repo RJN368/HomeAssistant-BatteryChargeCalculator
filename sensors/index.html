@@ -341,6 +341,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#battery-charge-projection" class="md-nav__link">
     <span class="md-ellipsis">
       Battery Charge Projection
@@ -468,6 +477,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../tariff-comparison-guide/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../machine-learning/" class="md-nav__link">
         
   
@@ -546,6 +575,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#battery-charge-projection" class="md-nav__link">
@@ -660,6 +698,75 @@
 
 <h1 id="sensors">Sensors<a class="headerlink" href="#sensors" title="Permanent link">#</a></h1>
 <p>The integration creates the following sensors in Home Assistant:</p>
+<hr />
+<h2 id="monthly-tariff-comparison">Monthly Tariff Comparison<a class="headerlink" href="#monthly-tariff-comparison" title="Permanent link">#</a></h2>
+<p><strong>Entity:</strong> <code>sensor.monthly_tariff_comparison</code></p>
+<p><strong>Only created when tariff comparison is enabled in the integration settings.</strong></p>
+<p>Shows what your electricity would have cost over the last 12 months under each configured Octopus tariff, using your real half-hourly smart meter reads.</p>
+<p><strong>State:</strong> Net annual cost (£) for the first tariff in your selection (your baseline).</p>
+<p><strong>Attributes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tariffs</code></td>
+<td>List of per-tariff result objects (see below)</td>
+</tr>
+<tr>
+<td><code>data_year</code></td>
+<td>The 12-month period this comparison covers</td>
+</tr>
+<tr>
+<td><code>last_updated</code></td>
+<td>ISO-8601 UTC timestamp of the last successful calculation</td>
+</tr>
+</tbody>
+</table>
+<p>Each entry in <code>tariffs</code> contains:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>label</code></td>
+<td>Human-readable tariff name</td>
+</tr>
+<tr>
+<td><code>import_tariff_code</code></td>
+<td>Octopus tariff code (e.g. <code>E-1R-AGILE-FLEX-22-11-25-B</code>)</td>
+</tr>
+<tr>
+<td><code>comparison_method</code></td>
+<td><code>real_meter_reads</code>, <code>naive_replay</code>, <code>simulation_in_progress</code>, or <code>simulation</code></td>
+</tr>
+<tr>
+<td><code>simulation_progress_pct</code></td>
+<td>0–100; how far through the background simulation</td>
+</tr>
+<tr>
+<td><code>data_quality_notes</code></td>
+<td>Rate map coverage percentage and any data gaps</td>
+</tr>
+<tr>
+<td><code>annual</code></td>
+<td>Dict with <code>import_cost_gbp</code>, <code>export_earnings_gbp</code>, <code>standing_charges_gbp</code>, <code>net_cost_gbp</code></td>
+</tr>
+<tr>
+<td><code>monthly</code></td>
+<td>List of 12 dicts — one per month — with the same cost fields plus <code>month</code> (YYYY-MM)</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../tariff-comparison-guide/">Monthly Tariff Comparison</a> for full setup and dashboard examples.</p>
 <hr />
 <h2 id="battery-charge-projection">Battery Charge Projection<a class="headerlink" href="#battery-charge-projection" title="Permanent link">#</a></h2>
 <p><strong>Entity:</strong> <code>sensor.battery_charge_projection</code></p>

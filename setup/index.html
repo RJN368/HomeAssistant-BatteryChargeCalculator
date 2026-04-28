@@ -396,6 +396,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison (optional)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ml-service-setup-optional" class="md-nav__link">
     <span class="md-ellipsis">
       ML Service setup (optional)
@@ -537,6 +546,26 @@
   
   <span class="md-ellipsis">
     How It Works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tariff-comparison-guide/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
   </span>
   
 
@@ -703,6 +732,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison (optional)
+    </span>
+  </a>
   
 </li>
       
@@ -896,6 +934,16 @@
 <li>Log in to <a href="https://octopus.energy">octopus.energy</a></li>
 <li>Go to <strong>Account → API Access</strong> to find your API key and account number</li>
 </ol>
+<hr />
+<h2 id="monthly-tariff-comparison-optional">Monthly Tariff Comparison (optional)<a class="headerlink" href="#monthly-tariff-comparison-optional" title="Permanent link">#</a></h2>
+<p>The Monthly Tariff Comparison feature shows you what your electricity would have cost over the last 12 months under different Octopus tariffs, using your real smart meter data.</p>
+<p>To enable it, go to <strong>Settings → Devices &amp; Services → Battery Charge Calculator → Configure</strong> and proceed to the <strong>Monthly Tariff Comparison</strong> step:</p>
+<ol>
+<li>Toggle <strong>Enable Monthly Tariff Comparison</strong> on</li>
+<li>On the next screen, a list of available Octopus tariffs is fetched automatically — your current tariff is pre-selected</li>
+<li>Tick the tariffs you want to compare and click <strong>Submit</strong></li>
+</ol>
+<p>A new sensor <code>sensor.monthly_tariff_comparison</code> will be created. See <a href="../tariff-comparison-guide/">Monthly Tariff Comparison</a> for dashboard setup and a full explanation of the results.</p>
 <hr />
 <h2 id="ml-service-setup-optional">ML Service setup (optional)<a class="headerlink" href="#ml-service-setup-optional" title="Permanent link">#</a></h2>
 <p>The ML service is a standalone Docker container that learns your home's real consumption patterns and improves power demand forecasts over time. It is entirely optional — the integration works fully without it.</p>

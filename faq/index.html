@@ -333,6 +333,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../tariff-comparison-guide/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../machine-learning/" class="md-nav__link">
         
   
@@ -570,6 +590,75 @@
   <a href="#how-do-i-update-the-ml-service" class="md-nav__link">
     <span class="md-ellipsis">
       How do I update the ML service?
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monthly Tariff Comparison">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-does-the-tariff-comparison-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      How does the tariff comparison work?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-does-it-say-naive_replay-instead-of-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does it say "naive_replay" instead of "simulation"?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tariff-list-shows-tariffs-from-the-wrong-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      The tariff list shows tariffs from the wrong region
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-often-does-the-comparison-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      How often does the comparison update?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-monthly-tariff-comparison-sensor-shows-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Monthly Tariff Comparison sensor shows unavailable
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-does-the-comparison-only-cover-import-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does the comparison only cover import tariffs?
     </span>
   </a>
   
@@ -870,6 +959,75 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#monthly-tariff-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monthly Tariff Comparison
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monthly Tariff Comparison">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-does-the-tariff-comparison-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      How does the tariff comparison work?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-does-it-say-naive_replay-instead-of-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does it say "naive_replay" instead of "simulation"?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tariff-list-shows-tariffs-from-the-wrong-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      The tariff list shows tariffs from the wrong region
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-often-does-the-comparison-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      How often does the comparison update?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-monthly-tariff-comparison-sensor-shows-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Monthly Tariff Comparison sensor shows unavailable
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-does-the-comparison-only-cover-import-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does the comparison only cover import tariffs?
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#credentials-and-security" class="md-nav__link">
     <span class="md-ellipsis">
       Credentials and security
@@ -1031,6 +1189,25 @@ docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> 
 docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>development/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--force-recreate<span class="w"> </span>bcc-ml-service
 </code></pre></div>
 <p>The trained model and credentials in <code>./config/bcc-ml-data/</code> are preserved.</p>
+<hr />
+<h2 id="monthly-tariff-comparison">Monthly Tariff Comparison<a class="headerlink" href="#monthly-tariff-comparison" title="Permanent link">#</a></h2>
+<h3 id="how-does-the-tariff-comparison-work">How does the tariff comparison work?<a class="headerlink" href="#how-does-the-tariff-comparison-work" title="Permanent link">#</a></h3>
+<p>It fetches your actual half-hourly import and export meter reads from the Octopus Energy API for the last 12 months, then calculates what those reads would have cost under each tariff's historical unit rates and standing charges. The result is a monthly breakdown per tariff.</p>
+<h3 id="why-does-it-say-naive_replay-instead-of-simulation">Why does it say "naive_replay" instead of "simulation"?<a class="headerlink" href="#why-does-it-say-naive_replay-instead-of-simulation" title="Permanent link">#</a></h3>
+<p>The comparison runs in two phases. <strong>Naive replay</strong> (available within minutes of enabling the feature) simply reprices your real meter reads at alternative tariff rates. It's accurate for fixed and TOU tariffs but slightly overestimates savings on cheap overnight tariffs, because your actual consumption patterns were shaped by your current tariff's pricing — not optimised for the alternative.</p>
+<p><strong>Simulation</strong> (runs in the background overnight) re-runs the genetic algorithm day-by-day as if you had always been on each alternative tariff, giving a more honest comparison. The <code>comparison_method</code> attribute on each tariff entry tells you which method was used.</p>
+<h3 id="the-tariff-list-shows-tariffs-from-the-wrong-region">The tariff list shows tariffs from the wrong region<a class="headerlink" href="#the-tariff-list-shows-tariffs-from-the-wrong-region" title="Permanent link">#</a></h3>
+<p>The region is detected from your current import tariff code's last letter (e.g. <code>B</code> for East Midlands). If this is wrong, check your tariff code in <strong>Settings → Devices &amp; Services → Battery Charge Calculator → Configure → Monthly Tariff Comparison</strong>.</p>
+<h3 id="how-often-does-the-comparison-update">How often does the comparison update?<a class="headerlink" href="#how-often-does-the-comparison-update" title="Permanent link">#</a></h3>
+<p>Once a week by default. You can force an immediate refresh via <strong>Developer Tools → Services → <code>battery_charge_calculator.refresh_tariff_comparison</code></strong>.</p>
+<h3 id="the-monthly-tariff-comparison-sensor-shows-unavailable">The Monthly Tariff Comparison sensor shows <code>unavailable</code><a class="headerlink" href="#the-monthly-tariff-comparison-sensor-shows-unavailable" title="Permanent link">#</a></h3>
+<ol>
+<li>Confirm the feature is enabled in the integration settings</li>
+<li>Check that your Octopus API key has access to your account's consumption data — test it at <code>https://api.octopus.energy/v1/accounts/{your-account}/</code></li>
+<li>Check the Home Assistant logs for errors from <code>battery_charge_calculator.tariff_comparison</code></li>
+</ol>
+<h3 id="why-does-the-comparison-only-cover-import-tariffs">Why does the comparison only cover import tariffs?<a class="headerlink" href="#why-does-the-comparison-only-cover-import-tariffs" title="Permanent link">#</a></h3>
+<p>By default only import tariffs are compared. Export comparison requires your export MPAN and serial number, which are optional fields in the integration settings (ML settings step). Once configured, export earnings are included in the net cost calculation.</p>
 <hr />
 <h2 id="credentials-and-security">Credentials and security<a class="headerlink" href="#credentials-and-security" title="Permanent link">#</a></h2>
 <h3 id="where-are-my-api-keys-stored">Where are my API keys stored?<a class="headerlink" href="#where-are-my-api-keys-stored" title="Permanent link">#</a></h3>

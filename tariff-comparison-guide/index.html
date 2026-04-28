@@ -1,0 +1,1040 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/tariff-comparison-guide/">
+      
+      
+        <link rel="prev" href="../how-it-works/">
+      
+      
+        <link rel="next" href="../machine-learning/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Monthly Tariff Comparison - Home Assistant Battery Charge Calculator</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#monthly-tariff-comparison" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-header__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Home Assistant Battery Charge Calculator
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Monthly Tariff Comparison
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="light-blue" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Home Assistant Battery Charge Calculator" class="md-nav__button md-logo" aria-label="Home Assistant Battery Charge Calculator" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Home Assistant Battery Charge Calculator
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RJN368/HomeAssistant-BatteryChargeCalculator" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sensors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How It Works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Monthly Tariff Comparison
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      What it does
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting it up
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting it up">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-open-the-integration-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1 — Open the integration settings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-enable-the-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2 — Enable the feature
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-pick-your-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3 — Pick your tariffs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-export-meter-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4 — Export meter (optional)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-sensor" class="md-nav__link">
+    <span class="md-ellipsis">
+      The sensor
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboard-chart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dashboard chart
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refreshing-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      Refreshing manually
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes-and-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes and limitations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#export-earnings-show-as-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      Export earnings show as £0
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulation-shows-rates-as-0p-for-the-first-half-of-the-month" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simulation shows rates as 0p for the first half of the month
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-stopped-updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      Results stopped updating
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../machine-learning/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Machine Learning
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power_calculator-enhancement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Power Calculator
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      What it does
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setting it up
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting it up">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-open-the-integration-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 1 — Open the integration settings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-enable-the-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 2 — Enable the feature
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-pick-your-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 3 — Pick your tariffs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-export-meter-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step 4 — Export meter (optional)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-sensor" class="md-nav__link">
+    <span class="md-ellipsis">
+      The sensor
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboard-chart" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dashboard chart
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refreshing-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      Refreshing manually
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes-and-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes and limitations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#export-earnings-show-as-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      Export earnings show as £0
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulation-shows-rates-as-0p-for-the-first-half-of-the-month" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simulation shows rates as 0p for the first half of the month
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-stopped-updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      Results stopped updating
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="monthly-tariff-comparison">Monthly Tariff Comparison<a class="headerlink" href="#monthly-tariff-comparison" title="Permanent link">#</a></h1>
+<p>The <strong>Monthly Tariff Comparison</strong> feature shows you what your electricity would have cost over the last 12 months under different Octopus Energy tariffs — using your real half-hourly smart meter data.</p>
+<p>It answers the question: <em>"Would I have saved money on Octopus Agile vs. my current tariff?"</em></p>
+<hr />
+<h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">#</a></h2>
+<ul>
+<li>Fetches your actual import and export readings from the Octopus Energy API (previous complete calendar month of half-hourly meter data)</li>
+<li>Reprices those readings against the historical unit rates of each tariff you choose to compare</li>
+<li>Produces a monthly breakdown — import cost, export earnings, standing charges, and net cost — for each tariff</li>
+<li>Exposes everything as a Home Assistant sensor so you can build a dashboard chart</li>
+</ul>
+<p><strong>Two calculation methods run in sequence:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>When available</th>
+<th>Accuracy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Naive replay</strong></td>
+<td>Immediately (minutes)</td>
+<td>Good for fixed/TOU tariffs. Slightly overestimates savings on cheap overnight tariffs because your real consumption was shaped by your current tariff's prices</td>
+</tr>
+<tr>
+<td><strong>Simulation</strong></td>
+<td>Background (hours, runs overnight)</td>
+<td>More accurate — uses the genetic algorithm to re-optimise your battery schedule day-by-day under each alternative tariff</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>comparison_method</code> attribute on each tariff entry tells you which method produced that result.</p>
+<hr />
+<h2 id="setting-it-up">Setting it up<a class="headerlink" href="#setting-it-up" title="Permanent link">#</a></h2>
+<h3 id="step-1-open-the-integration-settings">Step 1 — Open the integration settings<a class="headerlink" href="#step-1-open-the-integration-settings" title="Permanent link">#</a></h3>
+<p>Go to <strong>Settings → Devices &amp; Services</strong>, find <strong>Battery Charge Calculator</strong>, and click <strong>Configure</strong>.</p>
+<p>Navigate to the <strong>Monthly Tariff Comparison</strong> step (it appears after the ML settings step).</p>
+<h3 id="step-2-enable-the-feature">Step 2 — Enable the feature<a class="headerlink" href="#step-2-enable-the-feature" title="Permanent link">#</a></h3>
+<p>Toggle <strong>Enable Monthly Tariff Comparison</strong> on.</p>
+<h3 id="step-3-pick-your-tariffs">Step 3 — Pick your tariffs<a class="headerlink" href="#step-3-pick-your-tariffs" title="Permanent link">#</a></h3>
+<p>A list of available Octopus import tariffs is fetched from the Octopus API automatically. Your current tariff is pre-selected.</p>
+<p>Tick the tariffs you want to compare. You can select up to 6. Good candidates:</p>
+<ul>
+<li>Your current tariff (always include this — it's your baseline)</li>
+<li><strong>Agile Octopus</strong> — variable half-hourly rates, often cheapest for battery owners</li>
+<li><strong>Octopus Go</strong> / <strong>Intelligent Octopus Go</strong> — cheap overnight window</li>
+<li><strong>Octopus Flux</strong> — import cheap at night, export at a premium during the day</li>
+</ul>
+<p>Click <strong>Submit</strong> to save.</p>
+<div class="admonition tip">
+<p class="admonition-title">Region</p>
+<p>The tariff list is filtered to your meter's regional suffix (e.g. East Midlands = B). The region is detected automatically from your live tariff code.</p>
+</div>
+<h3 id="step-4-export-meter-optional">Step 4 — Export meter (optional)<a class="headerlink" href="#step-4-export-meter-optional" title="Permanent link">#</a></h3>
+<p>If you export electricity (e.g. solar + battery), enter your <strong>Export MPAN</strong> and <strong>export meter serial number</strong> on the next screen. These are used to fetch your actual export readings and the export tariff code from the Octopus API, so export earnings appear in the comparison.</p>
+<p>Leave blank to compare import costs only.</p>
+<div class="admonition tip">
+<p class="admonition-title">Where to find your export MPAN</p>
+<p>Your export MPAN is the 13-digit number on your electricity bill or in your Octopus account under "Export meter". It is different from your import MPAN.</p>
+</div>
+<hr />
+<h2 id="the-sensor">The sensor<a class="headerlink" href="#the-sensor" title="Permanent link">#</a></h2>
+<p><strong>Entity:</strong> <code>sensor.monthly_tariff_comparison</code></p>
+<p><strong>State:</strong> Net annual cost (£) for the first tariff in your selection (your baseline).</p>
+<p><strong>Attributes:</strong> Full monthly breakdown for every selected tariff. Example structure:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">tariffs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">label</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Agile</span><span class="nv"> </span><span class="s">Octopus&quot;</span>
+<span class="w">    </span><span class="nt">import_tariff_code</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;E-1R-AGILE-FLEX-22-11-25-B&quot;</span>
+<span class="w">    </span><span class="nt">comparison_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;naive_replay&quot;</span><span class="w">    </span><span class="c1"># or &quot;simulation&quot;, &quot;simulation_in_progress&quot;</span>
+<span class="w">    </span><span class="nt">simulation_progress_pct</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">          </span><span class="c1"># 0–100, updates as simulation runs</span>
+<span class="w">    </span><span class="nt">data_quality_notes</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Coverage:</span><span class="nv"> </span><span class="s">98.5%&quot;</span>
+<span class="w">    </span><span class="nt">annual</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">import_cost_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">842.30</span>
+<span class="w">      </span><span class="nt">export_earnings_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">124.10</span>
+<span class="w">      </span><span class="nt">standing_charges_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">95.45</span>
+<span class="w">      </span><span class="nt">net_cost_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">813.65</span>
+<span class="w">    </span><span class="nt">monthly</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">month</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2025-04&quot;</span>
+<span class="w">        </span><span class="nt">import_cost_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">68.20</span>
+<span class="w">        </span><span class="nt">export_earnings_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.80</span>
+<span class="w">        </span><span class="nt">standing_charge_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7.95</span>
+<span class="w">        </span><span class="nt">net_cost_gbp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">66.35</span>
+<span class="w">      </span><span class="c1"># ... 11 more months</span>
+</code></pre></div>
+<p>The <code>comparison_method</code> field progresses as background simulation completes:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>real_meter_reads</code></td>
+<td>Current tariff — costs from actual reads</td>
+</tr>
+<tr>
+<td><code>naive_replay</code></td>
+<td>Reads repriced against alternative tariff's historical rates</td>
+</tr>
+<tr>
+<td><code>simulation_in_progress</code></td>
+<td>Background simulation running; naive result shown for now</td>
+</tr>
+<tr>
+<td><code>simulation</code></td>
+<td>Full optimised simulation complete</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="dashboard-chart">Dashboard chart<a class="headerlink" href="#dashboard-chart" title="Permanent link">#</a></h2>
+<p>Install the <a href="https://github.com/RomRider/apexcharts-card">ApexCharts card</a> from HACS, then add this to your dashboard:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom:apexcharts-card</span>
+<span class="nt">header</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Monthly Tariff Comparison</span>
+<span class="w">  </span><span class="nt">show</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">graph_span</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12month</span>
+<span class="nt">series_in_graph</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">all_series_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="nt">series</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">entity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sensor.monthly_tariff_comparison</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Net monthly cost</span>
+<span class="w">    </span><span class="nt">data_generator</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">return entity.attributes.tariffs.flatMap(t =&gt;</span>
+<span class="w">        </span><span class="no">t.monthly.map(m =&gt; ({</span>
+<span class="w">          </span><span class="no">name: t.label,</span>
+<span class="w">          </span><span class="no">data: [[m.month + &#39;-01&#39;, m.net_cost_gbp]]</span>
+<span class="w">        </span><span class="no">}))</span>
+<span class="w">      </span><span class="no">);</span>
+</code></pre></div>
+<p>For a grouped bar chart comparing all tariffs side-by-side:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom:apexcharts-card</span>
+<span class="nt">header</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;What</span><span class="nv"> </span><span class="s">would</span><span class="nv"> </span><span class="s">I</span><span class="nv"> </span><span class="s">have</span><span class="nv"> </span><span class="s">paid?</span><span class="nv"> </span><span class="s">(last</span><span class="nv"> </span><span class="s">12</span><span class="nv"> </span><span class="s">months)&quot;</span>
+<span class="w">  </span><span class="nt">show</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">apex_config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">chart</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="w">  </span><span class="nt">plotOptions</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">bar</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">columnWidth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">70%</span>
+<span class="w">      </span><span class="nt">grouped</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">data_generator</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">  </span><span class="no">const tariffs = entity.attributes.tariffs || [];</span>
+<span class="w">  </span><span class="no">return tariffs.map(t =&gt; ({</span>
+<span class="w">    </span><span class="no">name: t.label,</span>
+<span class="w">    </span><span class="no">data: (t.monthly || []).map(m =&gt; [new Date(m.month + &#39;-01&#39;).getTime(), m.net_cost_gbp])</span>
+<span class="w">  </span><span class="no">}));</span>
+<span class="nt">series</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">entity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sensor.monthly_tariff_comparison</span>
+<span class="w">    </span><span class="nt">data_generator</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;return</span><span class="nv"> </span><span class="s">[];&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="refreshing-manually">Refreshing manually<a class="headerlink" href="#refreshing-manually" title="Permanent link">#</a></h2>
+<p>To force an immediate recalculation (e.g. after adding a new tariff):</p>
+<p><strong>Developer Tools → Services → <code>battery_charge_calculator.refresh_tariff_comparison</code></strong></p>
+<p>Or in a YAML automation/script:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">battery_charge_calculator.refresh_tariff_comparison</span>
+</code></pre></div>
+<p>The comparison normally updates automatically once a week.</p>
+<hr />
+<h2 id="notes-and-limitations">Notes and limitations<a class="headerlink" href="#notes-and-limitations" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>UK only</strong> — requires an Octopus Energy account with smart meter half-hourly reads available via the Octopus API</li>
+<li><strong>1-month rolling window</strong> — the comparison covers the previous complete calendar month (e.g. on 17 April 2026 it covers 1 March – 1 April 2026). This ensures all data is settled before calculations run</li>
+<li><strong>Import only by default</strong> — export comparison requires your export MPAN and serial number (see Step 4 above)</li>
+<li><strong>Standing charges</strong> — included in the net cost calculation. The standing charge for each tariff is fetched from the Octopus API</li>
+<li><strong>Simulation accuracy</strong> — the background simulation re-optimises your battery schedule day-by-day using historical temperatures (Open-Meteo) and the genetic algorithm. Solar is set to zero (no historical solar data available). For solar-heavy homes, naive replay may be more representative in summer months</li>
+<li><strong>Data coverage</strong> — the <code>data_quality_notes</code> attribute reports what percentage of slots had a direct rate lookup vs. forward-fill. Coverage below 90% may indicate a gap in the Octopus rate history for that tariff</li>
+</ul>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
+<h3 id="export-earnings-show-as-0">Export earnings show as £0<a class="headerlink" href="#export-earnings-show-as-0" title="Permanent link">#</a></h3>
+<ol>
+<li>Check that your export MPAN and meter serial are configured (Settings → Integrations → Battery Charge Calculator → Configure → Export Meter step)</li>
+<li>Confirm your Octopus account has an active export agreement for that MPAN</li>
+<li>After adding the export meter, force a refresh: <strong>Developer Tools → Services → <code>battery_charge_calculator.refresh_tariff_comparison</code></strong></li>
+</ol>
+<h3 id="simulation-shows-rates-as-0p-for-the-first-half-of-the-month">Simulation shows rates as 0p for the first half of the month<a class="headerlink" href="#simulation-shows-rates-as-0p-for-the-first-half-of-the-month" title="Permanent link">#</a></h3>
+<p>This can happen if the integration previously cached rates starting from today-minus-one-month instead of the calendar-month start. The integration now detects this automatically and re-fetches. If you see this on an existing install, trigger a manual refresh (above) to force a full re-fetch.</p>
+<h3 id="results-stopped-updating">Results stopped updating<a class="headerlink" href="#results-stopped-updating" title="Permanent link">#</a></h3>
+<p>The comparison re-calculates every 7 days by default (configurable). Force an immediate update with:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">battery_charge_calculator.refresh_tariff_comparison</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+  <aside class="md-source-file">
+    
+    
+    
+      
+  
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Contributors">
+      
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4"/></svg>
+      
+    </span>
+    <nav>
+      robert.nash
+    </nav>
+  </span>
+
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.top", "search.suggest", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>
