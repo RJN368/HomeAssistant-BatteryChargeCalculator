@@ -32,7 +32,7 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
     State: ISO8601 timestamp of the last recalculation (or None if not yet run).
     Attributes:
         reason        — machine-readable reason key (e.g. "battery_deviation")
-        reason_label  — human-readable description of the reason
+        reason_label  — translation-aware reason value for frontend display
     """
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
@@ -55,7 +55,7 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         reason_label = REASON_TRANSLATION_KEYS.get(reason, reason)
         self._attr_extra_state_attributes = {
             "reason": reason,
-            "reason_label": reason_label,
+            "reason_label": reason,
         }
 
     @callback
