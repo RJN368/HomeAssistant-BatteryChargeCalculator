@@ -360,11 +360,16 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     hourly_forecast,
                     tempdata,
                     "temperature",
-                    lambda f: (
-                        datetime.strptime(f["datetime"], "%Y-%m-%dT%H:%M:%S%z")
-                        .astimezone(self.tz)
-                        .strftime("%d:%H")
-                        == current_time.astimezone(self.tz).strftime("%d:%H")
+                    lambda f: self._time_in_slot(
+                        self._parse_iso_datetime(
+                            f["datetime"], context="temperature_forecast.start"
+                        ),
+                        self._parse_iso_datetime(
+                            f["datetime"], context="temperature_forecast.start"
+                        )
+                        + timedelta(hours=1),
+                        current_time,
+                        context="temperature_forecast",
                     ),
                 )
 
@@ -372,9 +377,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     all_octopus_export_rates,
                     export_ratedata,
                     "value_inc_vat",
-                    lambda f: (
-                        f["start"].astimezone(self.tz).strftime("%d:%H:%M")
-                        == current_time.astimezone(self.tz).strftime("%d:%H:%M")
+                    lambda f: self._time_in_slot(
+                        f["start"], f["end"], current_time, context="export_rate"
                     ),
                 )
 
@@ -382,9 +386,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     all_octopus_rates,
                     ratedata,
                     "value_inc_vat",
-                    lambda f: (
-                        f["start"].astimezone(self.tz).strftime("%d:%H:%M")
-                        == current_time.astimezone(self.tz).strftime("%d:%H:%M")
+                    lambda f: self._time_in_slot(
+                        f["start"], f["end"], current_time, context="import_rate"
                     ),
                 )
 
@@ -392,9 +395,11 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     solarcast["data"],
                     solardata,
                     "pv_estimate10",
-                    lambda entry: (
-                        entry["period_start"].strftime("%d:%H")
-                        == current_time.strftime("%d:%H")
+                    lambda entry: self._time_in_slot(
+                        entry["period_start"],
+                        entry["period_start"] + timedelta(minutes=30),
+                        current_time,
+                        context="solar_forecast",
                     ),
                 )
 
@@ -480,6 +485,25 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         naive = dt.replace(tzinfo=None)
         rounded = naive + (datetime.min - naive) % delta
         return rounded.replace(tzinfo=tz)
+
+    def _as_aware_utc(self, dt_value, *, context: str):
+        if dt_value.tzinfo is None:
+            _LOGGER.warning(
+                "Naive datetime in %s; assuming UTC to avoid local-time DST ambiguity.",
+                context,
+            )
+            dt_value = dt_value.replace(tzinfo=timezone.utc)
+        return dt_value.astimezone(timezone.utc)
+
+    def _parse_iso_datetime(self, iso_value: str, *, context: str):
+        dt_value = datetime.fromisoformat(iso_value)
+        return self._as_aware_utc(dt_value, context=context)
+
+    def _time_in_slot(self, slot_start, slot_end, current_time, *, context: str):
+        current_utc = self._as_aware_utc(current_time, context=f"{context}.current")
+        slot_start_utc = self._as_aware_utc(slot_start, context=f"{context}.start")
+        slot_end_utc = self._as_aware_utc(slot_end, context=f"{context}.end")
+        return slot_start_utc <= current_utc < slot_end_utc
 
     def current_active_slot(self):
         if not self.timeslots or not isinstance(self.timeslots, list):

@@ -96,6 +96,114 @@ class TestCeilDt:
         assert result == datetime(2026, 4, 4, 6, 30, 0)
 
 
+class TestTimeInSlot:
+    def test_dst_fall_back_repeated_local_hour_uses_absolute_instant(self):
+        coord = _make_coordinator()
+
+        # First local 01:30 (BST) is 00:30 UTC; second local 01:30 (GMT) is 01:30 UTC.
+        first_slot_start = datetime(2026, 10, 25, 0, 30, tzinfo=timezone.utc)
+        first_slot_end = datetime(2026, 10, 25, 1, 0, tzinfo=timezone.utc)
+        second_slot_start = datetime(2026, 10, 25, 1, 30, tzinfo=timezone.utc)
+        second_slot_end = datetime(2026, 10, 25, 2, 0, tzinfo=timezone.utc)
+        repeated_local_second_instance = datetime(
+            2026, 10, 25, 1, 30, tzinfo=timezone.utc
+        )
+
+        assert (
+            coord._time_in_slot(
+                first_slot_start,
+                first_slot_end,
+                repeated_local_second_instance,
+                context="test",
+            )
+            is False
+        )
+        assert (
+            coord._time_in_slot(
+                second_slot_start,
+                second_slot_end,
+                repeated_local_second_instance,
+                context="test",
+            )
+            is True
+        )
+
+    def test_time_in_slot_accepts_naive_datetimes_as_utc(self, caplog):
+        import logging as stdlib_logging
+
+        coord = _make_coordinator()
+        with caplog.at_level(stdlib_logging.WARNING):
+            assert (
+                coord._time_in_slot(
+                    datetime(2026, 4, 4, 12, 0, 0),
+                    datetime(2026, 4, 4, 12, 30, 0),
+                    datetime(2026, 4, 4, 12, 15, 0),
+                    context="test_naive",
+                )
+                is True
+            )
+
+        assert any("Naive datetime" in r.message for r in caplog.records)
+
+
+class TestTemporalWindowMatching:
+    def test_temperature_hour_window_handles_repeated_local_hour(self):
+        coord = _make_coordinator()
+
+        first_local_hour = coord._parse_iso_datetime(
+            "2026-10-25T01:00:00+01:00", context="test_temp.first"
+        )
+        second_local_hour = coord._parse_iso_datetime(
+            "2026-10-25T01:00:00+00:00", context="test_temp.second"
+        )
+        current_time = datetime(2026, 10, 25, 1, 30, tzinfo=timezone.utc)
+
+        assert (
+            coord._time_in_slot(
+                first_local_hour,
+                first_local_hour + timedelta(hours=1),
+                current_time,
+                context="test_temp",
+            )
+            is False
+        )
+        assert (
+            coord._time_in_slot(
+                second_local_hour,
+                second_local_hour + timedelta(hours=1),
+                current_time,
+                context="test_temp",
+            )
+            is True
+        )
+
+    def test_solar_slot_window_handles_repeated_local_half_hour(self):
+        coord = _make_coordinator()
+
+        first_local_slot = datetime(2026, 10, 25, 0, 30, tzinfo=timezone.utc)
+        second_local_slot = datetime(2026, 10, 25, 1, 30, tzinfo=timezone.utc)
+        current_time = datetime(2026, 10, 25, 1, 45, tzinfo=timezone.utc)
+
+        assert (
+            coord._time_in_slot(
+                first_local_slot,
+                first_local_slot + timedelta(minutes=30),
+                current_time,
+                context="test_solar",
+            )
+            is False
+        )
+        assert (
+            coord._time_in_slot(
+                second_local_slot,
+                second_local_slot + timedelta(minutes=30),
+                current_time,
+                context="test_solar",
+            )
+            is True
+        )
+
+
 # ---------------------------------------------------------------------------
 # current_active_slot
 # ---------------------------------------------------------------------------
