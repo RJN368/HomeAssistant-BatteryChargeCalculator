@@ -11,7 +11,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from unittest.mock import MagicMock
 
 # conftest installs HA stubs before any integration import
 from custom_components.battery_charge_calculator.tariff_comparison import (
@@ -348,3 +347,102 @@ class TestPeriodToBoundary:
             "April slot at period_to boundary should be filtered out; "
             "if April appears, standing charges for the full month are wrongly added"
         )
+
+
+# ---------------------------------------------------------------------------
+# Tests: tariff period coverage metadata
+# ---------------------------------------------------------------------------
+
+
+class TestTariffPeriodCoverageMetadata:
+    def test_full_month_tag_and_days_when_rate_map_covers_period(self):
+        period_from, period_to = _make_period()
+        t = period_from
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": True}
+        ]
+        import_slots = [_slot(t, 0.5)]
+        tariff_rates = {"IMPORT-A": _build_rate_dict(t, None, 25.0)}
+
+        result = _calculate_all(
+            None,
+            tariff_configs,
+            import_slots,
+            None,
+            tariff_rates,
+            period_from,
+            period_to,
+            export_meter_missing=True,
+        )
+
+        entry = result["tariffs"][0]
+        assert entry["period_days_total"] == 1
+        assert entry["period_days_covered"] == 1
+        assert entry["period_coverage_tag"] == "full-month"
+
+    def test_no_data_tag_and_zero_days_when_no_rate_map(self):
+        period_from, period_to = _make_period()
+        t = period_from
+        tariff_configs = [
+            {"import_tariff_code": "IMPORT-A", "name": "A", "is_current": False}
+        ]
+        import_slots = [_slot(t, 0.5)]
+        # Empty unit_rates -> no rate map
+        tariff_rates = {"IMPORT-A": {"unit_rates": [], "standing_charges": []}}
+
+        result = _calculate_all(
+            None,
+            tariff_configs,
+            import_slots,
+            None,
+            tariff_rates,
+            period_from,
+            period_to,
+            export_meter_missing=True,
+        )
+
+        entry = result["tariffs"][0]
+        assert entry["period_days_total"] == 1
+        assert entry["period_days_covered"] == 0
+        assert entry["period_coverage_tag"] == "no-data"
+        assert entry["monthly"] == []
+
+
+class TestTopLevelTariffCoverageSummary:
+    def test_coverage_summary_and_counts_include_all_categories(self):
+        period_from, period_to = _make_period()
+        t = period_from
+
+        tariff_configs = [
+            {"import_tariff_code": "FULL", "name": "Full", "is_current": True},
+            {
+                "import_tariff_code": "NODATA",
+                "name": "NoData",
+                "is_current": False,
+            },
+        ]
+
+        import_slots = [_slot(t, 0.5)]
+        tariff_rates = {
+            "FULL": _build_rate_dict(t, None, 25.0),
+            "NODATA": {"unit_rates": [], "standing_charges": []},
+        }
+
+        result = _calculate_all(
+            None,
+            tariff_configs,
+            import_slots,
+            None,
+            tariff_rates,
+            period_from,
+            period_to,
+            export_meter_missing=True,
+        )
+
+        assert result["tariff_coverage_summary"] == "1/2 full-month, 0 partial-month, 1 no-data"
+        assert result["tariff_coverage_counts"] == {
+            "full_month": 1,
+            "partial_month": 0,
+            "no_data": 1,
+            "total": 2,
+        }

@@ -7,6 +7,7 @@ the class can be safely called from hass.async_add_executor_job().
 
 from __future__ import annotations
 
+from bisect import bisect_right
 import logging
 from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
@@ -62,6 +63,33 @@ class TariffSimulator:
         Summing costs directly avoids division-by-zero when rates are 0 p/kWh
         and is more numerically stable than back-calculating kWh.
         """
+
+        def _lookup_rate(
+            slot_dt: datetime,
+            rates: dict[datetime, float],
+            sorted_keys: list[datetime],
+            last_rate: float,
+        ) -> float:
+            """Return the rate for *slot_dt* with a safe nearest-known fallback.
+
+            Normal path is an exact key lookup. If missing (e.g. sparse or
+            slightly misaligned cached keys), use the most recent earlier key,
+            then the first available key. This prevents silent 0p slots.
+            """
+            exact = rates.get(slot_dt)
+            if exact is not None:
+                return float(exact)
+
+            if last_rate > 0.0:
+                return float(last_rate)
+
+            if sorted_keys:
+                idx = bisect_right(sorted_keys, slot_dt) - 1
+                if idx >= 0:
+                    return float(rates.get(sorted_keys[idx], 0.0))
+                return float(rates.get(sorted_keys[0], 0.0))
+
+            return 0.0
 
         # Normalize solar_data_30min: None and all-zeros are treated identically
         if solar_data_30min is None:
@@ -125,6 +153,11 @@ class TariffSimulator:
                 nonzero_export,
             )
 
+        import_keys_sorted = sorted(rate_map_import.keys())
+        export_keys_sorted = sorted(rate_map_export.keys()) if rate_map_export else []
+        last_import_rate = 0.0
+        last_export_rate = 0.0
+
         for slot_idx in range(48):
             hour = slot_idx // 2
             minute = 30 if slot_idx % 2 else 0
@@ -140,8 +173,22 @@ class TariffSimulator:
             demand_kwh = power_calculator.from_temp_and_time(
                 current_time=slot_dt, tempdata=temp
             )
-            import_rate = rate_map_import.get(slot_dt, 0.0)
-            export_rate = rate_map_export.get(slot_dt, 0.0) if rate_map_export else 0.0
+            import_rate = _lookup_rate(
+                slot_dt,
+                rate_map_import,
+                import_keys_sorted,
+                last_import_rate,
+            )
+            last_import_rate = import_rate
+            export_rate = 0.0
+            if rate_map_export:
+                export_rate = _lookup_rate(
+                    slot_dt,
+                    rate_map_export,
+                    export_keys_sorted,
+                    last_export_rate,
+                )
+                last_export_rate = export_rate
             solar_kwh = (
                 float(solar_data_30min[slot_idx])
                 if solar_data_30min and slot_idx < len(solar_data_30min)
