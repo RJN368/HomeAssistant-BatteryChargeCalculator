@@ -1,6 +1,7 @@
 """Sensor sub-package for Battery Charge Calculator."""
 
 from .annual_forecast import AnnualForecastSensor
+from .axel_remote_control import AxelRemoteControlSensor
 from .battery_projection import BatteryProjectionSensor
 from .battery_soc import BatterySocSensor
 from .cost_prediction import CostPredictionSensor
@@ -14,6 +15,7 @@ from .time_slot import TimeSlotSensor
 
 __all__ = [
     "AnnualForecastSensor",
+    "AxelRemoteControlSensor",
     "BatteryProjectionSensor",
     "BatterySocSensor",
     "CostPredictionSensor",

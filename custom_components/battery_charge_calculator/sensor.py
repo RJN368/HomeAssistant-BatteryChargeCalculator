@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from . import const
 from .sensors import (
     AnnualForecastSensor,
+    AxelRemoteControlSensor,
     BatteryProjectionSensor,
     BatterySocSensor,
     CostPredictionSensor,
@@ -42,6 +43,9 @@ async def async_setup_entry(
         entities.append(MLModelStatusSensor(hass, coordinator))
         entities.append(AnnualForecastSensor(hass, coordinator))
         entities.append(MLPowerSurfaceSensor(hass, coordinator))
+
+    if config_entry.options.get(const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED):
+        entities.append(AxelRemoteControlSensor(hass, coordinator))
 
     if config_entry.options.get(const.TARIFF_COMPARISON_ENABLED, False):
         tc_coordinator = hass.data[const.DOMAIN].get(config_entry.entry_id + "_tariff")

@@ -98,3 +98,26 @@
 - `should_retrain(model, current_rmse_7day)`: returns True if model is None, age > 35 days, or 7-day RMSE > 1.5× training RMSE (D-9). RMSE trigger skipped when `current_rmse_7day is None` (startup path).
 - `_RETRAIN_RMSE_TRIGGER` imported from `model_trainer` to avoid duplication.
 - No homeassistant imports; pure Python + joblib.
+
+### 2026-05-27 — Axel VPP spec implementation-readiness review
+
+**Lead clarifications applied to `_docs/axel-vpp-awareness-spec.md`:**
+
+- Confirmed architectural boundary: Axel awareness gates command dispatch in `BatteryChargeCoordinator._async_update_data`; planning (`octopus_state_change_listener`) remains unchanged in MVP.
+- Confirmed tariff comparison isolation: `TariffComparisonCoordinator` must remain unaffected by Axel enablement and fallback behavior.
+- Tightened realistic file touchpoints for this repository layout: `sensor.py` wiring + `sensors/__init__.py` export path + flow insertion after `ml_settings` and before tariff-comparison steps.
+- Formalized overlap semantics as half-open intervals to remove slot-boundary ambiguity.
+- Added explicit acceptance criteria for non-Axel regression safety and `simulate_only` invariants.
+- Added rollout safety controls: opt-in default, reversible via options toggle, and constrained MVP blast radius.
+- Left product decisions open for confirmation: Axel API payload contract, neutralization default, and fail-safe default confirmation.
+
+### 2026-05-28 — Axel VPP implementation plan finalized
+
+**Implementation planning outcomes for `_docs/axel-vpp-awareness-spec.md`:**
+
+- Defined an execution-ready 5-phase delivery plan with explicit dependencies, complexity sizing (S/M/L), and test-first gates.
+- Locked core architectural boundary: MVP touches dispatch gating in `BatteryChargeCoordinator._async_update_data`; planning logic and tariff comparison remain isolated.
+- Added a file-by-file implementation map covering new Axel client/window modules, config flow/schema insertion, diagnostics sensor wiring, and required test modules.
+- Codified contract-preservation checks for `simulate_only`, non-Axel behavior parity, and tariff-comparison isolation.
+- Published risk register with practical mitigations and rollback paths aligned to Home Assistant operational recovery (feature toggle + narrow revert).
+- Recommended multi-PR slicing (4 PRs) to isolate high-risk dispatch behavior from lower-risk config/UI work and simplify rollback/bisect.

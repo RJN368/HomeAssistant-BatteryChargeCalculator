@@ -205,3 +205,47 @@ OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
 # so the GeneticEvaluator accounts for solar generation on each simulated day.
 SOLAR_ENERGY_ENTITY = "solar_energy_entity"
 DEFAULT_SOLAR_ENERGY_ENTITY = ""
+
+# ─────────────────────────── Axel VPP Awareness ─────────────────────────────
+# Phase 1 data-layer contracts. Feature remains opt-in and defaults safe.
+
+AXEL_ENABLED = "axel_enabled"
+AXEL_API_TOKEN = "axel_api_token"
+AXEL_POLL_INTERVAL_SECONDS = "axel_poll_interval_seconds"
+AXEL_REQUEST_TIMEOUT_SECONDS = "axel_request_timeout_seconds"
+AXEL_FAIL_SAFE_MODE = "axel_fail_safe_mode"
+AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY = "axel_neutralize_on_active_entry"
+
+AXEL_FAIL_SAFE_MODE_OPEN = "open"
+AXEL_FAIL_SAFE_MODE_CLOSED = "closed"
+
+DEFAULT_AXEL_ENABLED = False
+DEFAULT_AXEL_API_TOKEN = ""
+DEFAULT_AXEL_POLL_INTERVAL_SECONDS = 1800
+DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_AXEL_FAIL_SAFE_MODE = AXEL_FAIL_SAFE_MODE_OPEN
+DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY = True
+
+AXEL_EVENT_ENDPOINT = "https://api.axle.energy/vpp/home-assistant/event"
+AXEL_EVENT_ACCEPT_HEADER = "application/json"
+AXEL_MAX_RETRIES = 2
+AXEL_RETRY_BASE_DELAY_SECONDS = 0.5
+AXEL_RETRY_JITTER_SECONDS = 0.2
+
+AXEL_SOURCE_STATUS_FRESH = "fresh"
+AXEL_SOURCE_STATUS_STALE = "stale"
+AXEL_SOURCE_STATUS_UNAVAILABLE = "unavailable"
+
+AXEL_SUPPRESSION_REASON_ACTIVE_WINDOW = "axel_active_window"
+AXEL_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED = "axel_source_unavailable_closed"
+
+AXEL_TRANSITION_REASON_ACTIVE_ENTRY = "axel_active_entry"
+AXEL_TRANSITION_REASON_ACTIVE_EXIT = "axel_active_exit"
+
+AXEL_REMOTE_CONTROL_SENSOR = "battery_charge_calculator.axel_remote_control"
+AXEL_REMOTE_CONTROL_SENSOR_NAME = "Axel Remote Control"
+
+AXEL_FRESHNESS_MULTIPLIER = 3
+AXEL_STALE_MAX_AGE_SECONDS = 30 * 60
+
+REPLAN_REASON_AXEL_WINDOW_ENDED = "axel_window_ended"

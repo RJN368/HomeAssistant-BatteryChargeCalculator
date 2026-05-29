@@ -18,6 +18,7 @@ from .config_schemas import (
     _heat_loss_known_schema,
     _building_estimate_schema,
     _ml_settings_schema,
+    _axel_settings_schema,
     _tariff_comparison_enable_schema,
     _tariff_comparison_pick_schema,
     _export_meter_schema,
@@ -168,6 +169,26 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
         self._main_data: dict = {}
         self._heating_data: dict = {}
         self._resolved_current_import_tariff_code: str | None = None
+
+    def _with_axel_defaults(self, values: dict) -> dict:
+        """Return a copy with all Axel options populated to safe defaults."""
+        merged = dict(values)
+        merged.setdefault(const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED)
+        merged.setdefault(const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN)
+        merged.setdefault(
+            const.AXEL_POLL_INTERVAL_SECONDS,
+            const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+        )
+        merged.setdefault(
+            const.AXEL_REQUEST_TIMEOUT_SECONDS,
+            const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+        )
+        merged.setdefault(const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE)
+        merged.setdefault(
+            const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+            const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+        )
+        return merged
 
     async def async_step_user(self, user_input=None):
         """Step 1 – main settings."""
@@ -361,7 +382,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             # Also update self.options to ensure persistence if options flow is used later
             if hasattr(self, "options"):
                 self.options.update(ml_settings)
-            return await self.async_step_tariff_comparison()
+            return await self.async_step_axel_settings()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -387,6 +408,63 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 training_lookback_days=self._heating_data.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            ),
+        )
+
+    async def async_step_axel_settings(self, user_input=None):
+        """Axel VPP awareness settings step."""
+        if user_input is not None:
+            axel_settings = {
+                const.AXEL_ENABLED: user_input.get(
+                    const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED
+                ),
+                const.AXEL_API_TOKEN: user_input.get(
+                    const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN
+                ),
+                const.AXEL_POLL_INTERVAL_SECONDS: user_input.get(
+                    const.AXEL_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+                ),
+                const.AXEL_REQUEST_TIMEOUT_SECONDS: user_input.get(
+                    const.AXEL_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+                ),
+                const.AXEL_FAIL_SAFE_MODE: user_input.get(
+                    const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE
+                ),
+                const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY: user_input.get(
+                    const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                ),
+            }
+            self._heating_data.update(axel_settings)
+            return await self.async_step_tariff_comparison()
+
+        self._heating_data = self._with_axel_defaults(self._heating_data)
+        return self.async_show_form(
+            step_id="axel_settings",
+            data_schema=_axel_settings_schema(
+                axel_enabled=self._heating_data.get(
+                    const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED
+                ),
+                axel_api_token=self._heating_data.get(
+                    const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN
+                ),
+                axel_poll_interval_seconds=self._heating_data.get(
+                    const.AXEL_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+                ),
+                axel_request_timeout_seconds=self._heating_data.get(
+                    const.AXEL_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+                ),
+                axel_fail_safe_mode=self._heating_data.get(
+                    const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE
+                ),
+                axel_neutralize_on_active_entry=self._heating_data.get(
+                    const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
                 ),
             ),
         )
@@ -487,9 +565,6 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             },
         )
 
-        options = {**self._main_data, **self._heating_data}
-        return self.async_create_entry(title=const.TITLE, data={}, options=options)
-
     async def async_step_export_meter(self, user_input=None):
         """Step: configure export meter MPAN and serial for tariff comparison.
 
@@ -524,7 +599,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
 
     def _create_entry(self):
         """Finalise and create the config entry (called from tariff steps)."""
-        options = {**self._main_data, **self._heating_data}
+        options = self._with_axel_defaults({**self._main_data, **self._heating_data})
         return self.async_create_entry(title=const.TITLE, data={}, options=options)
 
     @staticmethod
@@ -550,6 +625,26 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry
         self.options = dict(config_entry.options)
         self._resolved_current_import_tariff_code: str | None = None
+
+    def _with_axel_defaults(self, values: dict) -> dict:
+        """Return a copy with all Axel options populated to safe defaults."""
+        merged = dict(values)
+        merged.setdefault(const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED)
+        merged.setdefault(const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN)
+        merged.setdefault(
+            const.AXEL_POLL_INTERVAL_SECONDS,
+            const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+        )
+        merged.setdefault(
+            const.AXEL_REQUEST_TIMEOUT_SECONDS,
+            const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+        )
+        merged.setdefault(const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE)
+        merged.setdefault(
+            const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+            const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+        )
+        return merged
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -844,7 +939,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             )
-            return await self.async_step_tariff_comparison()
+            return await self.async_step_axel_settings()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -870,6 +965,64 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 training_lookback_days=self.options.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            ),
+        )
+
+    async def async_step_axel_settings(self, user_input=None):
+        """Axel VPP awareness settings step (options flow)."""
+        if user_input is not None:
+            self.options.update(
+                {
+                    const.AXEL_ENABLED: user_input.get(
+                        const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED
+                    ),
+                    const.AXEL_API_TOKEN: user_input.get(
+                        const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN
+                    ),
+                    const.AXEL_POLL_INTERVAL_SECONDS: user_input.get(
+                        const.AXEL_POLL_INTERVAL_SECONDS,
+                        const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+                    ),
+                    const.AXEL_REQUEST_TIMEOUT_SECONDS: user_input.get(
+                        const.AXEL_REQUEST_TIMEOUT_SECONDS,
+                        const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+                    ),
+                    const.AXEL_FAIL_SAFE_MODE: user_input.get(
+                        const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE
+                    ),
+                    const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY: user_input.get(
+                        const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                        const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    ),
+                }
+            )
+            return await self.async_step_tariff_comparison()
+
+        self.options = self._with_axel_defaults(self.options)
+        return self.async_show_form(
+            step_id="axel_settings",
+            data_schema=_axel_settings_schema(
+                axel_enabled=self.options.get(
+                    const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED
+                ),
+                axel_api_token=self.options.get(
+                    const.AXEL_API_TOKEN, const.DEFAULT_AXEL_API_TOKEN
+                ),
+                axel_poll_interval_seconds=self.options.get(
+                    const.AXEL_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+                ),
+                axel_request_timeout_seconds=self.options.get(
+                    const.AXEL_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+                ),
+                axel_fail_safe_mode=self.options.get(
+                    const.AXEL_FAIL_SAFE_MODE, const.DEFAULT_AXEL_FAIL_SAFE_MODE
+                ),
+                axel_neutralize_on_active_entry=self.options.get(
+                    const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
                 ),
             ),
         )
@@ -958,7 +1111,10 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         # and fires the update_listener (which triggers async_reload in __init__.py).
         # Do NOT also call async_update_entry — that fires the listener a second time,
         # causing a double-reload race condition.
-        return self.async_create_entry(title=const.TITLE, data=self.options)
+        return self.async_create_entry(
+            title=const.TITLE,
+            data=self._with_axel_defaults(self.options),
+        )
 
     async def async_step_export_meter(self, user_input=None):
         """Step: configure export meter MPAN and serial (options flow)."""

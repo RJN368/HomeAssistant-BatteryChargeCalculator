@@ -309,10 +309,16 @@ class TestAsyncUpdateData:
         coord.timeslots = [slot]
         coord.tz = timezone.utc
         coord.givenergy.enableCharge = AsyncMock()
+        coord.givenergy.enableExport = AsyncMock()
+        coord.givenergy.disableCharge = AsyncMock()
+        coord.givenergy.disableExport = AsyncMock()
 
         await coord._async_update_data()
 
         coord.givenergy.enableCharge.assert_not_called()
+        coord.givenergy.enableExport.assert_not_called()
+        coord.givenergy.disableCharge.assert_not_called()
+        coord.givenergy.disableExport.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_charge_slot_dispatches_enable_charge(self):
@@ -364,6 +370,32 @@ class TestAsyncUpdateData:
 
         coord.givenergy.disableCharge.assert_called_once_with(coord.hass)
         coord.givenergy.disableExport.assert_called_once_with(coord.hass)
+        coord.givenergy.enableCharge.assert_not_called()
+        coord.givenergy.enableExport.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_has_no_tariff_coordinator_side_effects(self):
+        """Main coordinator refresh must not trigger tariff coordinator updates."""
+        coord = _make_coordinator(simulate=False)
+        now = datetime.now(tz=timezone.utc)
+        slot = _make_timeslot(dt=now - timedelta(minutes=5), charge_option="charge")
+        coord.timeslots = [slot]
+        coord.tz = timezone.utc
+        coord.givenergy.enableCharge = AsyncMock()
+        coord.givenergy.enableExport = AsyncMock()
+        coord.givenergy.disableCharge = AsyncMock()
+        coord.givenergy.disableExport = AsyncMock()
+
+        # Regression guard: _async_update_data dispatches battery commands only.
+        coord.tariff_coordinator = MagicMock()
+        coord.tariff_coordinator.async_refresh = AsyncMock()
+        coord.tariff_coordinator.async_request_refresh = AsyncMock()
+
+        await coord._async_update_data()
+
+        coord.givenergy.enableCharge.assert_called_once_with(coord.hass)
+        coord.tariff_coordinator.async_refresh.assert_not_called()
+        coord.tariff_coordinator.async_request_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_active_slot_sends_no_commands(self):

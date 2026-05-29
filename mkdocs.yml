@@ -7,6 +7,7 @@ nav:
   - Home: index.md
   - Setup: setup.md
   - Sensors: sensors.md
+  - Axel VPP Awareness: axel-vpp-awareness.md
   - How It Works: how-it-works.md
   - Monthly Tariff Comparison: tariff-comparison-guide.md
   - Machine Learning: machine-learning.md

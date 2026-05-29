@@ -12,6 +12,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from . import const, givenergy, power_calculator, genetic_evaluator
+from .axel_client import AxelClient, AxelClientError
+from .axel_windows import AxelWindow, normalize_windows
 from .octopus_agile import OctopusAgileRatesClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -115,6 +117,18 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         # Tariff Comparison Coordinator (lazy — created in async_setup_entry if enabled)
         self.tariff_coordinator = None
 
+        # Axel cache (Phase 1 only): state holders and freshness helpers.
+        self._axel_cache: dict = {
+            "windows": [],
+            "last_success_utc": None,
+            "last_error": None,
+            "source_status": const.AXEL_SOURCE_STATUS_UNAVAILABLE,
+            "is_active": False,
+            "suppression_reason": None,
+            "last_transition_reason": None,
+        }
+        self._axel_last_neutralized_window_key: tuple[datetime, datetime] | None = None
+
     def _build_ml_service_config(self, entry, hass=None) -> dict:
         """Build the config dict sent to POST /configure on the ML service."""
         opts = entry.options
@@ -158,6 +172,10 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 await self.ml_client.async_start()
             except Exception as exc:
                 _LOGGER.warning("ML service unreachable at startup: %s", exc)
+
+        if self._axel_is_enabled():
+            await self._axel_refresh_source_state(now_utc=datetime.now(timezone.utc))
+
         await self.octopus_state_change_listener(
             None, reason=const.REPLAN_REASON_INITIAL_SETUP
         )
@@ -516,12 +534,243 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         return None
 
+    def _axel_cache_age_seconds(self, now_utc: datetime | None = None) -> float | None:
+        """Return Axel cache age in seconds, or None when never fetched."""
+        last_success = self._axel_cache.get("last_success_utc")
+        if last_success is None:
+            return None
+
+        now_value = now_utc or datetime.now(timezone.utc)
+        if now_value.tzinfo is None:
+            now_value = now_value.replace(tzinfo=timezone.utc)
+
+        if last_success.tzinfo is None:
+            last_success = last_success.replace(tzinfo=timezone.utc)
+
+        return max(0.0, (now_value - last_success).total_seconds())
+
+    def _axel_evaluate_source_status(self, now_utc: datetime | None = None) -> str:
+        """Evaluate Axel source freshness from coordinator cache state."""
+        age_seconds = self._axel_cache_age_seconds(now_utc)
+        if age_seconds is None:
+            return const.AXEL_SOURCE_STATUS_UNAVAILABLE
+
+        poll_seconds = int(
+            self.config_entry.options.get(
+                const.AXEL_POLL_INTERVAL_SECONDS,
+                const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+            )
+        )
+        fresh_limit = poll_seconds * const.AXEL_FRESHNESS_MULTIPLIER
+
+        if age_seconds <= fresh_limit:
+            return const.AXEL_SOURCE_STATUS_FRESH
+
+        if age_seconds <= const.AXEL_STALE_MAX_AGE_SECONDS:
+            return const.AXEL_SOURCE_STATUS_STALE
+
+        return const.AXEL_SOURCE_STATUS_UNAVAILABLE
+
+    def _axel_cache_update(
+        self,
+        *,
+        windows: list[AxelWindow],
+        last_success_utc: datetime,
+        last_error: str | None,
+    ) -> None:
+        """Update coordinator-private Axel cache snapshot and source status."""
+        self._axel_cache["windows"] = windows
+        self._axel_cache["last_success_utc"] = last_success_utc
+        self._axel_cache["last_error"] = last_error
+        self._axel_cache["source_status"] = self._axel_evaluate_source_status(
+            now_utc=last_success_utc
+        )
+
+    def _axel_is_enabled(self) -> bool:
+        return bool(
+            self.config_entry.options.get(const.AXEL_ENABLED, const.DEFAULT_AXEL_ENABLED)
+        )
+
+    def _axel_redact_text(self, text: str) -> str:
+        """Redact configured Axel token from free-form text defensively."""
+        token = str(self.config_entry.options.get(const.AXEL_API_TOKEN, "")).strip()
+        if token:
+            return text.replace(token, "***REDACTED***")
+        return text
+
+    async def _axel_refresh_source_state(self, *, now_utc: datetime) -> None:
+        """Refresh Axel source cache snapshot from upstream endpoint."""
+        if not self._axel_is_enabled():
+            return
+
+        token = str(self.config_entry.options.get(const.AXEL_API_TOKEN, "")).strip()
+        if not token:
+            self._axel_cache["windows"] = []
+            self._axel_cache["last_error"] = "Axel enabled but API token is not configured"
+            self._axel_cache["source_status"] = const.AXEL_SOURCE_STATUS_UNAVAILABLE
+            _LOGGER.warning(
+                "Axel enabled but API token is missing; source marked unavailable."
+            )
+            return
+
+        timeout_seconds = int(
+            self.config_entry.options.get(
+                const.AXEL_REQUEST_TIMEOUT_SECONDS,
+                const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+            )
+        )
+        client = AxelClient(
+            token,
+            request_timeout_seconds=timeout_seconds,
+        )
+        session = async_get_clientsession(self.hass)
+
+        try:
+            event = await client.async_fetch_event(session)
+        except AxelClientError as err:
+            sanitized_error = self._axel_redact_text(str(err))
+            self._axel_cache["last_error"] = sanitized_error
+            self._axel_cache["source_status"] = self._axel_evaluate_source_status(
+                now_utc=now_utc
+            )
+            _LOGGER.warning(
+                "Axel source refresh failed; source_status=%s, cache_age_seconds=%s, error=%s",
+                self._axel_cache["source_status"],
+                self._axel_cache_age_seconds(now_utc),
+                sanitized_error,
+            )
+            return
+
+        windows = normalize_windows([event] if event is not None else [])
+        self._axel_cache_update(
+            windows=windows,
+            last_success_utc=now_utc,
+            last_error=None,
+        )
+
+    def _axel_overlapping_window(self, now_utc: datetime) -> AxelWindow | None:
+        """Return overlapping Axel window at now, using half-open [start, end)."""
+        for window in self._axel_cache.get("windows", []):
+            if window.start <= now_utc < window.end:
+                return window
+        return None
+
+    def _axel_gate_state(
+        self, now_utc: datetime
+    ) -> tuple[bool, str | None, AxelWindow | None]:
+        """Return gate decision: (suppress, reason, overlapping_window)."""
+        if not self._axel_is_enabled():
+            return False, None, None
+
+        source_status = self._axel_evaluate_source_status(now_utc)
+        self._axel_cache["source_status"] = source_status
+
+        overlapping_window = self._axel_overlapping_window(now_utc)
+        if source_status in (
+            const.AXEL_SOURCE_STATUS_FRESH,
+            const.AXEL_SOURCE_STATUS_STALE,
+        ):
+            if overlapping_window is not None:
+                return (
+                    True,
+                    const.AXEL_SUPPRESSION_REASON_ACTIVE_WINDOW,
+                    overlapping_window,
+                )
+            return False, None, None
+
+        fail_safe_mode = self.config_entry.options.get(
+            const.AXEL_FAIL_SAFE_MODE,
+            const.DEFAULT_AXEL_FAIL_SAFE_MODE,
+        )
+        if fail_safe_mode == const.AXEL_FAIL_SAFE_MODE_CLOSED:
+            return True, const.AXEL_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED, None
+
+        return False, None, None
+
     """Update the data"""
 
     async def _async_update_data(self):
         _LOGGER.info("update data in entity")
 
         simulate = self.config_entry.options.get(const.SIMULATE_ONLY)
+        now_utc = datetime.now(timezone.utc)
+
+        if self._axel_is_enabled():
+            await self._axel_refresh_source_state(now_utc=now_utc)
+
+        suppress_dispatch, suppression_reason, active_window = self._axel_gate_state(now_utc)
+
+        was_suppressed = bool(self._axel_cache.get("is_active", False))
+        became_active = suppress_dispatch and not was_suppressed
+        became_inactive = was_suppressed and not suppress_dispatch
+
+        self._axel_cache["is_active"] = suppress_dispatch
+        self._axel_cache["suppression_reason"] = suppression_reason
+
+        source_status = self._axel_cache.get("source_status")
+        if source_status == const.AXEL_SOURCE_STATUS_STALE and active_window is not None:
+            _LOGGER.info(
+                "Axel dispatch suppression active from stale overlap; window_start=%s window_end=%s",
+                active_window.start.isoformat(),
+                active_window.end.isoformat(),
+            )
+        elif suppression_reason == const.AXEL_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED:
+            _LOGGER.warning(
+                "Axel source unavailable with fail-safe closed; suppressing local dispatch."
+            )
+        elif source_status == const.AXEL_SOURCE_STATUS_UNAVAILABLE and not suppress_dispatch:
+            _LOGGER.info(
+                "Axel source unavailable with fail-safe open; allowing local dispatch."
+            )
+
+        if became_active:
+            self._axel_cache["last_transition_reason"] = (
+                const.AXEL_TRANSITION_REASON_ACTIVE_ENTRY
+            )
+            _LOGGER.info(
+                "Axel suppression transitioned to active; reason=%s source_status=%s",
+                suppression_reason,
+                source_status,
+            )
+            if active_window is not None:
+                window_key = (active_window.start, active_window.end)
+                neutralize_on_entry = self.config_entry.options.get(
+                    const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                )
+                should_neutralize = (
+                    neutralize_on_entry
+                    and self._axel_last_neutralized_window_key != window_key
+                )
+                if should_neutralize:
+                    if not simulate:
+                        await self.givenergy.disableCharge(self.hass)
+                        await self.givenergy.disableExport(self.hass)
+                        _LOGGER.info(
+                            "Axel neutralize-on-entry applied; window_start=%s window_end=%s",
+                            active_window.start.isoformat(),
+                            active_window.end.isoformat(),
+                        )
+                    self._axel_last_neutralized_window_key = window_key
+
+        if became_inactive:
+            self._axel_cache["last_transition_reason"] = (
+                const.AXEL_TRANSITION_REASON_ACTIVE_EXIT
+            )
+            _LOGGER.info("Axel suppression transitioned to inactive; resuming local planning.")
+            await self.octopus_state_change_listener(
+                None,
+                reason=const.REPLAN_REASON_AXEL_WINDOW_ENDED,
+            )
+
+        if suppress_dispatch:
+            _LOGGER.debug(
+                "Axel suppression gating active; reason=%s source_status=%s",
+                suppression_reason,
+                source_status,
+            )
+            return self.timeslots
+
         active_slot = self.current_active_slot()
         if active_slot is not None:
             _LOGGER.info(active_slot.charge_option)

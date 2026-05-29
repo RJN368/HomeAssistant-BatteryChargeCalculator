@@ -78,3 +78,33 @@
 - **D-15 fallback notifications:** GivEnergy→Octopus fallback raises a HA persistent notification (`notification_id = "bcc_partial_consumption_signal"`) as a fire-and-forget `async_create_task`. Does not await.
 - **_fetch_temperature signature:** `session` parameter is accepted but unused (Open-Meteo creates its own 60s-timeout session; HA entity path uses recorder). This matches function signature consistency for the caller pattern.
 - **`_build_physics_series` executor invocation:** passed as `hass.async_add_executor_job(self._build_physics_series, start_dt, end_dt, temp_series)`. `start` and `end` are part of the signature for API consistency even though the method iterates `temp_series.index`.
+
+### 2026-05-28 — Axel Phase 1 Data Layer Patterns
+
+- **No-event contract:** Axel payloads must map to no-event when response is empty/null/missing `start_time`. Keep this behavior in the HTTP client layer so coordinators consume a clear `AxelEvent | None` contract.
+- **Retry envelope:** implement per-cycle retries as `max_retries + 1` total attempts with exponential backoff and jitter; retry only network/timeouts and retryable HTTP classes (`429`, `5xx`).
+- **Token safety:** always sanitize free-form exception text before raising/logging by redacting both raw token strings and `Bearer ...` patterns.
+- **Window semantics:** normalize all window boundaries to UTC-aware datetimes, drop `end <= start`, then merge overlapping and `<=1 minute` adjacent windows before overlap checks.
+- **Coordinator Phase 1 boundary:** safe to add private Axel cache shape/freshness helpers in coordinator as long as `_async_update_data` dispatch path is unchanged.
+
+### 2026-05-28 — Axel Phase 2 Coordinator Gating Patterns
+
+- **Polling lifecycle integration:** keep Axel source refresh in coordinator lifecycle only (`_async_setup` startup refresh + per-minute `_async_update_data` refresh), without introducing extra timers.
+- **Fail-safe gate ordering:** evaluate source freshness first, then overlap. For `unavailable` source status, apply fail-safe mode (`open` -> no suppression, `closed` -> suppression even with no window payload).
+- **Neutralize-on-entry safety:** run one-time neutralization only on inactive->active overlap transition and key it by `(window.start, window.end)` to avoid repeated disable commands during the same active window.
+- **Immediate resume traceability:** on active->inactive transition, trigger immediate resume path by invoking `octopus_state_change_listener(..., reason=REPLAN_REASON_AXEL_WINDOW_ENDED)` before normal dispatch evaluation.
+- **Simulate invariant:** keep all transition paths side-effect free for MQTT commands when `simulate_only` is enabled, including neutralization and post-window resume dispatch.
+
+### 2026-05-28 — Axel Phase 4 Hardening Patterns
+
+- **Coordinator logging scope:** log Axel gate transitions and fail-safe branch decisions with source status and suppression reason, but avoid per-request payload details.
+- **Sensitive string defense-in-depth:** even when upstream client redacts token-bearing errors, coordinator should defensively re-redact configured token before persisting to cache or logging.
+- **Stale overlap contract:** stale source state still suppresses local dispatch when overlap exists; tests should assert cache state (`source_status=stale`, `suppression_reason=axel_active_window`, `is_active=True`) not only command side effects.
+- **Unavailable fail-safe contract:** fail-open keeps suppression_reason unset and allows dispatch; fail-closed sets `axel_source_unavailable_closed` and suppresses dispatch.
+- **Diagnostics schema stability:** Axel diagnostic sensor attributes should keep a fixed key set with stable value types (`None` for unknowns, ISO strings for window bounds) for UI consumers.
+
+### 2026-05-28 — Schema Module Repair Pattern (config_schemas)
+
+- Malformed Python modules with top-level content before the module docstring can silently mask deeper structural bugs; always restore canonical order first: docstring/imports, then function definitions.
+- For HA config-flow schema helpers, preserve exported helper names exactly (`get_schema`, `_ml_settings_schema`, `_axel_settings_schema`, etc.) so flow imports remain stable while repairing structure.
+- When untangling split functions, validate with targeted flow/setup tests immediately (`test_config_flow`, `test_sensor_setup`) to confirm behavior parity after refactor-only repairs.

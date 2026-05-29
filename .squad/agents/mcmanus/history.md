@@ -73,3 +73,26 @@ Key implementation note: cold-start Case C requires ≥ 400 background slots so 
 4. `test_pure_export_only_slot_is_counted` — export-only timestamps included in union loop.
 
 **Modules tested do not exist yet** — these are TDD tests written ahead of implementation by Dallas/Fenster.
+
+---
+
+### 2026-05-28 — Axel Phase 0 baseline safety harness
+
+**Files updated:**
+- `tests/unit/test_coordinator.py`
+- `tests/unit/test_config_flow.py`
+
+**What was added/strengthened:**
+- Strengthened `_async_update_data` dispatch assertions:
+	- simulate-only mode now explicitly asserts no charge/export/disable MQTT commands are sent.
+	- discharge mode now explicitly asserts enable commands are not sent.
+- Added a regression guard that main coordinator refresh path (`_async_update_data`) has no tariff coordinator side effects.
+	- `tariff_coordinator.async_refresh` and `tariff_coordinator.async_request_refresh` are both asserted not called.
+- Added explicit pre-Axel flow progression guards:
+	- initial flow: `heating_none` still transitions through `ml_settings`.
+	- initial flow: `ml_settings` transitions to `tariff_comparison`.
+	- options flow: `ml_settings` transitions to `tariff_comparison`.
+
+**Validation run:**
+- `pytest tests/unit/test_coordinator.py tests/unit/test_coordinator_debounce.py tests/unit/test_config_flow.py -q`
+- Result: `91 passed`.
