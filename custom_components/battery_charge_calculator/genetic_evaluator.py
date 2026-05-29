@@ -339,7 +339,7 @@ class GeneticEvaluator:
             lines.append(
                 "  %-18s %-12s %8.2f %8.2f %8.2f %8.2f %8.2f %9.4f %12.4f %12.4f"
                 % (
-                    slot.start_datetime.strftime("%d/%m %H:%M"),
+                    slot.start_datetime_london().strftime("%d/%m %H:%M"),
                     slot.charge_option or "—",
                     slot.initial_power,
                     slot.import_price,

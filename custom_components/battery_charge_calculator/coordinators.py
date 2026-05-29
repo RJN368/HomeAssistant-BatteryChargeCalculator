@@ -773,7 +773,13 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         active_slot = self.current_active_slot()
         if active_slot is not None:
-            _LOGGER.info(active_slot.charge_option)
+            slot_local = active_slot.start_datetime.astimezone(self.tz)
+            _LOGGER.info(
+                "Active slot: %s → %s (local %s)",
+                active_slot.charge_option,
+                active_slot.start_datetime.isoformat(),
+                slot_local.strftime("%d/%m %H:%M %Z"),
+            )
             if not simulate:
                 if active_slot.charge_option == "charge":
                     await self.givenergy.enableCharge(self.hass)
