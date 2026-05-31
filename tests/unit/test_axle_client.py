@@ -1,4 +1,4 @@
-"""Unit tests for Axel event client."""
+"""Unit tests for Axle event client."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from unittest.mock import patch
 import aiohttp
 import pytest
 
-from custom_components.battery_charge_calculator.axel_client import (
-    AxelClient,
-    AxelClientError,
+from custom_components.battery_charge_calculator.axle_client import (
+    AxleClient,
+    AxleClientError,
 )
 
 
@@ -69,7 +69,7 @@ async def test_fetch_event_sends_expected_headers_and_returns_event() -> None:
         "updated_at": "2026-05-28T09:58:00Z",
     }
     session = _FakeSession([_FakeRequestContext(response=_FakeResponse(payload=payload))])
-    client = AxelClient("secret-token")
+    client = AxleClient("secret-token")
 
     event = await client.async_fetch_event(session)
 
@@ -93,7 +93,7 @@ async def test_fetch_event_handles_empty_null_and_missing_start_as_no_event() ->
         session = _FakeSession(
             [_FakeRequestContext(response=_FakeResponse(status=200, payload=payload))]
         )
-        client = AxelClient("abc")
+        client = AxleClient("abc")
         event = await client.async_fetch_event(session)
         assert event is None
 
@@ -115,9 +115,9 @@ async def test_fetch_event_retries_on_timeout_then_succeeds() -> None:
             _FakeRequestContext(response=_FakeResponse(payload=payload)),
         ]
     )
-    client = AxelClient("abc", sleep_fn=_sleep)
+    client = AxleClient("abc", sleep_fn=_sleep)
 
-    with patch("custom_components.battery_charge_calculator.axel_client.random.uniform", return_value=0.0):
+    with patch("custom_components.battery_charge_calculator.axle_client.random.uniform", return_value=0.0):
         event = await client.async_fetch_event(session)
 
     assert event is not None
@@ -140,9 +140,9 @@ async def test_fetch_event_error_redacts_token() -> None:
             )
         ]
     )
-    client = AxelClient(token, max_retries=0)
+    client = AxleClient(token, max_retries=0)
 
-    with pytest.raises(AxelClientError) as err:
+    with pytest.raises(AxleClientError) as err:
         await client.async_fetch_event(session)
 
     message = str(err.value)

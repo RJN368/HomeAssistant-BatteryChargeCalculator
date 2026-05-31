@@ -1,11 +1,11 @@
-"""Unit tests for Axel window normalization helpers."""
+"""Unit tests for Axle window normalization helpers."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from custom_components.battery_charge_calculator.axel_windows import (
-    AxelWindow,
+from custom_components.battery_charge_calculator.axle_windows import (
+    AxleWindow,
     normalize_windows,
     overlaps_half_open,
 )
@@ -59,8 +59,8 @@ def test_normalize_windows_converts_to_utc_sorts_and_merges_adjacent() -> None:
     assert windows[1].end == datetime(2026, 5, 28, 11, 30, tzinfo=timezone.utc)
 
 
-def test_normalize_windows_accepts_axel_window_objects() -> None:
-    window = AxelWindow(
+def test_normalize_windows_accepts_axle_window_objects() -> None:
+    window = AxleWindow(
         start=datetime(2026, 5, 28, 13, 0, tzinfo=timezone.utc),
         end=datetime(2026, 5, 28, 13, 30, tzinfo=timezone.utc),
     )

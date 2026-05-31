@@ -200,43 +200,43 @@ def _ml_settings_schema(
     )
 
 
-def _axel_settings_schema(
-    axel_enabled=False,
-    axel_api_token="",
-    axel_poll_interval_seconds=60,
-    axel_request_timeout_seconds=10,
-    axel_fail_safe_mode="open",
-    axel_neutralize_on_active_entry=True,
+def _axle_settings_schema(
+    axle_enabled=False,
+    axle_api_token="",
+    axle_poll_interval_seconds=60,
+    axle_request_timeout_seconds=10,
+    axle_fail_safe_mode="open",
+    axle_neutralize_on_active_entry=True,
 ):
     return vol.Schema(
         {
-            vol.Required(const.AXEL_ENABLED, default=axel_enabled): BooleanSelector(),
-            vol.Optional(const.AXEL_API_TOKEN, default=axel_api_token): TextSelector(
+            vol.Required(const.AXLE_ENABLED, default=axle_enabled): BooleanSelector(),
+            vol.Optional(const.AXLE_API_TOKEN, default=axle_api_token): TextSelector(
                 TextSelectorConfig(type="password")
             ),
             vol.Optional(
-                const.AXEL_POLL_INTERVAL_SECONDS,
-                default=axel_poll_interval_seconds,
+                const.AXLE_POLL_INTERVAL_SECONDS,
+                default=axle_poll_interval_seconds,
             ): vol.Coerce(int),
             vol.Optional(
-                const.AXEL_REQUEST_TIMEOUT_SECONDS,
-                default=axel_request_timeout_seconds,
+                const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                default=axle_request_timeout_seconds,
             ): vol.Coerce(int),
             vol.Required(
-                const.AXEL_FAIL_SAFE_MODE,
-                default=axel_fail_safe_mode,
+                const.AXLE_FAIL_SAFE_MODE,
+                default=axle_fail_safe_mode,
             ): SelectSelector(
                 SelectSelectorConfig(
                     options=[
-                        const.AXEL_FAIL_SAFE_MODE_OPEN,
-                        const.AXEL_FAIL_SAFE_MODE_CLOSED,
+                        const.AXLE_FAIL_SAFE_MODE_OPEN,
+                        const.AXLE_FAIL_SAFE_MODE_CLOSED,
                     ],
-                    translation_key="axel_fail_safe_mode",
+                    translation_key="axle_fail_safe_mode",
                 )
             ),
             vol.Required(
-                const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
-                default=axel_neutralize_on_active_entry,
+                const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                default=axle_neutralize_on_active_entry,
             ): BooleanSelector(),
         }
     )

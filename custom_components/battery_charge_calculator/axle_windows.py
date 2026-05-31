@@ -1,4 +1,4 @@
-"""Axel window normalization and overlap helpers."""
+"""Axle window normalization and overlap helpers."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ _ADJACENCY_THRESHOLD = timedelta(minutes=1)
 
 
 @dataclass(slots=True)
-class AxelWindow:
-    """UTC-aware Axel control window."""
+class AxleWindow:
+    """UTC-aware Axle control window."""
 
     start: datetime
     end: datetime
@@ -19,9 +19,9 @@ class AxelWindow:
     source_updated_at: datetime | None = None
 
 
-def normalize_windows(raw_windows: Iterable[Any]) -> list[AxelWindow]:
+def normalize_windows(raw_windows: Iterable[Any]) -> list[AxleWindow]:
     """Parse, normalize, drop invalid windows, then sort and merge."""
-    parsed: list[AxelWindow] = []
+    parsed: list[AxleWindow] = []
     for raw_window in raw_windows:
         window = _parse_window(raw_window)
         if window is None:
@@ -49,11 +49,11 @@ def overlaps_half_open(
     return window_start_utc < slot_end_utc and window_end_utc > slot_start_utc
 
 
-def _merge_windows(windows: list[AxelWindow]) -> list[AxelWindow]:
+def _merge_windows(windows: list[AxleWindow]) -> list[AxleWindow]:
     if not windows:
         return []
 
-    merged: list[AxelWindow] = [windows[0]]
+    merged: list[AxleWindow] = [windows[0]]
     for current in windows[1:]:
         previous = merged[-1]
         gap = current.start - previous.end
@@ -71,9 +71,9 @@ def _merge_windows(windows: list[AxelWindow]) -> list[AxelWindow]:
     return merged
 
 
-def _parse_window(raw_window: Any) -> AxelWindow | None:
-    if isinstance(raw_window, AxelWindow):
-        return AxelWindow(
+def _parse_window(raw_window: Any) -> AxleWindow | None:
+    if isinstance(raw_window, AxleWindow):
+        return AxleWindow(
             start=_to_utc(raw_window.start),
             end=_to_utc(raw_window.end),
             control_intent=raw_window.control_intent,
@@ -98,7 +98,7 @@ def _parse_window(raw_window: Any) -> AxelWindow | None:
     if start is None or end is None:
         return None
 
-    return AxelWindow(
+    return AxleWindow(
         start=start,
         end=end,
         control_intent=str(intent) if intent is not None else None,

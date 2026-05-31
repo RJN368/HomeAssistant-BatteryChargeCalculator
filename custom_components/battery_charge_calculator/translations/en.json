@@ -129,24 +129,24 @@
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
             },
-            "axel_settings": {
-                "title": "Axel VPP Awareness",
-                "description": "Optional: integrate Axel remote-control windows so charging/export dispatch is automatically suppressed during active VPP events.",
+            "axle_settings": {
+                "title": "Axle VPP Awareness",
+                "description": "Optional: integrate Axle remote-control windows so charging/export dispatch is automatically suppressed during active VPP events.",
                 "data": {
-                    "axel_enabled": "Enable Axel VPP awareness",
-                    "axel_api_token": "Axel API token",
-                    "axel_poll_interval_seconds": "Poll interval (seconds)",
-                    "axel_request_timeout_seconds": "Request timeout (seconds)",
-                    "axel_fail_safe_mode": "Fail-safe mode when Axel source unavailable",
-                    "axel_neutralize_on_active_entry": "Send one-time neutralize commands when entering active window"
+                    "axle_enabled": "Enable Axle VPP awareness",
+                    "axle_api_token": "Axle API token",
+                    "axle_poll_interval_seconds": "Poll interval (seconds)",
+                    "axle_request_timeout_seconds": "Request timeout (seconds)",
+                    "axle_fail_safe_mode": "Fail-safe mode when Axle source unavailable",
+                    "axle_neutralize_on_active_entry": "Send one-time neutralize commands when entering active window"
                 },
                 "data_description": {
-                    "axel_enabled": "When enabled, live charge/export commands are suppressed while Axel reports an active control window.",
-                    "axel_api_token": "Bearer token for the Axel Home Assistant event endpoint. Leave blank to keep Axel feature disabled.",
-                    "axel_poll_interval_seconds": "How often to refresh Axel source state. Lower values react faster but increase API calls.",
-                    "axel_request_timeout_seconds": "HTTP timeout for Axel endpoint calls. Increase if your network is slow.",
-                    "axel_fail_safe_mode": "Open = continue normal dispatch if Axel becomes unavailable. Closed = suppress dispatch while unavailable.",
-                    "axel_neutralize_on_active_entry": "If enabled, sends disable charge/export once when entering each active Axel window."
+                    "axle_enabled": "When enabled, live charge/export commands are suppressed while Axle reports an active control window.",
+                    "axle_api_token": "Bearer token for the Axle Home Assistant event endpoint. Leave blank to keep Axle feature disabled.",
+                    "axle_poll_interval_seconds": "How often to refresh Axle source state. Lower values react faster but increase API calls.",
+                    "axle_request_timeout_seconds": "HTTP timeout for Axle endpoint calls. Increase if your network is slow.",
+                    "axle_fail_safe_mode": "Open = continue normal dispatch if Axle becomes unavailable. Closed = suppress dispatch while unavailable.",
+                    "axle_neutralize_on_active_entry": "If enabled, sends disable charge/export once when entering each active Axle window."
                 }
             },
             "tariff_comparison": {
@@ -320,24 +320,24 @@
                     "ml_training_lookback_days": "How many days of history to use for training. More data generally improves accuracy. Minimum 14, maximum 730 (2 years)."
                 }
             },
-            "axel_settings": {
-                "title": "Axel VPP Awareness",
-                "description": "Optional: integrate Axel remote-control windows so charging/export dispatch is automatically suppressed during active VPP events.",
+            "axle_settings": {
+                "title": "Axle VPP Awareness",
+                "description": "Optional: integrate Axle remote-control windows so charging/export dispatch is automatically suppressed during active VPP events.",
                 "data": {
-                    "axel_enabled": "Enable Axel VPP awareness",
-                    "axel_api_token": "Axel API token",
-                    "axel_poll_interval_seconds": "Poll interval (seconds)",
-                    "axel_request_timeout_seconds": "Request timeout (seconds)",
-                    "axel_fail_safe_mode": "Fail-safe mode when Axel source unavailable",
-                    "axel_neutralize_on_active_entry": "Send one-time neutralize commands when entering active window"
+                    "axle_enabled": "Enable Axle VPP awareness",
+                    "axle_api_token": "Axle API token",
+                    "axle_poll_interval_seconds": "Poll interval (seconds)",
+                    "axle_request_timeout_seconds": "Request timeout (seconds)",
+                    "axle_fail_safe_mode": "Fail-safe mode when Axle source unavailable",
+                    "axle_neutralize_on_active_entry": "Send one-time neutralize commands when entering active window"
                 },
                 "data_description": {
-                    "axel_enabled": "When enabled, live charge/export commands are suppressed while Axel reports an active control window.",
-                    "axel_api_token": "Bearer token for the Axel Home Assistant event endpoint. Leave blank to keep Axel feature disabled.",
-                    "axel_poll_interval_seconds": "How often to refresh Axel source state. Lower values react faster but increase API calls.",
-                    "axel_request_timeout_seconds": "HTTP timeout for Axel endpoint calls. Increase if your network is slow.",
-                    "axel_fail_safe_mode": "Open = continue normal dispatch if Axel becomes unavailable. Closed = suppress dispatch while unavailable.",
-                    "axel_neutralize_on_active_entry": "If enabled, sends disable charge/export once when entering each active Axel window."
+                    "axle_enabled": "When enabled, live charge/export commands are suppressed while Axle reports an active control window.",
+                    "axle_api_token": "Bearer token for the Axle Home Assistant event endpoint. Leave blank to keep Axle feature disabled.",
+                    "axle_poll_interval_seconds": "How often to refresh Axle source state. Lower values react faster but increase API calls.",
+                    "axle_request_timeout_seconds": "HTTP timeout for Axle endpoint calls. Increase if your network is slow.",
+                    "axle_fail_safe_mode": "Open = continue normal dispatch if Axle becomes unavailable. Closed = suppress dispatch while unavailable.",
+                    "axle_neutralize_on_active_entry": "If enabled, sends disable charge/export once when entering each active Axle window."
                 }
             },
             "tariff_comparison": {
@@ -383,103 +383,103 @@
     },
     "entity": {
         "sensor": {
-        "battery_soc": {
-            "name": "Battery SOC",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "battery_projection": {
-            "name": "Battery Charge Projection",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "battery_charge_slots": {
-            "name": "Battery Charge Slots"
-        },
-        "est_power_demand": {
-            "name": "Estimated Power Demand",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "cost_prediction": {
-            "name": "Cost Prediction",
-            "state": {
-                "unit_of_measurement": "GBP"
-            }
-        },
-        "annual_forecast": {
-            "name": "Annual Energy Forecast",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "daily_power_forecast": {
-            "name": "Daily Power Forecast",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "ml_model_status": {
-            "name": "ML Power Model Status"
-        },
-        "ml_power_surface": {
-            "name": "ML Power Surface",
-            "state": {
-                "unit_of_measurement": "kWh"
-            }
-        },
-        "last_recalculation": {
-            "name": "Charge Slots Last Recalculated",
-            "state_attributes": {
-                "reason": {
-                    "name": "Reason"
-                },
-                "reason_label": {
-                    "name": "Reason",
-                    "state": {
-                        "initial_setup": "Initial setup",
-                        "no_plan": "No existing plan",
-                        "plan_expiring": "Plan expiring soon",
-                        "battery_deviation": "Battery level deviation",
-                        "no_active_slot": "No active slot found",
-                        "manual": "Manual trigger"
-                    }
+            "battery_soc": {
+                "name": "Battery SOC",
+                "state": {
+                    "unit_of_measurement": "kWh"
                 }
-            }
-        },
-        "axel_remote_control": {
-            "name": "Axel Remote Control",
-            "state": {
-                "active": "Active",
-                "inactive": "Inactive",
-                "unavailable": "Unavailable"
             },
-            "state_attributes": {
-                "source_status": {
-                    "name": "Source status",
-                    "state": {
-                        "fresh": "Fresh",
-                        "stale": "Stale",
-                        "unavailable": "Unavailable"
+            "battery_projection": {
+                "name": "Battery Charge Projection",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "battery_charge_slots": {
+                "name": "Battery Charge Slots"
+            },
+            "est_power_demand": {
+                "name": "Estimated Power Demand",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "cost_prediction": {
+                "name": "Cost Prediction",
+                "state": {
+                    "unit_of_measurement": "GBP"
+                }
+            },
+            "annual_forecast": {
+                "name": "Annual Energy Forecast",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "daily_power_forecast": {
+                "name": "Daily Power Forecast",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "ml_model_status": {
+                "name": "ML Power Model Status"
+            },
+            "ml_power_surface": {
+                "name": "ML Power Surface",
+                "state": {
+                    "unit_of_measurement": "kWh"
+                }
+            },
+            "last_recalculation": {
+                "name": "Charge Slots Last Recalculated",
+                "state_attributes": {
+                    "reason": {
+                        "name": "Reason"
+                    },
+                    "reason_label": {
+                        "name": "Reason",
+                        "state": {
+                            "initial_setup": "Initial setup",
+                            "no_plan": "No existing plan",
+                            "plan_expiring": "Plan expiring soon",
+                            "battery_deviation": "Battery level deviation",
+                            "no_active_slot": "No active slot found",
+                            "manual": "Manual trigger"
+                        }
                     }
+                }
+            },
+            "axle_remote_control": {
+                "name": "Axle Remote Control",
+                "state": {
+                    "active": "Active",
+                    "inactive": "Inactive",
+                    "unavailable": "Unavailable"
                 },
-                "suppression_reason": {
-                    "name": "Suppression reason"
-                },
-                "last_transition_reason": {
-                    "name": "Last transition reason"
+                "state_attributes": {
+                    "source_status": {
+                        "name": "Source status",
+                        "state": {
+                            "fresh": "Fresh",
+                            "stale": "Stale",
+                            "unavailable": "Unavailable"
+                        }
+                    },
+                    "suppression_reason": {
+                        "name": "Suppression reason"
+                    },
+                    "last_transition_reason": {
+                        "name": "Last transition reason"
+                    }
+                }
+            },
+            "tariff_comparison": {
+                "name": "Monthly Tariff Comparison",
+                "state": {
+                    "unit_of_measurement": "GBP"
                 }
             }
-        },
-        "tariff_comparison": {
-            "name": "Monthly Tariff Comparison",
-            "state": {
-                "unit_of_measurement": "GBP"
-            }
-        }
         }
     },
     "selector": {
@@ -528,7 +528,7 @@
                 "both": "Both (average)"
             }
         },
-        "axel_fail_safe_mode": {
+        "axle_fail_safe_mode": {
             "options": {
                 "open": "Open (continue normal dispatch)",
                 "closed": "Closed (suppress dispatch when unavailable)"

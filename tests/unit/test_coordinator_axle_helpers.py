@@ -1,4 +1,4 @@
-"""Unit tests for BatteryChargeCoordinator Axel freshness helpers."""
+"""Unit tests for BatteryChargeCoordinator Axle freshness helpers."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _make_coordinator() -> BatteryChargeCoordinator:
         const.GIVENERGY_SERIAL_NUMBER: "SN001",
         const.GIVENERGY_API_TOKEN: "token",
         const.SIMULATE_ONLY: True,
-        const.AXEL_POLL_INTERVAL_SECONDS: 60,
+        const.AXLE_POLL_INTERVAL_SECONDS: 60,
     }
 
     hass = MagicMock()
@@ -47,33 +47,33 @@ def _make_coordinator() -> BatteryChargeCoordinator:
     return coordinator
 
 
-def test_axel_status_unavailable_when_no_success() -> None:
+def test_axle_status_unavailable_when_no_success() -> None:
     coordinator = _make_coordinator()
 
-    assert coordinator._axel_cache_age_seconds() is None
+    assert coordinator._axle_cache_age_seconds() is None
     assert (
-        coordinator._axel_evaluate_source_status()
-        == const.AXEL_SOURCE_STATUS_UNAVAILABLE
+        coordinator._axle_evaluate_source_status()
+        == const.AXLE_SOURCE_STATUS_UNAVAILABLE
     )
 
 
-def test_axel_status_fresh_when_age_within_multiplier_window() -> None:
+def test_axle_status_fresh_when_age_within_multiplier_window() -> None:
     coordinator = _make_coordinator()
     now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
-    coordinator._axel_cache["last_success_utc"] = now - timedelta(seconds=180)
+    coordinator._axle_cache["last_success_utc"] = now - timedelta(seconds=180)
 
-    assert coordinator._axel_evaluate_source_status(now_utc=now) == const.AXEL_SOURCE_STATUS_FRESH
+    assert coordinator._axle_evaluate_source_status(now_utc=now) == const.AXLE_SOURCE_STATUS_FRESH
 
 
-def test_axel_status_stale_and_unavailable_thresholds() -> None:
+def test_axle_status_stale_and_unavailable_thresholds() -> None:
     coordinator = _make_coordinator()
     now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
 
-    coordinator._axel_cache["last_success_utc"] = now - timedelta(minutes=20)
-    assert coordinator._axel_evaluate_source_status(now_utc=now) == const.AXEL_SOURCE_STATUS_STALE
+    coordinator._axle_cache["last_success_utc"] = now - timedelta(minutes=20)
+    assert coordinator._axle_evaluate_source_status(now_utc=now) == const.AXLE_SOURCE_STATUS_STALE
 
-    coordinator._axel_cache["last_success_utc"] = now - timedelta(minutes=40)
+    coordinator._axle_cache["last_success_utc"] = now - timedelta(minutes=40)
     assert (
-        coordinator._axel_evaluate_source_status(now_utc=now)
-        == const.AXEL_SOURCE_STATUS_UNAVAILABLE
+        coordinator._axle_evaluate_source_status(now_utc=now)
+        == const.AXLE_SOURCE_STATUS_UNAVAILABLE
     )

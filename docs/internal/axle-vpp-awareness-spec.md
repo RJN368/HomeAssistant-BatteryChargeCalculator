@@ -1,32 +1,32 @@
-# Axel VPP Awareness Specification
+# Axle VPP Awareness Specification
 
 ## 1) Problem statement and expected user outcome
 
 ### Problem statement
-The integration plans battery behavior using Octopus rates, weather, and site constraints, then dispatches inverter commands on a minute cadence. GivEnergy installations may also be controlled by Axel (VPP), which can impose temporary external control windows.
+The integration plans battery behavior using Octopus rates, weather, and site constraints, then dispatches inverter commands on a minute cadence. GivEnergy installations may also be controlled by Axle (VPP), which can impose temporary external control windows.
 
-Without Axel awareness, local command dispatch can conflict with remote VPP control, creating unpredictable behavior and unclear user outcomes.
+Without Axle awareness, local command dispatch can conflict with remote VPP control, creating unpredictable behavior and unclear user outcomes.
 
 ### Expected user outcome
-When Axel remote control is active:
+When Axle remote control is active:
 - Local charge/export command dispatch is paused safely.
 - Users can see that dispatch is paused and why.
 - Local scheduling resumes predictably after the window ends.
 
-When Axel is disabled or unavailable, current non-Axel behavior remains unchanged by default.
+When Axle is disabled or unavailable, current non-Axle behavior remains unchanged by default.
 
 ## Implementation outcome (2026-05-28)
 
 Implemented in current codebase:
-- Axel-aware dispatch gating in `BatteryChargeCoordinator._async_update_data`.
+- Axle-aware dispatch gating in `BatteryChargeCoordinator._async_update_data`.
 - Active-window suppression of local `enableCharge` / `enableExport` dispatch.
 - One-time neutralization on active-window entry when enabled.
-- Active->inactive transition path that triggers immediate replanning with reason `axel_window_ended`.
-- Fail-safe modes `open` (default) and `closed` for Axel source unavailable state.
-- Diagnostic entity `sensor.axel_remote_control` with source/suppression/transition attributes.
+- Active->inactive transition path that triggers immediate replanning with reason `axle_window_ended`.
+- Fail-safe modes `open` (default) and `closed` for Axle source unavailable state.
+- Diagnostic entity `sensor.axle_remote_control` with source/suppression/transition attributes.
 
 Not implemented:
-- No manual Axel refresh service.
+- No manual Axle refresh service.
 
 ## 2) Explicit assumptions and boundaries
 
@@ -38,60 +38,60 @@ Not implemented:
 - Config flow chain currently routes through `ml_settings`, then tariff comparison steps.
 
 ### In scope
-- Optional Axel awareness for command suppression during remote-control windows.
-- Axel window ingestion, normalization, freshness handling, and overlap evaluation.
+- Optional Axle awareness for command suppression during remote-control windows.
+- Axle window ingestion, normalization, freshness handling, and overlap evaluation.
 - Minimal diagnostics (sensor state/attributes) and config options required for safe operation.
 - Tests covering coordinator behavior, flow persistence, and regression safety.
 
 ### Non-goals
-- No attempt to control Axel itself.
+- No attempt to control Axle itself.
 - No runtime dependency on `ha-axle-vpp`.
 - No redesign of tariff comparison architecture.
-- No multi-controller arbitration beyond Axel awareness.
+- No multi-controller arbitration beyond Axle awareness.
 - No change to planning optimization algorithm in MVP.
 
 ## 3) Proposed architecture and realistic file touchpoints
 
 ### Existing modules to extend
 - `custom_components/battery_charge_calculator/const.py`
-  - Add Axel option keys, defaults, source-status enums, suppression reason constants, and any new recalculation reason constants.
+  - Add Axle option keys, defaults, source-status enums, suppression reason constants, and any new recalculation reason constants.
 - `custom_components/battery_charge_calculator/config_schemas.py`
-  - Add an Axel settings schema helper for both initial and options flow.
+  - Add an Axle settings schema helper for both initial and options flow.
 - `custom_components/battery_charge_calculator/config_flow.py`
-  - Insert `axel_settings` step after `ml_settings` and before tariff comparison steps in both flows.
+  - Insert `axle_settings` step after `ml_settings` and before tariff comparison steps in both flows.
 - `custom_components/battery_charge_calculator/coordinators.py`
-  - Add Axel cache state, polling hooks, freshness evaluation, and pre-dispatch suppression gate in `_async_update_data`.
+  - Add Axle cache state, polling hooks, freshness evaluation, and pre-dispatch suppression gate in `_async_update_data`.
   - Keep tariff comparison wiring untouched.
 - `custom_components/battery_charge_calculator/sensors/__init__.py`
-  - Export any new Axel diagnostic sensor class.
+  - Export any new Axle diagnostic sensor class.
 - `custom_components/battery_charge_calculator/sensor.py`
-  - Register Axel diagnostic sensor conditionally when Axel is enabled.
+  - Register Axle diagnostic sensor conditionally when Axle is enabled.
 - `custom_components/battery_charge_calculator/strings.json`
   - Add strings for new flow step/fields and diagnostic sensor labels.
 - `custom_components/battery_charge_calculator/translations/*.json`
   - Add corresponding translation keys for all newly introduced strings.
 - `custom_components/battery_charge_calculator/services.yaml` (optional in MVP)
-  - Only if adding explicit services like `refresh_axel_windows`.
+  - Only if adding explicit services like `refresh_axle_windows`.
 
 ### New modules proposed
-- `custom_components/battery_charge_calculator/axel_client.py`
+- `custom_components/battery_charge_calculator/axle_client.py`
   - Thin HTTP client for fetching remote-control windows with timeout/retry behavior.
-- `custom_components/battery_charge_calculator/axel_windows.py`
+- `custom_components/battery_charge_calculator/axle_windows.py`
   - Window parsing, UTC normalization, merge, and overlap helpers.
-- `custom_components/battery_charge_calculator/sensors/axel_remote_control.py`
+- `custom_components/battery_charge_calculator/sensors/axle_remote_control.py`
   - Diagnostic sensor exposing active status and source health.
 
 ### Test modules likely touched
 - `tests/unit/test_coordinator.py`
 - `tests/unit/test_config_flow.py`
-- New: `tests/unit/test_axel_windows.py`
-- New: `tests/unit/test_axel_client.py`
-- New: `tests/unit/test_coordinator_axel_awareness.py`
+- New: `tests/unit/test_axle_windows.py`
+- New: `tests/unit/test_axle_client.py`
+- New: `tests/unit/test_coordinator_axle_awareness.py`
 - Optional: `tests/integration/test_config_flow_integration.py`
 
-## 4) Axel data acquisition strategy
+## 4) Axle data acquisition strategy
 
-### Inferred Axel API contract (from reference implementation)
+### Inferred Axle API contract (from reference implementation)
 Reference project `deanhalllincoln/ha-axle-vpp` currently uses:
 - Method: `GET`
 - Endpoint: `https://api.axle.energy/vpp/home-assistant/event`
@@ -101,13 +101,13 @@ Reference project `deanhalllincoln/ha-axle-vpp` currently uses:
 Returned JSON is treated as one current/upcoming event object (or no event). Fields consumed by the reference integration:
 - `start_time` (required to treat response as an event)
 - `end_time` (expected for valid window)
-- `import_export` (control intent/type indicator from Axel)
+- `import_export` (control intent/type indicator from Axle)
 - `updated_at` (source timestamp)
 
 No-event behavior in the reference integration:
 - If response is empty, null-like, or missing `start_time`, treat as "no active event".
 
-For this repository, normalize Axel event data to an internal window model:
+For this repository, normalize Axle event data to an internal window model:
 - `start` <- `start_time`
 - `end` <- `end_time`
 - `control_intent` <- `import_export` (pass-through, no enum coercion in MVP)
@@ -158,8 +158,8 @@ Boundary clarifications:
 
 ### MVP behavior
 Add pre-dispatch gate in `_async_update_data`:
-1. Evaluate remote-control-active from cached Axel windows at `now_utc`.
-2. If Axel-aware mode is enabled and active:
+1. Evaluate remote-control-active from cached Axle windows at `now_utc`.
+2. If Axle-aware mode is enabled and active:
    - Suppress local `enableCharge`/`enableExport` dispatch.
   - Default transition behavior: send one-time neutralization (`disableCharge` + `disableExport`) when entering active state.
    - Expose runtime flags/attributes indicating paused state and active window end.
@@ -170,9 +170,9 @@ Add pre-dispatch gate in `_async_update_data`:
 ### Planning interaction
 - Keep `octopus_state_change_listener` behavior unchanged in MVP.
 - Do not block tariff-comparison coordinator updates.
-- Emit an explicit recalculation/transition reason when resuming after Axel window end (for traceability in logs/diagnostics).
+- Emit an explicit recalculation/transition reason when resuming after Axle window end (for traceability in logs/diagnostics).
 
-## 7) Fallback policy when Axel source degrades
+## 7) Fallback policy when Axle source degrades
 
 ### Default mode
 - `open` (default, confirmed): if source is `unavailable`, continue local scheduling.
@@ -191,20 +191,20 @@ Expose source health diagnostics:
 
 ## 8) Configuration and UX impact
 
-### New options (Axel step)
-- `axel_enabled` (bool, default false)
-- `axel_api_token` (text)
-- `axel_poll_interval_seconds` (int, default 60, min 30, max 300)
-- `axel_request_timeout_seconds` (int, default 10, min 3, max 30)
-- `axel_fail_safe_mode` (`open` or `closed`, default `open`)
-- `axel_neutralize_on_active_entry` (bool, default true)
+### New options (Axle step)
+- `axle_enabled` (bool, default false)
+- `axle_api_token` (text)
+- `axle_poll_interval_seconds` (int, default 60, min 30, max 300)
+- `axle_request_timeout_seconds` (int, default 10, min 3, max 30)
+- `axle_fail_safe_mode` (`open` or `closed`, default `open`)
+- `axle_neutralize_on_active_entry` (bool, default true)
 
 Endpoint behavior:
 - MVP default endpoint is fixed to `https://api.axle.energy/vpp/home-assistant/event` (inferred from reference integration).
 - Optional base URL override is out of scope unless a concrete multi-environment requirement is provided.
 
 Flow placement:
-- `... -> ml_settings -> axel_settings -> tariff_comparison -> ...`
+- `... -> ml_settings -> axle_settings -> tariff_comparison -> ...`
 
 ### Diagnostic sensor
 Add one diagnostic entity for remote control state and health. Minimum attributes:
@@ -219,7 +219,7 @@ Add one diagnostic entity for remote control state and health. Minimum attribute
 
 ## 9) Security and privacy
 
-- Never log raw Axel token.
+- Never log raw Axle token.
 - Redact token from raised errors and diagnostics.
 - Require HTTPS endpoints for token-bearing requests.
 - Use Home Assistant aiohttp session and standard TLS defaults.
@@ -227,18 +227,18 @@ Add one diagnostic entity for remote control state and health. Minimum attribute
 
 ## 10) Acceptance criteria (implementation readiness)
 
-1. With `axel_enabled = false`, command dispatch behavior is unchanged from current baseline.
-2. With `axel_enabled = true` and active overlapping window, coordinator does not issue `enableCharge` or `enableExport`.
+1. With `axle_enabled = false`, command dispatch behavior is unchanged from current baseline.
+2. With `axle_enabled = true` and active overlapping window, coordinator does not issue `enableCharge` or `enableExport`.
 3. Transition into active window triggers neutralization by default, at most once per active period.
 4. Transition out of active window triggers immediate refresh and resumes normal dispatch path without waiting for the next minute tick.
-5. `simulate_only = true` still prevents live MQTT command dispatch in all Axel states.
+5. `simulate_only = true` still prevents live MQTT command dispatch in all Axle states.
 6. `stale` state with cached overlap still suppresses dispatch and reports stale diagnostics.
 7. `unavailable` state obeys configured fail-safe mode (`open` vs `closed`).
-8. Tariff comparison coordinator behavior and refresh service remain unaffected by Axel feature enablement.
-9. Config flow and options flow persist Axel settings and defaults without breaking existing entries.
+8. Tariff comparison coordinator behavior and refresh service remain unaffected by Axle feature enablement.
+9. Config flow and options flow persist Axle settings and defaults without breaking existing entries.
 10. All new strings/translation keys resolve without frontend placeholder errors.
 11. Unit tests cover normalization, overlap boundaries, dispatch suppression, transitions, and fallback modes.
-12. Regression tests verify no command-path changes for non-Axel users.
+12. Regression tests verify no command-path changes for non-Axle users.
 
 ## 11) Rollout and safety controls
 
@@ -248,14 +248,14 @@ Add one diagnostic entity for remote control state and health. Minimum attribute
 
 ### Safety controls
 - Feature is opt-in and defaults off.
-- Behavior can be instantly reverted by toggling Axel feature off in options.
+- Behavior can be instantly reverted by toggling Axle feature off in options.
 - Keep planning path untouched in MVP to reduce regression surface.
 - Add explicit logging (info/debug) for state transitions without sensitive data.
 
 ## 12) Open decisions for confirmation
 
-1. Confirm `import_export` value domain and semantics with Axel docs (for example: `import`/`export` strings vs numeric codes), while MVP keeps raw pass-through.
-2. Confirm whether Axel may return multiple events/windows via a different endpoint or schema; current inferred contract assumes a single event response at `/vpp/home-assistant/event`.
+1. Confirm `import_export` value domain and semantics with Axle docs (for example: `import`/`export` strings vs numeric codes), while MVP keeps raw pass-through.
+2. Confirm whether Axle may return multiple events/windows via a different endpoint or schema; current inferred contract assumes a single event response at `/vpp/home-assistant/event`.
 
 ## Reference
 - Inspiration/reference implementation: https://github.com/deanhalllincoln/ha-axle-vpp
@@ -263,8 +263,8 @@ Add one diagnostic entity for remote control state and health. Minimum attribute
 
 ## Lead Review Notes
 
-- Clarified coordinator boundaries so Axel gating applies only to command dispatch path, not planning or tariff comparison processing.
+- Clarified coordinator boundaries so Axle gating applies only to command dispatch path, not planning or tariff comparison processing.
 - Tightened file touchpoints to match actual repository layout (`sensors/__init__.py`, `sensor.py`, config flow ordering, separate tariff coordinator).
 - Converted overlap/suppression behavior into explicit half-open interval semantics to avoid boundary ambiguity.
-- Strengthened acceptance criteria around non-Axel regression safety, `simulate_only` behavior, and fail-safe mode handling.
+- Strengthened acceptance criteria around non-Axle regression safety, `simulate_only` behavior, and fail-safe mode handling.
 - Added rollout safety controls and explicit open decisions requiring product-owner confirmation before implementation.

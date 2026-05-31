@@ -1,4 +1,4 @@
-"""Axel remote-control diagnostic sensor."""
+"""Axle remote-control diagnostic sensor."""
 
 from __future__ import annotations
 
@@ -19,31 +19,31 @@ except ImportError:  # pragma: no cover - compatibility for lightweight test stu
 from .. import const
 
 
-class AxelRemoteControlSensor(CoordinatorEntity, SensorEntity):
-    """Diagnostic sensor exposing Axel source and suppression state."""
+class AxleRemoteControlSensor(CoordinatorEntity, SensorEntity):
+    """Diagnostic sensor exposing Axle source and suppression state."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
-    _attr_translation_key = "axel_remote_control"
-    _attr_unique_id = const.AXEL_REMOTE_CONTROL_SENSOR
+    _attr_translation_key = "axle_remote_control"
+    _attr_unique_id = const.AXLE_REMOTE_CONTROL_SENSOR
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
-        """Initialise the Axel remote-control sensor."""
+        """Initialise the Axle remote-control sensor."""
         super().__init__(coordinator)
         self.hass = hass
         self._update_attributes()
 
     def _update_attributes(self) -> None:
-        """Sync state and attributes from coordinator Axel cache."""
-        cache = getattr(self.coordinator, "_axel_cache", {})
+        """Sync state and attributes from coordinator Axle cache."""
+        cache = getattr(self.coordinator, "_axle_cache", {})
 
         source_status = cache.get(
             "source_status",
-            const.AXEL_SOURCE_STATUS_UNAVAILABLE,
+            const.AXLE_SOURCE_STATUS_UNAVAILABLE,
         )
         is_active = bool(cache.get("is_active", False))
 
-        if source_status == const.AXEL_SOURCE_STATUS_UNAVAILABLE:
+        if source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE:
             state = "unavailable"
         elif is_active:
             state = "active"
@@ -52,7 +52,7 @@ class AxelRemoteControlSensor(CoordinatorEntity, SensorEntity):
 
         active_window = None
         now_utc = None
-        overlapping_window_fn = getattr(self.coordinator, "_axel_overlapping_window", None)
+        overlapping_window_fn = getattr(self.coordinator, "_axle_overlapping_window", None)
         if callable(overlapping_window_fn):
             now_utc = cache.get("last_success_utc")
             if now_utc is None:
@@ -62,7 +62,7 @@ class AxelRemoteControlSensor(CoordinatorEntity, SensorEntity):
             active_window = overlapping_window_fn(now_utc)
 
         cache_age_seconds = None
-        cache_age_fn = getattr(self.coordinator, "_axel_cache_age_seconds", None)
+        cache_age_fn = getattr(self.coordinator, "_axle_cache_age_seconds", None)
         if callable(cache_age_fn):
             cache_age_seconds = cache_age_fn(now_utc=now_utc)
 
@@ -80,20 +80,20 @@ class AxelRemoteControlSensor(CoordinatorEntity, SensorEntity):
             else None,
             "cache_age_seconds": cache_age_seconds,
             "fail_safe_mode": self.coordinator.config_entry.options.get(
-                const.AXEL_FAIL_SAFE_MODE,
-                const.DEFAULT_AXEL_FAIL_SAFE_MODE,
+                const.AXLE_FAIL_SAFE_MODE,
+                const.DEFAULT_AXLE_FAIL_SAFE_MODE,
             ),
             "neutralize_on_active_entry": self.coordinator.config_entry.options.get(
-                const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
-                const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
             ),
             "poll_interval_seconds": self.coordinator.config_entry.options.get(
-                const.AXEL_POLL_INTERVAL_SECONDS,
-                const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS,
+                const.AXLE_POLL_INTERVAL_SECONDS,
+                const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
             ),
             "request_timeout_seconds": self.coordinator.config_entry.options.get(
-                const.AXEL_REQUEST_TIMEOUT_SECONDS,
-                const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS,
+                const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
             ),
         }
 

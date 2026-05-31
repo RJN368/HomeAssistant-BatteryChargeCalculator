@@ -76,7 +76,7 @@ Key implementation note: cold-start Case C requires ≥ 400 background slots so 
 
 ---
 
-### 2026-05-28 — Axel Phase 0 baseline safety harness
+### 2026-05-28 — Axle Phase 0 baseline safety harness
 
 **Files updated:**
 - `tests/unit/test_coordinator.py`
@@ -88,7 +88,7 @@ Key implementation note: cold-start Case C requires ≥ 400 background slots so 
 	- discharge mode now explicitly asserts enable commands are not sent.
 - Added a regression guard that main coordinator refresh path (`_async_update_data`) has no tariff coordinator side effects.
 	- `tariff_coordinator.async_refresh` and `tariff_coordinator.async_request_refresh` are both asserted not called.
-- Added explicit pre-Axel flow progression guards:
+- Added explicit pre-Axle flow progression guards:
 	- initial flow: `heating_none` still transitions through `ml_settings`.
 	- initial flow: `ml_settings` transitions to `tariff_comparison`.
 	- options flow: `ml_settings` transitions to `tariff_comparison`.

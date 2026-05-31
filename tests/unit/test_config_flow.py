@@ -295,15 +295,15 @@ class TestConfigFlowHeatingSteps:
 
     @pytest.mark.asyncio
     async def test_ml_settings_transitions_to_tariff_comparison(self):
-        """Phase 3 guard: ml_settings must transition to axel_settings."""
+        """Phase 3 guard: ml_settings must transition to axle_settings."""
         flow = BatteryChargCalculatorConfigFlow()
         flow.hass = MagicMock()
         flow.async_show_form = MagicMock(return_value={"type": "form"})
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
         flow._main_data = {const.GIVENERGY_SERIAL_NUMBER: "SN"}
         flow._heating_data = {}
-        flow.async_step_axel_settings = AsyncMock(
-            return_value={"type": "form", "step_id": "axel_settings"}
+        flow.async_step_axle_settings = AsyncMock(
+            return_value={"type": "form", "step_id": "axle_settings"}
         )
 
         result = await flow.async_step_ml_settings(
@@ -319,11 +319,11 @@ class TestConfigFlowHeatingSteps:
             }
         )
 
-        flow.async_step_axel_settings.assert_called_once_with()
-        assert result["step_id"] == "axel_settings"
+        flow.async_step_axle_settings.assert_called_once_with()
+        assert result["step_id"] == "axle_settings"
 
     @pytest.mark.asyncio
-    async def test_config_flow_create_entry_persists_axel_defaults(self):
+    async def test_config_flow_create_entry_persists_axle_defaults(self):
         flow = BatteryChargCalculatorConfigFlow()
         flow.hass = MagicMock()
         flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
@@ -333,20 +333,20 @@ class TestConfigFlowHeatingSteps:
         flow._create_entry()
 
         options = flow.async_create_entry.call_args.kwargs["options"]
-        assert options[const.AXEL_ENABLED] is const.DEFAULT_AXEL_ENABLED
-        assert options[const.AXEL_API_TOKEN] == const.DEFAULT_AXEL_API_TOKEN
+        assert options[const.AXLE_ENABLED] is const.DEFAULT_AXLE_ENABLED
+        assert options[const.AXLE_API_TOKEN] == const.DEFAULT_AXLE_API_TOKEN
         assert (
-            options[const.AXEL_POLL_INTERVAL_SECONDS]
-            == const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS
+            options[const.AXLE_POLL_INTERVAL_SECONDS]
+            == const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS
         )
         assert (
-            options[const.AXEL_REQUEST_TIMEOUT_SECONDS]
-            == const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS
+            options[const.AXLE_REQUEST_TIMEOUT_SECONDS]
+            == const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS
         )
-        assert options[const.AXEL_FAIL_SAFE_MODE] == const.DEFAULT_AXEL_FAIL_SAFE_MODE
+        assert options[const.AXLE_FAIL_SAFE_MODE] == const.DEFAULT_AXLE_FAIL_SAFE_MODE
         assert (
-            options[const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY]
-            is const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY
+            options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY]
+            is const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY
         )
 
     @pytest.mark.asyncio
@@ -609,15 +609,15 @@ class TestOptionsFlow:
 
     @pytest.mark.asyncio
     async def test_options_ml_settings_transitions_to_tariff_comparison(self):
-        """Phase 3 guard: options ml_settings must transition to axel_settings."""
+        """Phase 3 guard: options ml_settings must transition to axle_settings."""
         config_entry = MagicMock()
         config_entry.options = {}
         handler = BatteryChargCalculatorFlowHandler(config_entry)
         handler.hass = MagicMock()
         handler.async_show_form = MagicMock(return_value={"type": "form"})
         handler.async_create_entry = MagicMock(return_value={"type": "create_entry"})
-        handler.async_step_axel_settings = AsyncMock(
-            return_value={"type": "form", "step_id": "axel_settings"}
+        handler.async_step_axle_settings = AsyncMock(
+            return_value={"type": "form", "step_id": "axle_settings"}
         )
 
         result = await handler.async_step_ml_settings(
@@ -633,11 +633,11 @@ class TestOptionsFlow:
             }
         )
 
-        handler.async_step_axel_settings.assert_called_once_with()
-        assert result["step_id"] == "axel_settings"
+        handler.async_step_axle_settings.assert_called_once_with()
+        assert result["step_id"] == "axle_settings"
 
     @pytest.mark.asyncio
-    async def test_options_save_persists_axel_defaults_for_existing_entries(self):
+    async def test_options_save_persists_axle_defaults_for_existing_entries(self):
         handler, _ = self._make_options_flow(
             existing_options={
                 const.GIVENERGY_SERIAL_NUMBER: "SN",
@@ -651,20 +651,20 @@ class TestOptionsFlow:
         handler._save_and_exit()
 
         data = handler.async_create_entry.call_args.kwargs["data"]
-        assert data[const.AXEL_ENABLED] is const.DEFAULT_AXEL_ENABLED
-        assert data[const.AXEL_API_TOKEN] == const.DEFAULT_AXEL_API_TOKEN
+        assert data[const.AXLE_ENABLED] is const.DEFAULT_AXLE_ENABLED
+        assert data[const.AXLE_API_TOKEN] == const.DEFAULT_AXLE_API_TOKEN
         assert (
-            data[const.AXEL_POLL_INTERVAL_SECONDS]
-            == const.DEFAULT_AXEL_POLL_INTERVAL_SECONDS
+            data[const.AXLE_POLL_INTERVAL_SECONDS]
+            == const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS
         )
         assert (
-            data[const.AXEL_REQUEST_TIMEOUT_SECONDS]
-            == const.DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS
+            data[const.AXLE_REQUEST_TIMEOUT_SECONDS]
+            == const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS
         )
-        assert data[const.AXEL_FAIL_SAFE_MODE] == const.DEFAULT_AXEL_FAIL_SAFE_MODE
+        assert data[const.AXLE_FAIL_SAFE_MODE] == const.DEFAULT_AXLE_FAIL_SAFE_MODE
         assert (
-            data[const.AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY]
-            is const.DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY
+            data[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY]
+            is const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY
         )
 
     @pytest.mark.asyncio

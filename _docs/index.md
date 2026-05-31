@@ -26,4 +26,4 @@ To compare what your electricity would have cost on different Octopus tariffs, s
 
 To enable the machine-learning power forecasting feature, see [Machine Learning](machine-learning.md).
 
-To enable and configure Axel dispatch-awareness mode, see [Axel VPP Awareness](axel-vpp-awareness.md).
+To enable and configure Axle dispatch-awareness mode, see [Axle VPP Awareness](axle-vpp-awareness.md).

@@ -21,25 +21,25 @@ The ML service learns your household's energy consumption patterns from historic
 
 See the [setup documentation](https://rjn368.github.io/HomeAssistant-batterychargecalculator/setup/) for instructions on deploying the ML service.
 
-## Axel VPP Awareness
+## Axle VPP Awareness
 
-Axel awareness is an opt-in safety layer for dispatch control. When enabled, the coordinator checks Axel remote-control windows and suppresses local inverter dispatch (`enableCharge` / `enableExport`) while a window is active.
+Axle awareness is an opt-in safety layer for dispatch control. When enabled, the coordinator checks Axle remote-control windows and suppresses local inverter dispatch (`enableCharge` / `enableExport`) while a window is active.
 
 Key options:
-- `axel_enabled`: turns Axel awareness on/off (default off)
-- `axel_api_token`: bearer token used to fetch Axel event data
-- `axel_poll_interval_seconds`: Axel poll cadence
-- `axel_request_timeout_seconds`: request timeout for Axel API calls
-- `axel_fail_safe_mode`: behavior when Axel source is unavailable (`open` or `closed`)
-- `axel_neutralize_on_active_entry`: on window entry, send one-time neutralize (`disableCharge` + `disableExport`)
+- `axle_enabled`: turns Axle awareness on/off (default off)
+- `axle_api_token`: bearer token used to fetch Axle event data
+- `axle_poll_interval_seconds`: Axle poll cadence
+- `axle_request_timeout_seconds`: request timeout for Axle API calls
+- `axle_fail_safe_mode`: behavior when Axle source is unavailable (`open` or `closed`)
+- `axle_neutralize_on_active_entry`: on window entry, send one-time neutralize (`disableCharge` + `disableExport`)
 
 Fail-safe behavior:
-- `open` (default): if Axel source is unavailable, local schedule dispatch continues
-- `closed`: if Axel source is unavailable, dispatch is suppressed for safety
+- `open` (default): if Axle source is unavailable, local schedule dispatch continues
+- `closed`: if Axle source is unavailable, dispatch is suppressed for safety
 - If source is stale but cached windows still overlap now, dispatch remains suppressed
 
 Diagnostic entity:
-- `sensor.axel_remote_control` reports `active`, `inactive`, or `unavailable`
+- `sensor.axle_remote_control` reports `active`, `inactive`, or `unavailable`
 - Key attributes include `source_status`, `suppression_reason`, `last_transition_reason`, `last_error`, `active_window_start`, `active_window_end`, `cache_age_seconds`, `fail_safe_mode`, `neutralize_on_active_entry`, `poll_interval_seconds`, and `request_timeout_seconds`
 
 

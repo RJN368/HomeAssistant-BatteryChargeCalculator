@@ -206,46 +206,46 @@ OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
 SOLAR_ENERGY_ENTITY = "solar_energy_entity"
 DEFAULT_SOLAR_ENERGY_ENTITY = ""
 
-# ─────────────────────────── Axel VPP Awareness ─────────────────────────────
+# ─────────────────────────── Axle VPP Awareness ─────────────────────────────
 # Phase 1 data-layer contracts. Feature remains opt-in and defaults safe.
 
-AXEL_ENABLED = "axel_enabled"
-AXEL_API_TOKEN = "axel_api_token"
-AXEL_POLL_INTERVAL_SECONDS = "axel_poll_interval_seconds"
-AXEL_REQUEST_TIMEOUT_SECONDS = "axel_request_timeout_seconds"
-AXEL_FAIL_SAFE_MODE = "axel_fail_safe_mode"
-AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY = "axel_neutralize_on_active_entry"
+AXLE_ENABLED = "axle_enabled"
+AXLE_API_TOKEN = "axle_api_token"
+AXLE_POLL_INTERVAL_SECONDS = "axle_poll_interval_seconds"
+AXLE_REQUEST_TIMEOUT_SECONDS = "axle_request_timeout_seconds"
+AXLE_FAIL_SAFE_MODE = "axle_fail_safe_mode"
+AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY = "axle_neutralize_on_active_entry"
 
-AXEL_FAIL_SAFE_MODE_OPEN = "open"
-AXEL_FAIL_SAFE_MODE_CLOSED = "closed"
+AXLE_FAIL_SAFE_MODE_OPEN = "open"
+AXLE_FAIL_SAFE_MODE_CLOSED = "closed"
 
-DEFAULT_AXEL_ENABLED = False
-DEFAULT_AXEL_API_TOKEN = ""
-DEFAULT_AXEL_POLL_INTERVAL_SECONDS = 1800
-DEFAULT_AXEL_REQUEST_TIMEOUT_SECONDS = 10
-DEFAULT_AXEL_FAIL_SAFE_MODE = AXEL_FAIL_SAFE_MODE_OPEN
-DEFAULT_AXEL_NEUTRALIZE_ON_ACTIVE_ENTRY = True
+DEFAULT_AXLE_ENABLED = False
+DEFAULT_AXLE_API_TOKEN = ""
+DEFAULT_AXLE_POLL_INTERVAL_SECONDS = 1800
+DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_AXLE_FAIL_SAFE_MODE = AXLE_FAIL_SAFE_MODE_OPEN
+DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY = True
 
-AXEL_EVENT_ENDPOINT = "https://api.axle.energy/vpp/home-assistant/event"
-AXEL_EVENT_ACCEPT_HEADER = "application/json"
-AXEL_MAX_RETRIES = 2
-AXEL_RETRY_BASE_DELAY_SECONDS = 0.5
-AXEL_RETRY_JITTER_SECONDS = 0.2
+AXLE_EVENT_ENDPOINT = "https://api.axle.energy/vpp/home-assistant/event"
+AXLE_EVENT_ACCEPT_HEADER = "application/json"
+AXLE_MAX_RETRIES = 2
+AXLE_RETRY_BASE_DELAY_SECONDS = 0.5
+AXLE_RETRY_JITTER_SECONDS = 0.2
 
-AXEL_SOURCE_STATUS_FRESH = "fresh"
-AXEL_SOURCE_STATUS_STALE = "stale"
-AXEL_SOURCE_STATUS_UNAVAILABLE = "unavailable"
+AXLE_SOURCE_STATUS_FRESH = "fresh"
+AXLE_SOURCE_STATUS_STALE = "stale"
+AXLE_SOURCE_STATUS_UNAVAILABLE = "unavailable"
 
-AXEL_SUPPRESSION_REASON_ACTIVE_WINDOW = "axel_active_window"
-AXEL_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED = "axel_source_unavailable_closed"
+AXLE_SUPPRESSION_REASON_ACTIVE_WINDOW = "axle_active_window"
+AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED = "axle_source_unavailable_closed"
 
-AXEL_TRANSITION_REASON_ACTIVE_ENTRY = "axel_active_entry"
-AXEL_TRANSITION_REASON_ACTIVE_EXIT = "axel_active_exit"
+AXLE_TRANSITION_REASON_ACTIVE_ENTRY = "axle_active_entry"
+AXLE_TRANSITION_REASON_ACTIVE_EXIT = "axle_active_exit"
 
-AXEL_REMOTE_CONTROL_SENSOR = "battery_charge_calculator.axel_remote_control"
-AXEL_REMOTE_CONTROL_SENSOR_NAME = "Axel Remote Control"
+AXLE_REMOTE_CONTROL_SENSOR = "battery_charge_calculator.axle_remote_control"
+AXLE_REMOTE_CONTROL_SENSOR_NAME = "Axle Remote Control"
 
-AXEL_FRESHNESS_MULTIPLIER = 3
-AXEL_STALE_MAX_AGE_SECONDS = 30 * 60
+AXLE_FRESHNESS_MULTIPLIER = 3
+AXLE_STALE_MAX_AGE_SECONDS = 30 * 60
 
-REPLAN_REASON_AXEL_WINDOW_ENDED = "axel_window_ended"
+REPLAN_REASON_AXLE_WINDOW_ENDED = "axle_window_ended"
