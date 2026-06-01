@@ -62,7 +62,14 @@ The sensor also exposes detailed attributes containing all scheduled time slots,
 
 **Entity:** `sensor.cost_prediction`
 
-Shows the estimated total energy cost for the current schedule, based on the Octopus Energy import/export rates and the calculated battery schedule.
+Shows the projected end-of-day electricity cost for the current day.
+
+The value is recalculated whenever the battery plan is recalculated. It uses a blended approach:
+
+- **Actual data up to now**: real half-hourly consumption from Octopus meter readings, costed with the matching import tariff for each interval.
+- **Predicted data for the rest of today**: forecast schedule slot costs from the optimizer.
+
+This means the value becomes progressively more accurate during the day as more real consumption data becomes available.
 
 **Unit:** £ (GBP)
 

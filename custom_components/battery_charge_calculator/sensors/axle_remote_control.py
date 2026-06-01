@@ -103,6 +103,12 @@ class AxleRemoteControlSensor(CoordinatorEntity, SensorEntity):
         self._update_attributes()
         self.async_write_ha_state()
 
+    async def async_added_to_hass(self) -> None:
+        """Register coordinator listener and immediately write current state."""
+        await super().async_added_to_hass()
+        self._update_attributes()
+        self.async_write_ha_state()
+
     @property
     def available(self) -> bool:
         """Sensor is always available when registered."""

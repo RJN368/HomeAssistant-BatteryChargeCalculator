@@ -306,6 +306,14 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 session, export=True
             )
 
+            # Fetch today's real half-hourly consumption so cost prediction can
+            # blend actual spend up to now with predicted spend for the rest of the day.
+            mpan = self.config_entry.options.get(const.OCTOPUS_MPN, "")
+            meter_serial = self.config_entry.options.get(const.OCTOPUS_METER_SERIAL, "")
+            today_consumption = await self.agile_rates_client.async_fetch_today_consumption(
+                session, mpan, meter_serial
+            )
+
             weather_state = self.hass.states.get("weather.forecast_home")
             if weather_state is None:
                 _LOGGER.error("Weather entity weather.forecast_home not found")
@@ -476,6 +484,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
             self.timeslots, self.totalcost = evaluator.evaluate()
             self.daily_power_forecast = daily_forecast
+            self.end_of_day_cost = self._calculate_end_of_day_cost(
+                self.timeslots, all_octopus_rates, today_consumption, now
+            )
 
             # Refresh ML service status for diagnostic sensors
             if self.ml_client is not None:
@@ -486,6 +497,59 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             _LOGGER.error(
                 "Exception in octopus_state_change_listener: %s", exc, exc_info=True
             )
+
+    def _calculate_end_of_day_cost(
+        self,
+        timeslots: list,
+        all_octopus_rates: list[dict],
+        consumption_data: list[dict],
+        now: datetime,
+    ) -> float:
+        """Return the predicted end-of-day energy cost for today.
+
+        Blends two sources:
+        - **Actual spend** — real half-hourly consumption (from Octopus API) ×
+          the tariff rate for each slot, for intervals that have already passed.
+        - **Predicted spend** — ``timeslot.cost`` from the genetic evaluator for
+          all remaining slots from now until midnight.
+
+        If consumption data is unavailable for a past interval the evaluator's
+        predicted cost for that slot is used as a fallback.
+        """
+        london = ZoneInfo("Europe/London")
+        today_day = now.astimezone(london).day
+        total = 0.0
+
+        # --- Actual spend: past half-hours with real meter readings ---
+        for entry in consumption_data:
+            interval_start = entry["interval_start"]
+            if interval_start.astimezone(london).day != today_day:
+                continue
+            rate = next(
+                (
+                    r["value_inc_vat"]
+                    for r in all_octopus_rates
+                    if r["start"] <= interval_start < r["end"]
+                ),
+                None,
+            )
+            if rate is not None:
+                total += entry["consumption_kwh"] * rate
+            else:
+                _LOGGER.debug(
+                    "No import rate found for consumption interval %s — skipping",
+                    interval_start,
+                )
+
+        # --- Predicted spend: today's timeslots from now onwards ---
+        for slot in timeslots:
+            slot_dt = slot.start_datetime
+            if slot_dt.tzinfo is None:
+                slot_dt = slot_dt.replace(tzinfo=timezone.utc)
+            if slot_dt.astimezone(london).day == today_day:
+                total += getattr(slot, "cost", 0)
+
+        return total
 
     def find_in_dataset(self, sourcedata, lastvalue, value_field, comparitor):
         result_list = list(filter(comparitor, sourcedata))

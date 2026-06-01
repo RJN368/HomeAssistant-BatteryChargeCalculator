@@ -117,3 +117,16 @@ If the ML service is enabled, the integration triggers a model retrain every 30 
 
 See [Machine Learning](machine-learning.md) for a full explanation of how the model works.
 
+---
+
+## 7. Cost prediction sensor update
+
+When a plan recalculation runs, the integration also recalculates `sensor.cost_prediction` for the current day.
+
+The sensor value is computed as:
+
+- **Actual spend so far today**: half-hour Octopus consumption readings multiplied by the matching import rate for each completed interval.
+- **Predicted spend for the rest of today**: remaining schedule slot costs from the optimizer.
+
+This blended method avoids treating the whole day as forecast-only and makes the displayed total track reality as the day progresses.
+

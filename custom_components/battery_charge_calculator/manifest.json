@@ -19,10 +19,5 @@
     "requirements": [
         "scipy>=1.12"
     ],
-    "translations": [
-    {
-      "language": "en",
-      "path": "translations/en.json"
-    }],
     "version": "0.1.0"
 }
