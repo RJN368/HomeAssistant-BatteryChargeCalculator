@@ -20,7 +20,7 @@ The ML power estimation feature runs as a separate Docker container (`bcc-ml-ser
 
 The ML service learns your household's energy consumption patterns from historical GivEnergy data and produces per-slot power demand forecasts alongside the physics-based estimates.
 
-See the [setup documentation](https://rjn368.github.io/HomeAssistant-batterychargecalculator/setup/) for instructions on deploying the ML service.
+See the [setup documentation](https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/setup/) for instructions on deploying the ML service.
 
 ## Axle VPP Awareness
 
@@ -61,15 +61,15 @@ You can install this integration via [HACS](https://github.com/hacs/integration)
 
 ## Setup
 
-After installation, follow the setup instructions in the [documentation](https://rjn368.github.io/HomeAssistant-batterychargecalculator/) to connect your Octopus Energy account and configure your GivEnergy system.
+After installation, follow the setup instructions in the [documentation](https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/) to connect your Octopus Energy account and configure your GivEnergy system.
 
 ## Documentation
 
-Full documentation is available at: [https://rjn368.github.io/HomeAssistant-batterychargecalculator/](https://rjn368.github.io/HomeAssistant-batterychargecalculator/)
+Full documentation is available at: [https://rjn368.github.io/HomeAssistant-batterychargecalculator/](https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/)
 
 ## FAQ & Support
 
-For frequently asked questions and support, please refer to the [docs FAQ section](https://rjn368.github.io/HomeAssistant-batterychargecalculator/faq/) or open an issue on GitHub.
+For frequently asked questions and support, please refer to the [docs FAQ section](https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/faq/) or open an issue on GitHub.
 
 ## Sponsorship
 
@@ -77,4 +77,4 @@ If you find this addon useful, consider [sponsoring the developer](https://githu
 
 ## FAQ
 
-Before raising anything, please read through the [faq](https://rjn368.github.io/HomeAssistant-batterychargecalculator/faq). If you have questions, then you can raise a [discussion](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/discussions). If you have found a bug or have a feature request please [raise it](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/issues) using the appropriate report template.
+Before raising anything, please read through the [faq](https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/faq). If you have found a bug or have a feature request please [raise it](https://github.com/rjn368/HomeAssistant-BatteryChargeCalculator/issues) using the appropriate report template.
