@@ -73,18 +73,16 @@ class MLPowerSurfaceSensor(CoordinatorEntity, SensorEntity):
         blend_weight -- current w_ml blend weight (0 = physics, 1 = full ML)
         generated_at -- ISO-8601 UTC timestamp of the last successful training run
     """
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "ml_power_surface"
-    _attr_unique_id = const.ML_POWER_SURFACE_SENSOR
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_icon = "mdi:chart-surface"
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the ML power surface sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "ml_power_surface"
+        self._attr_unique_id = const.ML_POWER_SURFACE_SENSOR
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_icon = "mdi:chart-surface"
         self._update_attributes()
 
     def _update_attributes(self) -> None:

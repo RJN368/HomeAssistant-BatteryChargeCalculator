@@ -18,16 +18,14 @@ class CostPredictionSensor(CoordinatorEntity, RestoreSensor):
     with the genetic evaluator's predicted costs for remaining slots.
     """
 
-    _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_should_poll = False
-    _attr_translation_key = "cost_prediction"
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.hass = hass
         self._attr_unique_id = const.CHARGE_COST_ESTIMATE_SENSOR
-        self.entity_id = const.CHARGE_COST_ESTIMATE_SENSOR
+        self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_should_poll = False
+        self._attr_translation_key = "cost_prediction"
 
     @property
     def native_value(self):

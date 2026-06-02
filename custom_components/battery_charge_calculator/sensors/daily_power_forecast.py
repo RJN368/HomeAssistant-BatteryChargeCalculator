@@ -82,16 +82,15 @@ class DailyPowerForecastSensor(CoordinatorEntity, SensorEntity):
     ``temp_c``, and ``kwh``.
     """
 
-    _attr_should_poll = False
-    _attr_translation_key = "daily_power_forecast"
-    _attr_unique_id = const.DAILY_POWER_FORECAST_SENSOR
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:chart-bell-curve-cumulative"
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_should_poll = False
+        self._attr_translation_key = "daily_power_forecast"
+        self._attr_unique_id = const.DAILY_POWER_FORECAST_SENSOR
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:chart-bell-curve-cumulative"
         self._update_attributes()
 
     def _update_attributes(self) -> None:

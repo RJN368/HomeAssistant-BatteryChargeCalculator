@@ -14,16 +14,18 @@ from .. import const
 class TimeSlotSensor(CoordinatorEntity, SelectEntity, RestoreSensor):
     """Sensor showing the current active charge/export/discharge slot."""
 
-    _attr_options = ["charge", "export", "discharge"]
-    _attr_should_poll = False
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.hass = hass
         self._attr_unique_id = const.BATTERY_CHARGE_SENSOR
-        self.entity_id = const.BATTERY_CHARGE_SENSOR
         self._attr_translation_key = "battery_charge_slots"
+        self._attr_options = ["charge", "export", "discharge"]
+        self._attr_should_poll = False
+        self._update_attributes()
+
+    def _update_attributes(self) -> None:
+        return
 
     @property
     def current_option(self) -> str | None:

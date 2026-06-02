@@ -22,14 +22,13 @@ from .. import const
 class AxleRemoteControlSensor(CoordinatorEntity, SensorEntity):
     """Diagnostic sensor exposing Axle source and suppression state."""
 
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "axle_remote_control"
-    _attr_unique_id = const.AXLE_REMOTE_CONTROL_SENSOR
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the Axle remote-control sensor."""
         super().__init__(coordinator)
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "axle_remote_control"
+        self._attr_unique_id = const.AXLE_REMOTE_CONTROL_SENSOR
         self.hass = hass
         self._update_attributes()
 

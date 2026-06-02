@@ -47,16 +47,14 @@ class MLModelStatusSensor(CoordinatorEntity, SensorEntity):
         ml_enabled            — bool (mirrors config option)
         error_message         — last error string (None when ready)
     """
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "ml_model_status"
-    _attr_unique_id = const.ML_MODEL_STATUS_SENSOR
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the ML model status sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "ml_model_status"
+        self._attr_unique_id = const.ML_MODEL_STATUS_SENSOR
         self._update_attributes()
 
     def _update_attributes(self) -> None:

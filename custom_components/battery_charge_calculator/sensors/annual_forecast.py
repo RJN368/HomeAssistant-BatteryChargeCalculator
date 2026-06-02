@@ -44,16 +44,19 @@ class AnnualForecastSensor(CoordinatorEntity, SensorEntity):
     of the year?" based on historical patterns observed during training.
     """
 
-    _attr_should_poll = False
-    _attr_translation_key = "annual_forecast"
-    _attr_unique_id = const.ANNUAL_FORECAST_SENSOR
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_icon = "mdi:chart-bar"
+
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the annual forecast sensor."""
         super().__init__(coordinator)
         self.hass = hass
+
+        self._attr_should_poll = False
+        self._attr_translation_key = "annual_forecast"
+        self._attr_unique_id = const.ANNUAL_FORECAST_SENSOR
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_icon = "mdi:chart-bar"
+
         self._update_attributes()
 
     # ------------------------------------------------------------------

@@ -51,16 +51,14 @@ class EstimatedPowerDemandSensor(CoordinatorEntity, SensorEntity):
             line:
               color: steelblue
     """
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "est_power_demand"
-    _attr_unique_id = const.EST_POWER_DEMAND_SENSOR
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the estimated power demand sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "est_power_demand"
+        self._attr_unique_id = const.EST_POWER_DEMAND_SENSOR
         self._update_attributes()
 
     def _update_attributes(self) -> None:

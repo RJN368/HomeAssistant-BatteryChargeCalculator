@@ -34,17 +34,15 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         reason        — machine-readable reason key (e.g. "battery_deviation")
         reason_label  — translation-aware reason value for frontend display
     """
-
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "last_recalculation"
-    _attr_unique_id = const.LAST_RECALCULATION_SENSOR
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "last_recalculation"
+        self._attr_unique_id = const.LAST_RECALCULATION_SENSOR
         self._update_attributes()
 
     def _update_attributes(self) -> None:

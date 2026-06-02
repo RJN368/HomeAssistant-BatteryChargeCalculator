@@ -17,17 +17,20 @@ class BatterySocSensor(CoordinatorEntity, SensorEntity):
     without waiting for a full planning cycle.
     """
 
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_should_poll = False
-    _attr_translation_key = "battery_soc"
-    _attr_unique_id = "battery_charge_calculator_soc_kwh"
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the SOC sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = False
+        self._attr_translation_key = "battery_soc"
+        self._attr_unique_id = "battery_charge_calculator_soc_kwh"
+        self._update_attributes()
+
+    def _update_attributes(self) -> None:
+        return
 
     @property
     def native_value(self) -> float:

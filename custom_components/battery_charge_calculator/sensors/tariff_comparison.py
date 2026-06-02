@@ -40,18 +40,16 @@ class TariffComparisonSensor(CoordinatorEntity, SensorEntity):
     All tariff data — monthly breakdowns, annual totals, coverage, and data
     quality notes — is exposed in ``extra_state_attributes``.
     """
-
-    _attr_should_poll = False
-    _attr_translation_key = "tariff_comparison"
-    _attr_unique_id = const.TARIFF_COMPARISON_SENSOR
-    _attr_native_unit_of_measurement = "GBP"
-    _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_icon = "mdi:currency-gbp"
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialise the tariff comparison sensor."""
         super().__init__(coordinator)
         self.hass = hass
+        self._attr_should_poll = False
+        self._attr_translation_key = "tariff_comparison"
+        self._attr_unique_id = const.TARIFF_COMPARISON_SENSOR
+        self._attr_native_unit_of_measurement = "GBP"
+        self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_icon = "mdi:currency-gbp"
         self._update_attributes()
 
     # ------------------------------------------------------------------

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfEnergy
@@ -15,17 +15,18 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .. import const
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
     """Representation of future price predictions."""
-
-    _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = "total"
-    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_should_poll = False
-
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the future price sensor."""
         super().__init__(coordinator)
+        self._attr_device_class = SensorDeviceClass.ENERGY
+        self._attr_state_class = "total"
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_should_poll = False
         self.hass = hass
         self._attr_translation_key = "battery_projection"
         self._attr_unique_id = const.BATTERY_PROJECTION_SENSOR
@@ -54,10 +55,10 @@ class BatteryProjectionSensor(CoordinatorEntity, SensorEntity):
                     continue
                 dt = val.start_datetime
                 if dt.tzinfo is None:
-                    logging.warning(
+                    _LOGGER.warning(
                         "Naive datetime in battery projection slot; assuming UTC."
                     )
-                    dt = dt.replace(tzinfo=datetime.timezone.utc)
+                    dt = dt.replace(tzinfo=timezone.utc)
                 dt = dt.astimezone(ZoneInfo("Europe/London"))
                 if current_day < dt.day:
                     cost_sum = 0
