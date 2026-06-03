@@ -327,3 +327,84 @@ class OctopusAgileRatesClient:
                 )
             raw_rates = sorted(raw_rates, key=lambda r: r["start"])
             return _expand_to_30min_slots(raw_rates, days)
+
+    async def async_fetch_today_consumption(
+        self,
+        session: aiohttp.ClientSession,
+        mpan: str,
+        meter_serial: str,
+    ) -> list[dict]:
+        """Fetch today's half-hourly electricity consumption from the Octopus API.
+
+        Returns a list of dicts with keys:
+          - ``interval_start`` (datetime, UTC-aware)
+          - ``interval_end``   (datetime, UTC-aware)
+          - ``consumption_kwh`` (float)
+
+        Returns an empty list when MPAN or meter serial is absent, or when the
+        API call fails (the caller can then fall back to fully-predicted costs).
+        """
+        if not mpan or not meter_serial:
+            _LOGGER.warning(
+                "MPAN or meter serial not configured — skipping today's consumption fetch"
+            )
+            return []
+
+        london = ZoneInfo("Europe/London")
+        now_utc = datetime.now(UTC)
+        # Start of today in London time, converted back to UTC for the API query
+        today_london_midnight = now_utc.astimezone(london).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        period_from = today_london_midnight.astimezone(UTC)
+
+        url = (
+            f"{OCTOPUS_API_BASE}/electricity-meter-points/{mpan}"
+            f"/meters/{meter_serial}/consumption/"
+        )
+        params = {
+            "period_from": period_from.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "period_to": now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "page_size": 48,
+            "order_by": "period",
+        }
+
+        try:
+            async with session.get(url, auth=self._auth(), params=params) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+        except Exception as exc:
+            _LOGGER.warning("Failed to fetch today's consumption from Octopus: %s", exc)
+            return []
+
+        results: list[dict] = []
+        for entry in data.get("results", []):
+            interval_start_str = entry.get("interval_start")
+            interval_end_str = entry.get("interval_end")
+            consumption = entry.get("consumption")
+            if not interval_start_str or consumption is None:
+                continue
+            interval_start = datetime.fromisoformat(interval_start_str)
+            if interval_start.tzinfo is None:
+                _LOGGER.warning(
+                    "Naive datetime in consumption interval_start; assuming UTC."
+                )
+                interval_start = interval_start.replace(tzinfo=UTC)
+            interval_end = (
+                datetime.fromisoformat(interval_end_str)
+                if interval_end_str
+                else interval_start + timedelta(minutes=30)
+            )
+            if interval_end.tzinfo is None:
+                _LOGGER.warning(
+                    "Naive datetime in consumption interval_end; assuming UTC."
+                )
+                interval_end = interval_end.replace(tzinfo=UTC)
+            results.append(
+                {
+                    "interval_start": interval_start.astimezone(UTC),
+                    "interval_end": interval_end.astimezone(UTC),
+                    "consumption_kwh": float(consumption),
+                }
+            )
+        return results

@@ -309,10 +309,16 @@ class TestAsyncUpdateData:
         coord.timeslots = [slot]
         coord.tz = timezone.utc
         coord.givenergy.enableCharge = AsyncMock()
+        coord.givenergy.enableExport = AsyncMock()
+        coord.givenergy.disableCharge = AsyncMock()
+        coord.givenergy.disableExport = AsyncMock()
 
         await coord._async_update_data()
 
         coord.givenergy.enableCharge.assert_not_called()
+        coord.givenergy.enableExport.assert_not_called()
+        coord.givenergy.disableCharge.assert_not_called()
+        coord.givenergy.disableExport.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_charge_slot_dispatches_enable_charge(self):
@@ -364,6 +370,32 @@ class TestAsyncUpdateData:
 
         coord.givenergy.disableCharge.assert_called_once_with(coord.hass)
         coord.givenergy.disableExport.assert_called_once_with(coord.hass)
+        coord.givenergy.enableCharge.assert_not_called()
+        coord.givenergy.enableExport.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_has_no_tariff_coordinator_side_effects(self):
+        """Main coordinator refresh must not trigger tariff coordinator updates."""
+        coord = _make_coordinator(simulate=False)
+        now = datetime.now(tz=timezone.utc)
+        slot = _make_timeslot(dt=now - timedelta(minutes=5), charge_option="charge")
+        coord.timeslots = [slot]
+        coord.tz = timezone.utc
+        coord.givenergy.enableCharge = AsyncMock()
+        coord.givenergy.enableExport = AsyncMock()
+        coord.givenergy.disableCharge = AsyncMock()
+        coord.givenergy.disableExport = AsyncMock()
+
+        # Regression guard: _async_update_data dispatches battery commands only.
+        coord.tariff_coordinator = MagicMock()
+        coord.tariff_coordinator.async_refresh = AsyncMock()
+        coord.tariff_coordinator.async_request_refresh = AsyncMock()
+
+        await coord._async_update_data()
+
+        coord.givenergy.enableCharge.assert_called_once_with(coord.hass)
+        coord.tariff_coordinator.async_refresh.assert_not_called()
+        coord.tariff_coordinator.async_request_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_active_slot_sends_no_commands(self):
@@ -641,3 +673,97 @@ class TestConditionalReplan:
         await coord._conditional_replan()
 
         coord.octopus_state_change_listener.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _calculate_end_of_day_cost
+# ---------------------------------------------------------------------------
+
+_LONDON_DAY = datetime(2026, 5, 31, 0, 0, 0, tzinfo=timezone.utc)  # midnight UTC ≈ 01:00 BST
+
+
+def _make_slot_with_cost(dt: datetime, cost: float) -> "Timeslot":
+    slot = _make_timeslot(dt=dt)
+    slot.cost = cost
+    return slot
+
+
+def _rate(start: datetime, end: datetime, rate_per_kwh: float) -> dict:
+    return {"start": start, "end": end, "value_inc_vat": rate_per_kwh}
+
+
+def _consumption(start: datetime, kwh: float) -> dict:
+    return {
+        "interval_start": start,
+        "interval_end": start + timedelta(minutes=30),
+        "consumption_kwh": kwh,
+    }
+
+
+class TestCalculateEndOfDayCost:
+    """Unit tests for BatteryChargeCoordinator._calculate_end_of_day_cost."""
+
+    def test_no_data_returns_zero(self):
+        coord = _make_coordinator()
+        result = coord._calculate_end_of_day_cost([], [], [], datetime.now(timezone.utc))
+        assert result == 0.0
+
+    def test_predicted_slots_summed(self):
+        """When there is no real consumption data, sums predicted slot costs for today."""
+        coord = _make_coordinator()
+        now = datetime(2026, 5, 31, 14, 0, 0, tzinfo=timezone.utc)
+        # Two future slots today (BST = UTC+1 so 14:00 UTC = 15:00 BST, still May 31)
+        slots = [
+            _make_slot_with_cost(datetime(2026, 5, 31, 14, 0, 0, tzinfo=timezone.utc), 0.10),
+            _make_slot_with_cost(datetime(2026, 5, 31, 14, 30, 0, tzinfo=timezone.utc), 0.12),
+        ]
+        result = coord._calculate_end_of_day_cost(slots, [], [], now)
+        assert result == pytest.approx(0.22)
+
+    def test_actual_consumption_used_for_past_slots(self):
+        """Real consumption × rate is used instead of slot.cost for past intervals."""
+        coord = _make_coordinator()
+        # now = 14:30 UTC; the 13:30 slot is in the past
+        now = datetime(2026, 5, 31, 14, 30, 0, tzinfo=timezone.utc)
+        slot_13_30 = datetime(2026, 5, 31, 13, 30, 0, tzinfo=timezone.utc)
+        slot_14_30 = datetime(2026, 5, 31, 14, 30, 0, tzinfo=timezone.utc)
+
+        # Predicted future slot
+        future_slot = _make_slot_with_cost(slot_14_30, 0.20)
+        timeslots = [future_slot]
+
+        # Real consumption for past half-hour: 0.5 kWh at 20p/kWh = £0.10
+        consumption = [_consumption(slot_13_30, 0.5)]
+        rates = [
+            _rate(slot_13_30, slot_13_30 + timedelta(minutes=30), 0.20),
+            _rate(slot_14_30, slot_14_30 + timedelta(minutes=30), 0.25),
+        ]
+
+        result = coord._calculate_end_of_day_cost(timeslots, rates, consumption, now)
+        # actual: 0.5 × 0.20 = 0.10 ; predicted: 0.20 → total 0.30
+        assert result == pytest.approx(0.30)
+
+    def test_consumption_without_matching_rate_is_skipped(self):
+        """Consumption intervals with no matching rate entry are skipped gracefully."""
+        coord = _make_coordinator()
+        now = datetime(2026, 5, 31, 14, 30, 0, tzinfo=timezone.utc)
+        slot_13_30 = datetime(2026, 5, 31, 13, 30, 0, tzinfo=timezone.utc)
+
+        consumption = [_consumption(slot_13_30, 0.5)]
+        # No rates provided
+        result = coord._calculate_end_of_day_cost([], [], consumption, now)
+        assert result == pytest.approx(0.0)
+
+    def test_slots_on_different_day_excluded(self):
+        """Timeslots falling on a different calendar day (London) are not counted."""
+        coord = _make_coordinator()
+        now = datetime(2026, 5, 31, 22, 0, 0, tzinfo=timezone.utc)
+        # Slot on June 1 UTC (still May 31 in London if <23:00 UTC, but June 1 01:00 BST = June 1)
+        tomorrow_slot = _make_slot_with_cost(
+            datetime(2026, 6, 1, 1, 0, 0, tzinfo=timezone.utc), 0.50
+        )
+        today_slot = _make_slot_with_cost(
+            datetime(2026, 5, 31, 22, 0, 0, tzinfo=timezone.utc), 0.15
+        )
+        result = coord._calculate_end_of_day_cost([today_slot, tomorrow_slot], [], [], now)
+        assert result == pytest.approx(0.15)

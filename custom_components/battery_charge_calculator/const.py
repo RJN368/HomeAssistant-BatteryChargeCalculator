@@ -2,6 +2,8 @@ TITLE = "Battery Charge Calculator"
 import voluptuous as vol
 
 cv_float = vol.All(vol.Coerce(float))
+DEVICE_NAME = "Battery Charge Calculator"
+
 GIVENERGY_SERIAL_NUMBER = "givenergy_api_serial_number"
 GIVENERGY_API_TOKEN = "givenergy_api_token"
 OCTOPUS_MPN = "octopus_mpn"
@@ -84,12 +86,12 @@ DEFAULT_BUILDING_GLAZING = "double"
 VERSION = "3.3.7"
 DOMAIN = "battery_charge_calculator"
 BATTERY_SCHEDULE_DATA_ID = "battery_schedule"
-BATTERY_PROJECTION_SENSOR = "battery_charge_calculator.battery_projection_sensor"
+BATTERY_PROJECTION_SENSOR = "battery_projection_sensor"
 BATTERY_PROJECTION_SENSOR_NAME = "Battery Charge Projection"
-BATTERY_CHARGE_SENSOR = "battery_charge_calculator.battery_charge_slots_sensor"
+BATTERY_CHARGE_SENSOR = "battery_charge_slots_sensor"
 BATTERY_CHARGE_SENSOR_NAME = "Battery Charge Slots"
-CHARGE_COST_ESTIMATE_SENSOR = "battery_charge_calculator.cost_prediction_sensor"
-EST_POWER_DEMAND_SENSOR = "battery_charge_calculator.est_power_demand"
+CHARGE_COST_ESTIMATE_SENSOR = "cost_prediction_sensor"
+EST_POWER_DEMAND_SENSOR = "est_power_demand"
 EST_POWER_DEMAND_SENSOR_NAME = "Estimated Power Demand"
 CHARGE_SWITCH_NAME = "Charge Switch"
 CHARGE_SWITCH_ID = "charge_switch"
@@ -149,12 +151,12 @@ ML_TRAINING_LOOKBACK_DAYS = "ml_training_lookback_days"
 DEFAULT_ML_TRAINING_LOOKBACK_DAYS = 730  # days of historical data to fetch
 
 # Sensor identifiers
-ML_MODEL_STATUS_SENSOR = "battery_charge_calculator.ml_model_status"
+ML_MODEL_STATUS_SENSOR = "ml_model_status"
 ML_MODEL_STATUS_SENSOR_NAME = "ML Power Model Status"
-ANNUAL_FORECAST_SENSOR = "battery_charge_calculator.annual_forecast"
+ANNUAL_FORECAST_SENSOR = "annual_forecast"
 
 # Last recalculation sensor
-LAST_RECALCULATION_SENSOR = "battery_charge_calculator.last_recalculation"
+LAST_RECALCULATION_SENSOR = "last_recalculation"
 LAST_RECALCULATION_SENSOR_NAME = "Charge Slots Last Recalculated"
 
 # Recalculation reason values
@@ -165,9 +167,9 @@ REPLAN_REASON_BATTERY_DEVIATION = "battery_deviation"
 REPLAN_REASON_NO_ACTIVE_SLOT = "no_active_slot"
 REPLAN_REASON_MANUAL = "manual"
 ANNUAL_FORECAST_SENSOR_NAME = "Annual Energy Forecast"
-DAILY_POWER_FORECAST_SENSOR = "battery_charge_calculator.daily_power_forecast"
+DAILY_POWER_FORECAST_SENSOR = "daily_power_forecast"
 DAILY_POWER_FORECAST_SENSOR_NAME = "Daily Power Forecast"
-ML_POWER_SURFACE_SENSOR = "battery_charge_calculator.ml_power_surface"
+ML_POWER_SURFACE_SENSOR = "ml_power_surface"
 ML_POWER_SURFACE_SENSOR_NAME = "ML Power Surface"
 
 # ─────────────────────────── Tariff Comparison ───────────────────────────────
@@ -193,7 +195,7 @@ DEFAULT_TARIFF_COMPARISON_CACHE_MAX_AGE_DAYS = 7
 DEFAULT_TARIFF_COMPARISON_INCLUDE_EXPORT = False
 
 # Sensor identifiers
-TARIFF_COMPARISON_SENSOR = "battery_charge_calculator.tariff_comparison"
+TARIFF_COMPARISON_SENSOR = "tariff_comparison"
 TARIFF_COMPARISON_SENSOR_NAME = "Monthly Tariff Comparison"
 
 # Export meter serial — new field; added alongside OCTOPUS_METER_SERIAL (D-18)
@@ -205,3 +207,47 @@ OCTOPUS_EXPORT_METER_SERIAL = "octopus_export_meter_serial"
 # so the GeneticEvaluator accounts for solar generation on each simulated day.
 SOLAR_ENERGY_ENTITY = "solar_energy_entity"
 DEFAULT_SOLAR_ENERGY_ENTITY = ""
+
+# ─────────────────────────── Axle VPP Awareness ─────────────────────────────
+# Phase 1 data-layer contracts. Feature remains opt-in and defaults safe.
+
+AXLE_ENABLED = "axle_enabled"
+AXLE_API_TOKEN = "axle_api_token"
+AXLE_POLL_INTERVAL_SECONDS = "axle_poll_interval_seconds"
+AXLE_REQUEST_TIMEOUT_SECONDS = "axle_request_timeout_seconds"
+AXLE_FAIL_SAFE_MODE = "axle_fail_safe_mode"
+AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY = "axle_neutralize_on_active_entry"
+
+AXLE_FAIL_SAFE_MODE_OPEN = "open"
+AXLE_FAIL_SAFE_MODE_CLOSED = "closed"
+
+DEFAULT_AXLE_ENABLED = False
+DEFAULT_AXLE_API_TOKEN = ""
+DEFAULT_AXLE_POLL_INTERVAL_SECONDS = 60
+DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_AXLE_FAIL_SAFE_MODE = AXLE_FAIL_SAFE_MODE_OPEN
+DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY = True
+
+AXLE_EVENT_ENDPOINT = "https://api.axle.energy/vpp/home-assistant/event"
+AXLE_EVENT_ACCEPT_HEADER = "application/json"
+AXLE_MAX_RETRIES = 2
+AXLE_RETRY_BASE_DELAY_SECONDS = 0.5
+AXLE_RETRY_JITTER_SECONDS = 0.2
+
+AXLE_SOURCE_STATUS_FRESH = "fresh"
+AXLE_SOURCE_STATUS_STALE = "stale"
+AXLE_SOURCE_STATUS_UNAVAILABLE = "unavailable"
+
+AXLE_SUPPRESSION_REASON_ACTIVE_WINDOW = "axle_active_window"
+AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED = "axle_source_unavailable_closed"
+
+AXLE_TRANSITION_REASON_ACTIVE_ENTRY = "axle_active_entry"
+AXLE_TRANSITION_REASON_ACTIVE_EXIT = "axle_active_exit"
+
+AXLE_REMOTE_CONTROL_SENSOR = "axle_remote_control"
+AXLE_REMOTE_CONTROL_SENSOR_NAME = "Axle Remote Control"
+
+AXLE_FRESHNESS_MULTIPLIER = 3
+AXLE_STALE_MAX_AGE_SECONDS = 30 * 60
+
+REPLAN_REASON_AXLE_WINDOW_ENDED = "axle_window_ended"

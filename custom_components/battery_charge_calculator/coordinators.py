@@ -12,6 +12,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from . import const, givenergy, power_calculator, genetic_evaluator
+from .axle_client import AxleClient, AxleClientError
+from .axle_windows import AxleWindow, normalize_windows
 from .octopus_agile import OctopusAgileRatesClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -115,6 +117,18 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         # Tariff Comparison Coordinator (lazy — created in async_setup_entry if enabled)
         self.tariff_coordinator = None
 
+        # Axle cache (Phase 1 only): state holders and freshness helpers.
+        self._axle_cache: dict = {
+            "windows": [],
+            "last_success_utc": None,
+            "last_error": None,
+            "source_status": const.AXLE_SOURCE_STATUS_UNAVAILABLE,
+            "is_active": False,
+            "suppression_reason": None,
+            "last_transition_reason": None,
+        }
+        self._axle_last_neutralized_window_key: tuple[datetime, datetime] | None = None
+
     def _build_ml_service_config(self, entry, hass=None) -> dict:
         """Build the config dict sent to POST /configure on the ML service."""
         opts = entry.options
@@ -158,6 +172,10 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 await self.ml_client.async_start()
             except Exception as exc:
                 _LOGGER.warning("ML service unreachable at startup: %s", exc)
+
+        if self._axle_is_enabled():
+            await self._axle_refresh_source_state(now_utc=datetime.now(timezone.utc))
+
         await self.octopus_state_change_listener(
             None, reason=const.REPLAN_REASON_INITIAL_SETUP
         )
@@ -286,6 +304,14 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
             all_octopus_export_rates = await self.agile_rates_client.fetch_rates(
                 session, export=True
+            )
+
+            # Fetch today's real half-hourly consumption so cost prediction can
+            # blend actual spend up to now with predicted spend for the rest of the day.
+            mpan = self.config_entry.options.get(const.OCTOPUS_MPN, "")
+            meter_serial = self.config_entry.options.get(const.OCTOPUS_METER_SERIAL, "")
+            today_consumption = await self.agile_rates_client.async_fetch_today_consumption(
+                session, mpan, meter_serial
             )
 
             weather_state = self.hass.states.get("weather.forecast_home")
@@ -458,6 +484,9 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
             self.timeslots, self.totalcost = evaluator.evaluate()
             self.daily_power_forecast = daily_forecast
+            self.end_of_day_cost = self._calculate_end_of_day_cost(
+                self.timeslots, all_octopus_rates, today_consumption, now
+            )
 
             # Refresh ML service status for diagnostic sensors
             if self.ml_client is not None:
@@ -468,6 +497,59 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
             _LOGGER.error(
                 "Exception in octopus_state_change_listener: %s", exc, exc_info=True
             )
+
+    def _calculate_end_of_day_cost(
+        self,
+        timeslots: list,
+        all_octopus_rates: list[dict],
+        consumption_data: list[dict],
+        now: datetime,
+    ) -> float:
+        """Return the predicted end-of-day energy cost for today.
+
+        Blends two sources:
+        - **Actual spend** — real half-hourly consumption (from Octopus API) ×
+          the tariff rate for each slot, for intervals that have already passed.
+        - **Predicted spend** — ``timeslot.cost`` from the genetic evaluator for
+          all remaining slots from now until midnight.
+
+        If consumption data is unavailable for a past interval the evaluator's
+        predicted cost for that slot is used as a fallback.
+        """
+        london = ZoneInfo("Europe/London")
+        today_day = now.astimezone(london).day
+        total = 0.0
+
+        # --- Actual spend: past half-hours with real meter readings ---
+        for entry in consumption_data:
+            interval_start = entry["interval_start"]
+            if interval_start.astimezone(london).day != today_day:
+                continue
+            rate = next(
+                (
+                    r["value_inc_vat"]
+                    for r in all_octopus_rates
+                    if r["start"] <= interval_start < r["end"]
+                ),
+                None,
+            )
+            if rate is not None:
+                total += entry["consumption_kwh"] * rate
+            else:
+                _LOGGER.debug(
+                    "No import rate found for consumption interval %s — skipping",
+                    interval_start,
+                )
+
+        # --- Predicted spend: today's timeslots from now onwards ---
+        for slot in timeslots:
+            slot_dt = slot.start_datetime
+            if slot_dt.tzinfo is None:
+                slot_dt = slot_dt.replace(tzinfo=timezone.utc)
+            if slot_dt.astimezone(london).day == today_day:
+                total += getattr(slot, "cost", 0)
+
+        return total
 
     def find_in_dataset(self, sourcedata, lastvalue, value_field, comparitor):
         result_list = list(filter(comparitor, sourcedata))
@@ -516,15 +598,252 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         return None
 
+    def _axle_cache_age_seconds(self, now_utc: datetime | None = None) -> float | None:
+        """Return Axle cache age in seconds, or None when never fetched."""
+        last_success = self._axle_cache.get("last_success_utc")
+        if last_success is None:
+            return None
+
+        now_value = now_utc or datetime.now(timezone.utc)
+        if now_value.tzinfo is None:
+            now_value = now_value.replace(tzinfo=timezone.utc)
+
+        if last_success.tzinfo is None:
+            last_success = last_success.replace(tzinfo=timezone.utc)
+
+        return max(0.0, (now_value - last_success).total_seconds())
+
+    def _axle_evaluate_source_status(self, now_utc: datetime | None = None) -> str:
+        """Evaluate Axle source freshness from coordinator cache state."""
+        age_seconds = self._axle_cache_age_seconds(now_utc)
+        if age_seconds is None:
+            return const.AXLE_SOURCE_STATUS_UNAVAILABLE
+
+        poll_seconds = int(
+            self.config_entry.options.get(
+                const.AXLE_POLL_INTERVAL_SECONDS,
+                const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+            )
+        )
+        fresh_limit = poll_seconds * const.AXLE_FRESHNESS_MULTIPLIER
+
+        if age_seconds <= fresh_limit:
+            return const.AXLE_SOURCE_STATUS_FRESH
+
+        if age_seconds <= const.AXLE_STALE_MAX_AGE_SECONDS:
+            return const.AXLE_SOURCE_STATUS_STALE
+
+        return const.AXLE_SOURCE_STATUS_UNAVAILABLE
+
+    def _axle_cache_update(
+        self,
+        *,
+        windows: list[AxleWindow],
+        last_success_utc: datetime,
+        last_error: str | None,
+    ) -> None:
+        """Update coordinator-private Axle cache snapshot and source status."""
+        self._axle_cache["windows"] = windows
+        self._axle_cache["last_success_utc"] = last_success_utc
+        self._axle_cache["last_error"] = last_error
+        self._axle_cache["source_status"] = self._axle_evaluate_source_status(
+            now_utc=last_success_utc
+        )
+
+    def _axle_is_enabled(self) -> bool:
+        return bool(
+            self.config_entry.options.get(const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED)
+        )
+
+    def _axle_redact_text(self, text: str) -> str:
+        """Redact configured Axle token from free-form text defensively."""
+        token = str(self.config_entry.options.get(const.AXLE_API_TOKEN, "")).strip()
+        if token:
+            return text.replace(token, "***REDACTED***")
+        return text
+
+    async def _axle_refresh_source_state(self, *, now_utc: datetime) -> None:
+        """Refresh Axle source cache snapshot from upstream endpoint."""
+        if not self._axle_is_enabled():
+            return
+
+        token = str(self.config_entry.options.get(const.AXLE_API_TOKEN, "")).strip()
+        if not token:
+            self._axle_cache["windows"] = []
+            self._axle_cache["last_error"] = "Axle enabled but API token is not configured"
+            self._axle_cache["source_status"] = const.AXLE_SOURCE_STATUS_UNAVAILABLE
+            _LOGGER.warning(
+                "Axle enabled but API token is missing; source marked unavailable."
+            )
+            return
+
+        timeout_seconds = int(
+            self.config_entry.options.get(
+                const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+            )
+        )
+        client = AxleClient(
+            token,
+            request_timeout_seconds=timeout_seconds,
+        )
+        session = async_get_clientsession(self.hass)
+
+        try:
+            event = await client.async_fetch_event(session)
+        except AxleClientError as err:
+            sanitized_error = self._axle_redact_text(str(err))
+            self._axle_cache["last_error"] = sanitized_error
+            self._axle_cache["source_status"] = self._axle_evaluate_source_status(
+                now_utc=now_utc
+            )
+            _LOGGER.warning(
+                "Axle source refresh failed; source_status=%s, cache_age_seconds=%s, error=%s",
+                self._axle_cache["source_status"],
+                self._axle_cache_age_seconds(now_utc),
+                sanitized_error,
+            )
+            return
+
+        windows = normalize_windows([event] if event is not None else [])
+        self._axle_cache_update(
+            windows=windows,
+            last_success_utc=now_utc,
+            last_error=None,
+        )
+
+    def _axle_overlapping_window(self, now_utc: datetime) -> AxleWindow | None:
+        """Return overlapping Axle window at now, using half-open [start, end)."""
+        for window in self._axle_cache.get("windows", []):
+            if window.start <= now_utc < window.end:
+                return window
+        return None
+
+    def _axle_gate_state(
+        self, now_utc: datetime
+    ) -> tuple[bool, str | None, AxleWindow | None]:
+        """Return gate decision: (suppress, reason, overlapping_window)."""
+        if not self._axle_is_enabled():
+            return False, None, None
+
+        source_status = self._axle_evaluate_source_status(now_utc)
+        self._axle_cache["source_status"] = source_status
+
+        overlapping_window = self._axle_overlapping_window(now_utc)
+        if source_status in (
+            const.AXLE_SOURCE_STATUS_FRESH,
+            const.AXLE_SOURCE_STATUS_STALE,
+        ):
+            if overlapping_window is not None:
+                return (
+                    True,
+                    const.AXLE_SUPPRESSION_REASON_ACTIVE_WINDOW,
+                    overlapping_window,
+                )
+            return False, None, None
+
+        fail_safe_mode = self.config_entry.options.get(
+            const.AXLE_FAIL_SAFE_MODE,
+            const.DEFAULT_AXLE_FAIL_SAFE_MODE,
+        )
+        if fail_safe_mode == const.AXLE_FAIL_SAFE_MODE_CLOSED:
+            return True, const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED, None
+
+        return False, None, None
+
     """Update the data"""
 
     async def _async_update_data(self):
         _LOGGER.info("update data in entity")
 
         simulate = self.config_entry.options.get(const.SIMULATE_ONLY)
+        now_utc = datetime.now(timezone.utc)
+
+        if self._axle_is_enabled():
+            await self._axle_refresh_source_state(now_utc=now_utc)
+
+        suppress_dispatch, suppression_reason, active_window = self._axle_gate_state(now_utc)
+
+        was_suppressed = bool(self._axle_cache.get("is_active", False))
+        became_active = suppress_dispatch and not was_suppressed
+        became_inactive = was_suppressed and not suppress_dispatch
+
+        self._axle_cache["is_active"] = suppress_dispatch
+        self._axle_cache["suppression_reason"] = suppression_reason
+
+        source_status = self._axle_cache.get("source_status")
+        if source_status == const.AXLE_SOURCE_STATUS_STALE and active_window is not None:
+            _LOGGER.info(
+                "Axle dispatch suppression active from stale overlap; window_start=%s window_end=%s",
+                active_window.start.isoformat(),
+                active_window.end.isoformat(),
+            )
+        elif suppression_reason == const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED:
+            _LOGGER.warning(
+                "Axle source unavailable with fail-safe closed; suppressing local dispatch."
+            )
+        elif source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE and not suppress_dispatch:
+            _LOGGER.info(
+                "Axle source unavailable with fail-safe open; allowing local dispatch."
+            )
+
+        if became_active:
+            self._axle_cache["last_transition_reason"] = (
+                const.AXLE_TRANSITION_REASON_ACTIVE_ENTRY
+            )
+            _LOGGER.info(
+                "Axle suppression transitioned to active; reason=%s source_status=%s",
+                suppression_reason,
+                source_status,
+            )
+            if active_window is not None:
+                window_key = (active_window.start, active_window.end)
+                neutralize_on_entry = self.config_entry.options.get(
+                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                )
+                should_neutralize = (
+                    neutralize_on_entry
+                    and self._axle_last_neutralized_window_key != window_key
+                )
+                if should_neutralize:
+                    if not simulate:
+                        await self.givenergy.disableCharge(self.hass)
+                        await self.givenergy.disableExport(self.hass)
+                        _LOGGER.info(
+                            "Axle neutralize-on-entry applied; window_start=%s window_end=%s",
+                            active_window.start.isoformat(),
+                            active_window.end.isoformat(),
+                        )
+                    self._axle_last_neutralized_window_key = window_key
+
+        if became_inactive:
+            self._axle_cache["last_transition_reason"] = (
+                const.AXLE_TRANSITION_REASON_ACTIVE_EXIT
+            )
+            _LOGGER.info("Axle suppression transitioned to inactive; resuming local planning.")
+            await self.octopus_state_change_listener(
+                None,
+                reason=const.REPLAN_REASON_AXLE_WINDOW_ENDED,
+            )
+
+        if suppress_dispatch:
+            _LOGGER.debug(
+                "Axle suppression gating active; reason=%s source_status=%s",
+                suppression_reason,
+                source_status,
+            )
+            return self.timeslots
+
         active_slot = self.current_active_slot()
         if active_slot is not None:
-            _LOGGER.info(active_slot.charge_option)
+            slot_local = active_slot.start_datetime.astimezone(self.tz)
+            _LOGGER.info(
+                "Active slot: %s → %s (local %s)",
+                active_slot.charge_option,
+                active_slot.start_datetime.isoformat(),
+                slot_local.strftime("%d/%m %H:%M %Z"),
+            )
             if not simulate:
                 if active_slot.charge_option == "charge":
                     await self.givenergy.enableCharge(self.hass)

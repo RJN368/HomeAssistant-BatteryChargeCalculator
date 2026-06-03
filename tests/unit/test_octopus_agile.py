@@ -1,7 +1,7 @@
 """Unit tests for Octopus Agile tariff agreement selection and refresh behavior."""
 
 from datetime import datetime, timedelta, UTC
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -133,3 +133,87 @@ async def test_find_current_tariffs_refreshes_after_boundary() -> None:
     )
     assert client.import_tariff_code == "E-1R-NEW-IMPORT-A"
     assert meters_mock.await_count == 2
+
+
+# ---------------------------------------------------------------------------
+# async_fetch_today_consumption
+# ---------------------------------------------------------------------------
+
+
+def _make_consumption_client() -> OctopusAgileRatesClient:
+    return OctopusAgileRatesClient(api_key="key", account_number="acct")
+
+
+def _mock_session_with_consumption(results: list[dict]) -> AsyncMock:
+    """Return a mock aiohttp session whose GET returns the given consumption results."""
+    resp = AsyncMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value={"results": results})
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = AsyncMock()
+    session.get = MagicMock(return_value=resp)
+    return session
+
+
+@pytest.mark.asyncio
+async def test_fetch_today_consumption_returns_empty_when_mpan_missing() -> None:
+    """Returns empty list immediately when MPAN is blank."""
+    client = _make_consumption_client()
+    session = AsyncMock()
+    result = await client.async_fetch_today_consumption(session, "", "SN001")
+    assert result == []
+    session.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_today_consumption_returns_empty_when_serial_missing() -> None:
+    """Returns empty list immediately when meter serial is blank."""
+    client = _make_consumption_client()
+    session = AsyncMock()
+    result = await client.async_fetch_today_consumption(session, "1200012345678", "")
+    assert result == []
+    session.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_today_consumption_parses_results() -> None:
+    """Parses interval_start, interval_end, and consumption_kwh from API response."""
+    client = _make_consumption_client()
+    api_results = [
+        {
+            "interval_start": "2026-05-31T00:00:00Z",
+            "interval_end": "2026-05-31T00:30:00Z",
+            "consumption": 0.312,
+        },
+        {
+            "interval_start": "2026-05-31T00:30:00Z",
+            "interval_end": "2026-05-31T01:00:00Z",
+            "consumption": 0.278,
+        },
+    ]
+    session = _mock_session_with_consumption(api_results)
+    result = await client.async_fetch_today_consumption(session, "1200012345678", "SN001")
+
+    assert len(result) == 2
+    assert result[0]["consumption_kwh"] == pytest.approx(0.312)
+    assert result[1]["consumption_kwh"] == pytest.approx(0.278)
+    # All datetimes must be UTC-aware
+    for entry in result:
+        assert entry["interval_start"].tzinfo is not None
+        assert entry["interval_end"].tzinfo is not None
+
+
+@pytest.mark.asyncio
+async def test_fetch_today_consumption_returns_empty_on_http_error() -> None:
+    """Returns empty list and does not raise when the API call fails."""
+    client = _make_consumption_client()
+    resp = AsyncMock()
+    resp.raise_for_status = MagicMock(side_effect=Exception("503 Service Unavailable"))
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = AsyncMock()
+    session.get = MagicMock(return_value=resp)
+
+    result = await client.async_fetch_today_consumption(session, "1200012345678", "SN001")
+    assert result == []

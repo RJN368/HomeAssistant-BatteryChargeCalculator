@@ -86,6 +86,7 @@ def _add_listener_mocks(coord: BatteryChargeCoordinator) -> None:
     rate_entry = {"start": now, "end": slot_end, "value_inc_vat": 0.25}
     coord.agile_rates_client.fetch_standing_charge = AsyncMock(return_value=0.35)
     coord.agile_rates_client.fetch_rates = AsyncMock(return_value=[rate_entry])
+    coord.agile_rates_client.async_fetch_today_consumption = AsyncMock(return_value=[])
 
     weather_state = MagicMock()
     weather_state.attributes.get = MagicMock(return_value=15.0)

@@ -18,6 +18,7 @@ from .config_schemas import (
     _heat_loss_known_schema,
     _building_estimate_schema,
     _ml_settings_schema,
+    _axle_settings_schema,
     _tariff_comparison_enable_schema,
     _tariff_comparison_pick_schema,
     _export_meter_schema,
@@ -161,13 +162,33 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
     Step 5b (building_estimate)     – building questions → auto-calculated W/°C
     """
 
-    VERSION = 2
+    VERSION = 3
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     def __init__(self):
         self._main_data: dict = {}
         self._heating_data: dict = {}
         self._resolved_current_import_tariff_code: str | None = None
+
+    def _with_axle_defaults(self, values: dict) -> dict:
+        """Return a copy with all Axle options populated to safe defaults."""
+        merged = dict(values)
+        merged.setdefault(const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED)
+        merged.setdefault(const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN)
+        merged.setdefault(
+            const.AXLE_POLL_INTERVAL_SECONDS,
+            const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+        )
+        merged.setdefault(
+            const.AXLE_REQUEST_TIMEOUT_SECONDS,
+            const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+        )
+        merged.setdefault(const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE)
+        merged.setdefault(
+            const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+            const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+        )
+        return merged
 
     async def async_step_user(self, user_input=None):
         """Step 1 – main settings."""
@@ -361,7 +382,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             # Also update self.options to ensure persistence if options flow is used later
             if hasattr(self, "options"):
                 self.options.update(ml_settings)
-            return await self.async_step_tariff_comparison()
+            return await self.async_step_axle_settings()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -387,6 +408,63 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
                 training_lookback_days=self._heating_data.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            ),
+        )
+
+    async def async_step_axle_settings(self, user_input=None):
+        """Axle VPP awareness settings step."""
+        if user_input is not None:
+            axle_settings = {
+                const.AXLE_ENABLED: user_input.get(
+                    const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED
+                ),
+                const.AXLE_API_TOKEN: user_input.get(
+                    const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN
+                ),
+                const.AXLE_POLL_INTERVAL_SECONDS: user_input.get(
+                    const.AXLE_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+                ),
+                const.AXLE_REQUEST_TIMEOUT_SECONDS: user_input.get(
+                    const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+                ),
+                const.AXLE_FAIL_SAFE_MODE: user_input.get(
+                    const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE
+                ),
+                const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY: user_input.get(
+                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                ),
+            }
+            self._heating_data.update(axle_settings)
+            return await self.async_step_tariff_comparison()
+
+        self._heating_data = self._with_axle_defaults(self._heating_data)
+        return self.async_show_form(
+            step_id="axle_settings",
+            data_schema=_axle_settings_schema(
+                axle_enabled=self._heating_data.get(
+                    const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED
+                ),
+                axle_api_token=self._heating_data.get(
+                    const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN
+                ),
+                axle_poll_interval_seconds=self._heating_data.get(
+                    const.AXLE_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+                ),
+                axle_request_timeout_seconds=self._heating_data.get(
+                    const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+                ),
+                axle_fail_safe_mode=self._heating_data.get(
+                    const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE
+                ),
+                axle_neutralize_on_active_entry=self._heating_data.get(
+                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
                 ),
             ),
         )
@@ -487,9 +565,6 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
             },
         )
 
-        options = {**self._main_data, **self._heating_data}
-        return self.async_create_entry(title=const.TITLE, data={}, options=options)
-
     async def async_step_export_meter(self, user_input=None):
         """Step: configure export meter MPAN and serial for tariff comparison.
 
@@ -524,7 +599,7 @@ class BatteryChargCalculatorConfigFlow(config_entries.ConfigFlow, domain=const.D
 
     def _create_entry(self):
         """Finalise and create the config entry (called from tariff steps)."""
-        options = {**self._main_data, **self._heating_data}
+        options = self._with_axle_defaults({**self._main_data, **self._heating_data})
         return self.async_create_entry(title=const.TITLE, data={}, options=options)
 
     @staticmethod
@@ -550,6 +625,26 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry
         self.options = dict(config_entry.options)
         self._resolved_current_import_tariff_code: str | None = None
+
+    def _with_axle_defaults(self, values: dict) -> dict:
+        """Return a copy with all Axle options populated to safe defaults."""
+        merged = dict(values)
+        merged.setdefault(const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED)
+        merged.setdefault(const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN)
+        merged.setdefault(
+            const.AXLE_POLL_INTERVAL_SECONDS,
+            const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+        )
+        merged.setdefault(
+            const.AXLE_REQUEST_TIMEOUT_SECONDS,
+            const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+        )
+        merged.setdefault(const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE)
+        merged.setdefault(
+            const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+            const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+        )
+        return merged
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -844,7 +939,7 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             )
-            return await self.async_step_tariff_comparison()
+            return await self.async_step_axle_settings()
 
         return self.async_show_form(
             step_id="ml_settings",
@@ -870,6 +965,64 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
                 training_lookback_days=self.options.get(
                     const.ML_TRAINING_LOOKBACK_DAYS,
                     const.DEFAULT_ML_TRAINING_LOOKBACK_DAYS,
+                ),
+            ),
+        )
+
+    async def async_step_axle_settings(self, user_input=None):
+        """Axle VPP awareness settings step (options flow)."""
+        if user_input is not None:
+            self.options.update(
+                {
+                    const.AXLE_ENABLED: user_input.get(
+                        const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED
+                    ),
+                    const.AXLE_API_TOKEN: user_input.get(
+                        const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN
+                    ),
+                    const.AXLE_POLL_INTERVAL_SECONDS: user_input.get(
+                        const.AXLE_POLL_INTERVAL_SECONDS,
+                        const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+                    ),
+                    const.AXLE_REQUEST_TIMEOUT_SECONDS: user_input.get(
+                        const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                        const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+                    ),
+                    const.AXLE_FAIL_SAFE_MODE: user_input.get(
+                        const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE
+                    ),
+                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY: user_input.get(
+                        const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                        const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    ),
+                }
+            )
+            return await self.async_step_tariff_comparison()
+
+        self.options = self._with_axle_defaults(self.options)
+        return self.async_show_form(
+            step_id="axle_settings",
+            data_schema=_axle_settings_schema(
+                axle_enabled=self.options.get(
+                    const.AXLE_ENABLED, const.DEFAULT_AXLE_ENABLED
+                ),
+                axle_api_token=self.options.get(
+                    const.AXLE_API_TOKEN, const.DEFAULT_AXLE_API_TOKEN
+                ),
+                axle_poll_interval_seconds=self.options.get(
+                    const.AXLE_POLL_INTERVAL_SECONDS,
+                    const.DEFAULT_AXLE_POLL_INTERVAL_SECONDS,
+                ),
+                axle_request_timeout_seconds=self.options.get(
+                    const.AXLE_REQUEST_TIMEOUT_SECONDS,
+                    const.DEFAULT_AXLE_REQUEST_TIMEOUT_SECONDS,
+                ),
+                axle_fail_safe_mode=self.options.get(
+                    const.AXLE_FAIL_SAFE_MODE, const.DEFAULT_AXLE_FAIL_SAFE_MODE
+                ),
+                axle_neutralize_on_active_entry=self.options.get(
+                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+                    const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
                 ),
             ),
         )
@@ -958,7 +1111,10 @@ class BatteryChargCalculatorFlowHandler(config_entries.OptionsFlow):
         # and fires the update_listener (which triggers async_reload in __init__.py).
         # Do NOT also call async_update_entry — that fires the listener a second time,
         # causing a double-reload race condition.
-        return self.async_create_entry(title=const.TITLE, data=self.options)
+        return self.async_create_entry(
+            title=const.TITLE,
+            data=self._with_axle_defaults(self.options),
+        )
 
     async def async_step_export_meter(self, user_input=None):
         """Step: configure export meter MPAN and serial (options flow)."""

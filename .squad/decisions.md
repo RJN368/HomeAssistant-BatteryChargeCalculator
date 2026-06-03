@@ -797,6 +797,61 @@ All defaults are safe; implementation can proceed without Robert's answers.
 
 ---
 
+## Active Decisions (Axle VPP Awareness)
+*Added: 2026-05-27 — sources: Dallas (feature spec), Keaton (lead review)*
+
+### D-AX-1: MVP architecture is command-path gating only
+
+**Decision:** Axle awareness is applied only to charge/export command dispatch in `BatteryChargeCoordinator._async_update_data` for MVP. Planning and forecast generation remain active and unchanged.
+
+**Why:** This is the minimum-change path to prevent local/remote command contention while preserving existing planning behavior and forecast sensors.
+
+*Agreed by: Dallas, Keaton — 2026-05-27*
+
+### D-AX-2: Feature defaults and safety behavior
+
+**Decision:** Axle awareness is opt-in and disabled by default. `simulate_only` behavior is preserved in all Axle states, and non-Axle behavior is a hard regression guard.
+
+**Fallback decision:** Fail-open after prolonged Axle API unavailability is the default for MVP, with optional fail-closed mode.
+
+*Agreed by: Dallas, Keaton — 2026-05-27*
+
+### D-AX-3: Tariff comparison stays independent
+
+**Decision:** Axle suppression/fallback state must not block `TariffComparisonCoordinator` refreshes or tariff sensor behavior.
+
+**Why:** Tariff comparison is explicitly non-impacted by the Axle rollout.
+
+*Agreed by: Keaton — 2026-05-27*
+
+### D-AX-4: Config flow placement and interval semantics
+
+**Decision:** Axle settings are inserted after `ml_settings` and before tariff comparison steps in both initial and options flows.
+
+**Decision:** Runtime overlap checks use half-open intervals `[slot_start, slot_end)` to avoid endpoint ambiguity.
+
+*Agreed by: Keaton — 2026-05-27*
+
+### D-AX-5: MVP transparency requirement
+
+**Decision:** Include a dedicated diagnostic sensor for Axle remote-control status in MVP.
+
+**Why:** Improves user transparency and reduces support ambiguity when schedule commands are paused.
+
+*Agreed by: Dallas — 2026-05-27*
+
+### Open questions — Axle VPP awareness (pending product-owner confirmation)
+
+| # | Question | Default | Blocking? |
+|---|---|---|---|
+| OQ-AX-1 | Axle API contract details and authentication scheme | Await confirmation | No |
+| OQ-AX-2 | Entering active Axle window: issue one-time neutralization command or suppress-only | Suppress-only for MVP | No |
+| OQ-AX-3 | Confirm fallback default in product terms (fail-open vs fail-closed) | Fail-open default, fail-closed optional | No |
+
+Implementation inspiration from `ha-axle-vpp` is allowed, but no runtime dependency is introduced.
+
+---
+
 ## Active Decisions (other)
 
 *No other active decisions recorded.*

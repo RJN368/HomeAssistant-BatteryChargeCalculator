@@ -477,6 +477,12 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     sc_rates = await client.fetch_standing_charges(
                         session, import_code, period_from, period_to
                     )
+                    _LOGGER.debug(
+                        "Fetched rates for %s: unit_rates=%d standing_charges=%d",
+                        import_code,
+                        len(unit_rates),
+                        len(sc_rates),
+                    )
                     new_tariff_rates[import_code] = {
                         "unit_rates": unit_rates,
                         "standing_charges": sc_rates,
@@ -502,6 +508,11 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 try:
                     exp_unit_rates = await client.fetch_unit_rates(
                         session, export_code, period_from, period_to
+                    )
+                    _LOGGER.debug(
+                        "Fetched export rates for %s: unit_rates=%d",
+                        export_code,
+                        len(exp_unit_rates),
                     )
                     new_tariff_rates[export_code] = {
                         "unit_rates": exp_unit_rates,
@@ -631,6 +642,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         now = datetime.now(timezone.utc)
         tariff_results: list[dict] = []
         any_low_coverage = False
+        total_period_days = max(0, (period_to.date() - period_from.date()).days)
 
         for tc in tariff_configs:
             import_code: str = tc.get("import_tariff_code", "")
@@ -648,6 +660,51 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             import_rate_map = client_helper.build_rate_map(
                 import_raw, period_from, period_to
             )
+
+            covered_days = len({dt.date() for dt in import_rate_map})
+            if covered_days <= 0:
+                period_coverage_tag = "no-data"
+            elif total_period_days > 0 and covered_days >= total_period_days:
+                period_coverage_tag = "full-month"
+            else:
+                period_coverage_tag = "partial-month"
+
+            if not import_rate_map:
+                any_low_coverage = True
+                _LOGGER.warning(
+                    "No import rates mapped for %s in %s -> %s; leaving monthly costs empty",
+                    import_code,
+                    period_from.date(),
+                    period_to.date(),
+                )
+                comparison_method = "real_meter_reads" if is_current else "naive_replay"
+                notes: list[str] = [
+                    "No import tariff rate data was available for this period. "
+                    "Costs cannot be calculated for this tariff."
+                ]
+                if not is_current:
+                    notes.append(
+                        "Simulation will be skipped until valid rate data is available."
+                    )
+
+                tariff_results.append(
+                    {
+                        "name": tc.get("name", import_code),
+                        "import_tariff_code": import_code,
+                        "export_tariff_code": export_code,
+                        "is_current": is_current,
+                        "include_standing_charges": include_sc,
+                        "comparison_method": comparison_method,
+                        "simulation_progress_pct": 0.0,
+                        "data_quality_notes": notes,
+                        "coverage_pct": 0.0,
+                        "period_days_covered": covered_days,
+                        "period_days_total": total_period_days,
+                        "period_coverage_tag": period_coverage_tag,
+                        "monthly": [],
+                    }
+                )
+                continue
 
             export_rate_map: dict[datetime, float] | None = None
             if export_code and export_code in tariff_rates:
@@ -689,9 +746,27 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 "simulation_progress_pct": 0.0,
                 "data_quality_notes": data_quality_notes,
                 "coverage_pct": coverage,
+                "period_days_covered": covered_days,
+                "period_days_total": total_period_days,
+                "period_coverage_tag": period_coverage_tag,
                 "monthly": calc_result["monthly"],
             }
             tariff_results.append(tariff_entry)
+
+        full_month_count = sum(
+            1
+            for t in tariff_results
+            if t.get("period_coverage_tag") == "full-month"
+        )
+        partial_month_count = sum(
+            1
+            for t in tariff_results
+            if t.get("period_coverage_tag") == "partial-month"
+        )
+        no_data_count = sum(
+            1 for t in tariff_results if t.get("period_coverage_tag") == "no-data"
+        )
+        total_tariffs = len(tariff_results)
 
         return {
             "generated_at": now.isoformat(),
@@ -700,6 +775,16 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                 "to": period_to.date().isoformat(),
             },
             "coverage_warning": any_low_coverage,
+            "tariff_coverage_summary": (
+                f"{full_month_count}/{total_tariffs} full-month, "
+                f"{partial_month_count} partial-month, {no_data_count} no-data"
+            ),
+            "tariff_coverage_counts": {
+                "full_month": full_month_count,
+                "partial_month": partial_month_count,
+                "no_data": no_data_count,
+                "total": total_tariffs,
+            },
             "tariffs": tariff_results,
             "export_configured": export_slots is not None,
             "export_meter_serial_missing": export_meter_missing,
@@ -793,7 +878,6 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         Updates sensor progress via _push_simulation_progress() so concurrent
         simulations never overwrite each other's state.
         """
-        from ..genetic_evaluator import GeneticEvaluator
         from .simulator import TariffSimulator
 
         import_code: str = tariff_config.get("import_tariff_code", "")
@@ -933,6 +1017,10 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         simulator = TariffSimulator()
         monthly_import_pence: dict[str, float] = defaultdict(float)
         monthly_export_pence: dict[str, float] = defaultdict(float)
+        missing_rate_days = 0
+        simulated_days = 0
+        first_missing_day: date | None = None
+        last_missing_day: date | None = None
 
         # Signal that this tariff is now being simulated
         self._push_simulation_progress(
@@ -946,6 +1034,14 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
         )
 
         for day_idx, day_obj in enumerate(day_range):
+            day_import_rates = per_day_import.get(day_obj, {})
+            if not day_import_rates:
+                missing_rate_days += 1
+                if first_missing_day is None:
+                    first_missing_day = day_obj
+                last_missing_day = day_obj
+                continue
+
             hourly_temps = weather_data.get(day_obj, [10.0] * 24)
             solar_30min = solar_data.get(day_obj)  # None → simulate_day uses 0.0
 
@@ -954,7 +1050,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     simulator.simulate_day,
                     day_obj,
                     hourly_temps,
-                    per_day_import[day_obj],
+                    day_import_rates,
                     per_day_export[day_obj],
                     power_calculator,
                     inverter_size_kw,
@@ -975,6 +1071,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             month_key = day_obj.strftime("%Y-%m")
             monthly_import_pence[month_key] += day_result["import_cost_pence"]
             monthly_export_pence[month_key] += day_result["export_earnings_pence"]
+            simulated_days += 1
 
             # Report progress every 5 days and on the final day
             days_done = day_idx + 1
@@ -988,16 +1085,51 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
                     data_quality_notes=[f"Simulation {progress_pct:.0f}% complete."],
                 )
 
+        if missing_rate_days > 0:
+            _LOGGER.warning(
+                "Simulation coverage gap for %s: skipped %d/%d days with no import rates "
+                "(first=%s, last=%s)",
+                import_code,
+                missing_rate_days,
+                total_days,
+                first_missing_day,
+                last_missing_day,
+            )
+
+        if simulated_days == 0:
+            self._push_simulation_progress(
+                import_code,
+                comparison_method="naive_replay",
+                simulation_progress_pct=0.0,
+                data_quality_notes=[
+                    "Simulation skipped: no usable import rate data was available "
+                    "for the selected month."
+                ],
+            )
+            _LOGGER.warning(
+                "Approach A simulation skipped for %s: 0/%d days had import rate data",
+                import_code,
+                total_days,
+            )
+            return
+
         # Simulation complete
         final_monthly = _build_simulation_monthly(
             monthly_import_pence, monthly_export_pence, sc_raw, include_sc
         )
 
+        quality_notes: list[str] = []
+        if missing_rate_days > 0:
+            quality_notes.append(
+                f"Simulation coverage incomplete: {simulated_days}/{total_days} days "
+                "had usable import rates."
+            )
+
         self._push_simulation_progress(
             import_code,
             comparison_method="simulation",
             simulation_progress_pct=100.0,
-            data_quality_notes=[],
+            data_quality_notes=quality_notes,
             monthly=final_monthly,
         )
 

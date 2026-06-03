@@ -98,3 +98,44 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator = hass.data[const.DOMAIN].pop(entry.entry_id)
         await coordinator.givenergy.async_stop()
     return unload_ok
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate a config entry to the current version.
+
+    Version 2 → 3: rename all ``axel_*`` option keys to ``axle_*`` (typo fix).
+    """
+    _LOGGER.info(
+        "Migrating Battery Charge Calculator config entry from version %s",
+        entry.version,
+    )
+
+    if entry.version == 2:
+        _AXEL_TO_AXLE: dict[str, str] = {
+            "axel_enabled": const.AXLE_ENABLED,
+            "axel_api_token": const.AXLE_API_TOKEN,
+            "axel_poll_interval_seconds": const.AXLE_POLL_INTERVAL_SECONDS,
+            "axel_request_timeout_seconds": const.AXLE_REQUEST_TIMEOUT_SECONDS,
+            "axel_fail_safe_mode": const.AXLE_FAIL_SAFE_MODE,
+            "axel_neutralize_on_active_entry": const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
+        }
+        new_options = dict(entry.options)
+        migrated = False
+        for old_key, new_key in _AXEL_TO_AXLE.items():
+            if old_key in new_options:
+                new_options[new_key] = new_options.pop(old_key)
+                migrated = True
+        if migrated:
+            hass.config_entries.async_update_entry(
+                entry,
+                options=new_options,
+                version=3,
+            )
+            _LOGGER.info(
+                "Migrated Battery Charge Calculator config entry to version 3"
+                " (axel → axle key rename)"
+            )
+        else:
+            hass.config_entries.async_update_entry(entry, version=3)
+
+    return True
