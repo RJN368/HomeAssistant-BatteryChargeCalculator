@@ -14,7 +14,7 @@
         <link rel="prev" href="../setup/">
       
       
-        <link rel="next" href="../how-it-works/">
+        <link rel="next" href="../axle-vpp-awareness/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -457,6 +457,26 @@
   
   
     <li class="md-nav__item">
+      <a href="../axle-vpp-awareness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Axle VPP Awareness
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../how-it-works/" class="md-nav__link">
         
   
@@ -785,7 +805,13 @@
 <hr />
 <h2 id="cost-prediction">Cost Prediction<a class="headerlink" href="#cost-prediction" title="Permanent link">#</a></h2>
 <p><strong>Entity:</strong> <code>sensor.cost_prediction</code></p>
-<p>Shows the estimated total energy cost for the current schedule, based on the Octopus Energy import/export rates and the calculated battery schedule.</p>
+<p>Shows the projected end-of-day electricity cost for the current day.</p>
+<p>The value is recalculated whenever the battery plan is recalculated. It uses a blended approach:</p>
+<ul>
+<li><strong>Actual data up to now</strong>: real half-hourly consumption from Octopus meter readings, costed with the matching import tariff for each interval.</li>
+<li><strong>Predicted data for the rest of today</strong>: forecast schedule slot costs from the optimizer.</li>
+</ul>
+<p>This means the value becomes progressively more accurate during the day as more real consumption data becomes available.</p>
 <p><strong>Unit:</strong> £ (GBP)</p>
 <hr />
 <h2 id="battery-charge-slots">Battery Charge Slots<a class="headerlink" href="#battery-charge-slots" title="Permanent link">#</a></h2>

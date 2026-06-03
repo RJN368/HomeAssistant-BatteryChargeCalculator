@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://rjn368.github.io/HomeAssistant-BatteryChargeCalculator/how-it-works/">
       
       
-        <link rel="prev" href="../sensors/">
+        <link rel="prev" href="../axle-vpp-awareness/">
       
       
         <link rel="next" href="../tariff-comparison-guide/">
@@ -300,6 +300,26 @@
   
   <span class="md-ellipsis">
     Sensors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../axle-vpp-awareness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Axle VPP Awareness
   </span>
   
 
@@ -711,6 +731,15 @@
 <h2 id="6-ml-model-refresh-optional">6. ML model refresh (optional)<a class="headerlink" href="#6-ml-model-refresh-optional" title="Permanent link">#</a></h2>
 <p>If the ML service is enabled, the integration triggers a model retrain every 30 days so the model keeps learning from your most recent consumption history. You can also trigger a retrain at any time from <strong>Developer Tools → Services → <code>battery_charge_calculator.trigger_ml_training</code></strong>.</p>
 <p>See <a href="../machine-learning/">Machine Learning</a> for a full explanation of how the model works.</p>
+<hr />
+<h2 id="7-cost-prediction-sensor-update">7. Cost prediction sensor update<a class="headerlink" href="#7-cost-prediction-sensor-update" title="Permanent link">#</a></h2>
+<p>When a plan recalculation runs, the integration also recalculates <code>sensor.cost_prediction</code> for the current day.</p>
+<p>The sensor value is computed as:</p>
+<ul>
+<li><strong>Actual spend so far today</strong>: half-hour Octopus consumption readings multiplied by the matching import rate for each completed interval.</li>
+<li><strong>Predicted spend for the rest of today</strong>: remaining schedule slot costs from the optimizer.</li>
+</ul>
+<p>This blended method avoids treating the whole day as forecast-only and makes the displayed total track reality as the day progresses.</p>
 
 
 
