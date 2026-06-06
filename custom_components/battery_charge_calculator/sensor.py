@@ -6,6 +6,8 @@ into Home Assistant via async_setup_entry.
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.core import HomeAssistant
 
 from . import const
@@ -23,6 +25,35 @@ from .sensors import (
     TariffComparisonSensor,
     TimeSlotSensor,
 )
+
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _apply_shared_device_info(entities: list, config_entry) -> None:
+    """Assign a stable shared device identifier to integration entities."""
+    shared_device_info = {
+        "identifiers": {(const.DOMAIN, config_entry.entry_id)},
+        "name": const.TITLE,
+        "manufacturer": "@rjn368",
+        "model": const.DOMAIN,
+    }
+    for entity in entities:
+        unique_id = getattr(entity, "unique_id", None) or getattr(
+            entity, "_attr_unique_id", None
+        )
+        if unique_id is None:
+            continue
+        # Translation-key entities should use entity-level names so they do not
+        # all collapse to the shared device name in the UI.
+        if (
+            getattr(entity, "_attr_translation_key", None)
+            and getattr(entity, "_attr_has_entity_name", None) is None
+        ):
+            entity._attr_has_entity_name = True
+        if getattr(entity, "device_info", None) is not None:
+            continue
+        entity._attr_device_info = shared_device_info
 
 
 async def async_setup_entry(
@@ -52,4 +83,10 @@ async def async_setup_entry(
         if tc_coordinator:
             entities.append(TariffComparisonSensor(hass, tc_coordinator))
 
+    _apply_shared_device_info(entities, config_entry)
+    _LOGGER.debug(
+        "Registered %s battery_charge_calculator sensor entities for device %s",
+        len(entities),
+        config_entry.entry_id,
+    )
     async_add_entities(entities)

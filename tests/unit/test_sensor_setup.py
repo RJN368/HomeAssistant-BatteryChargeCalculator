@@ -20,7 +20,8 @@ def _install_stub_sensors_module() -> type:
 
     class _BaseSensor:
         def __init__(self, _hass, _coordinator):
-            pass
+            self._attr_unique_id = f"{self.__class__.__name__.lower()}_uid"
+            self._attr_translation_key = self.__class__.__name__.lower()
 
     class AxleRemoteControlSensor(_BaseSensor):
         pass
@@ -121,6 +122,38 @@ async def test_axle_sensor_registered_when_axle_enabled() -> None:
     )
 
     assert any(isinstance(entity, AxleRemoteControlSensor) for entity in entities)
+
+
+@pytest.mark.asyncio
+async def test_sensors_share_stable_device_info_identifier() -> None:
+    _install_stub_sensors_module()
+    sensor_module = _import_sensor_module()
+
+    hass = MagicMock()
+    coordinator = MagicMock()
+    entry = MagicMock()
+    entry.entry_id = "entry-device-id"
+    entry.options = {
+        const.ML_ENABLED: False,
+        const.AXLE_ENABLED: False,
+        const.TARIFF_COMPARISON_ENABLED: False,
+    }
+    hass.data = {const.DOMAIN: {entry.entry_id: coordinator}}
+
+    entities = []
+    await sensor_module.async_setup_entry(
+        hass,
+        entry,
+        lambda new_entities: entities.extend(new_entities),
+    )
+
+    assert entities
+    for entity in entities:
+        assert entity._attr_unique_id is not None
+        assert entity._attr_has_entity_name is True
+        assert entity._attr_device_info["identifiers"] == {
+            (const.DOMAIN, entry.entry_id)
+        }
 
 
 def test_axle_remote_control_diagnostics_schema_unavailable() -> None:

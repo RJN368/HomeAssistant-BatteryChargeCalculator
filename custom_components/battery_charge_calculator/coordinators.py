@@ -596,7 +596,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         return lastvalue
 
     def callback(self):
-        _LOGGER.debug("hello")
+        _LOGGER.debug("Coordinator callback invoked")
 
     def ceil_dt(self, dt, delta):
         tz = dt.tzinfo
@@ -846,10 +846,13 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
     """Update the data"""
 
     async def _async_update_data(self):
-        _LOGGER.info("update data in entity")
-
         simulate = self.config_entry.options.get(const.SIMULATE_ONLY)
         now_utc = datetime.now(timezone.utc)
+        _LOGGER.debug(
+            "Coordinator update cycle start: simulate_only=%s axle_enabled=%s",
+            simulate,
+            self._axle_is_enabled(),
+        )
 
         if self._axle_is_enabled():
             await self._axle_refresh_source_state(now_utc=now_utc)
