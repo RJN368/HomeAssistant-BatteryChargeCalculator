@@ -120,14 +120,18 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         # Axle cache (Phase 1 only): state holders and freshness helpers.
         self._axle_cache: dict = {
             "windows": [],
+            "windows_signature": (),
+            "windows_changed": False,
             "last_success_utc": None,
             "last_error": None,
             "source_status": const.AXLE_SOURCE_STATUS_UNAVAILABLE,
             "is_active": False,
             "suppression_reason": None,
             "last_transition_reason": None,
+            "planning_adjustment_active": False,
+            "slot_adjustment_kwh_total": 0.0,
+            "required_export_energy_next_24h_kwh": 0.0,
         }
-        self._axle_last_neutralized_window_key: tuple[datetime, datetime] | None = None
 
     def _build_ml_service_config(self, entry, hass=None) -> dict:
         """Build the config dict sent to POST /configure on the ML service."""
@@ -460,10 +464,30 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
             # Pass 2 — build forecast and evaluator with corrected values
             daily_forecast: list[dict] = []
+            inverter_size_kw = float(
+                self.config_entry.options.get(
+                    const.INVERTER_SIZE_KW, const.DEFAULT_INVERTER_SIZE_KW
+                )
+            )
+            slot_adjustment_kwh_total = 0.0
+            forced_actions: list[str | None] = []
             for i, s in enumerate(slot_data):
+                slot_end = s["current_time"] + timedelta(minutes=30)
+                axle_adjustment_kwh = self._axle_slot_export_adjustment_kwh(
+                    slot_start=s["current_time"],
+                    slot_end=slot_end,
+                    inverter_size_kw=inverter_size_kw,
+                )
+                forced_action = self._axle_slot_forced_action(
+                    slot_start=s["current_time"],
+                    slot_end=slot_end,
+                )
                 required_power = (
                     ml_corrections[i] if i < len(ml_corrections) else s["physics_kwh"]
                 )
+                required_power += axle_adjustment_kwh
+                slot_adjustment_kwh_total += axle_adjustment_kwh
+                forced_actions.append(forced_action)
                 daily_forecast.append(
                     {
                         "time": s["current_time"].isoformat(),
@@ -472,6 +496,8 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                         else None,
                         "kwh": round(required_power, 4),
                         "physics_kwh": round(s["physics_kwh"], 4),
+                        "axle_adjustment_kwh": round(axle_adjustment_kwh, 4),
+                        "forced_action": forced_action,
                     }
                 )
                 evaluator.add_data(
@@ -482,8 +508,18 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                     s["solardata"],
                 )
 
+            evaluator.set_forced_actions(forced_actions)
             self.timeslots, self.totalcost = evaluator.evaluate()
             self.daily_power_forecast = daily_forecast
+            self._axle_cache["slot_adjustment_kwh_total"] = round(
+                slot_adjustment_kwh_total, 4
+            )
+            self._axle_cache["required_export_energy_next_24h_kwh"] = round(
+                slot_adjustment_kwh_total, 4
+            )
+            self._axle_cache["planning_adjustment_active"] = (
+                slot_adjustment_kwh_total > 0
+            )
             self.end_of_day_cost = self._calculate_end_of_day_cost(
                 self.timeslots, all_octopus_rates, today_consumption, now
             )
@@ -643,12 +679,100 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
         last_error: str | None,
     ) -> None:
         """Update coordinator-private Axle cache snapshot and source status."""
-        self._axle_cache["windows"] = windows
+        self._axle_set_windows(windows)
         self._axle_cache["last_success_utc"] = last_success_utc
         self._axle_cache["last_error"] = last_error
         self._axle_cache["source_status"] = self._axle_evaluate_source_status(
             now_utc=last_success_utc
         )
+
+    def _axle_is_export_intent(self, control_intent: str | None) -> bool:
+        """Return True when Axle control_intent requests export."""
+        if control_intent is None:
+            return False
+        return str(control_intent).strip().lower() == "export"
+
+    def _axle_overlap_hours(
+        self,
+        *,
+        slot_start: datetime,
+        slot_end: datetime,
+        window: AxleWindow,
+    ) -> float:
+        """Return overlap duration in hours for [slot_start, slot_end) and window."""
+        overlap_start = max(slot_start, window.start)
+        overlap_end = min(slot_end, window.end)
+        overlap_seconds = (overlap_end - overlap_start).total_seconds()
+        if overlap_seconds <= 0:
+            return 0.0
+        return overlap_seconds / 3600.0
+
+    def _axle_slot_export_adjustment_kwh(
+        self,
+        *,
+        slot_start: datetime,
+        slot_end: datetime,
+        inverter_size_kw: float,
+    ) -> float:
+        """Compute required export obligation for a slot as kWh."""
+        adjustment = 0.0
+        for window in self._axle_cache.get("windows", []):
+            if not self._axle_is_export_intent(window.control_intent):
+                continue
+            overlap_hours = self._axle_overlap_hours(
+                slot_start=slot_start,
+                slot_end=slot_end,
+                window=window,
+            )
+            adjustment += inverter_size_kw * overlap_hours
+        return adjustment
+
+    def _axle_slot_forced_action(
+        self,
+        *,
+        slot_start: datetime,
+        slot_end: datetime,
+    ) -> str | None:
+        """Return forced slot action when an export-intent Axle overlap exists."""
+        for window in self._axle_cache.get("windows", []):
+            if not self._axle_is_export_intent(window.control_intent):
+                continue
+            if (
+                self._axle_overlap_hours(
+                    slot_start=slot_start,
+                    slot_end=slot_end,
+                    window=window,
+                )
+                > 0
+            ):
+                return "export"
+        return None
+
+    def _axle_windows_signature(
+        self, windows: list[AxleWindow]
+    ) -> tuple[tuple[str, str, str], ...]:
+        """Build normalized immutable signature for change detection."""
+        return tuple(
+            (
+                window.start.astimezone(timezone.utc).isoformat(),
+                window.end.astimezone(timezone.utc).isoformat(),
+                str(window.control_intent or "").strip().lower(),
+            )
+            for window in windows
+        )
+
+    def _axle_set_windows(self, windows: list[AxleWindow]) -> bool:
+        """Store normalized windows and mark signature changes."""
+        signature = self._axle_windows_signature(windows)
+        previous_signature = self._axle_cache.get("windows_signature", ())
+        changed = signature != previous_signature
+
+        self._axle_cache["windows"] = windows
+        self._axle_cache["windows_signature"] = signature
+        self._axle_cache["windows_changed"] = bool(
+            self._axle_cache.get("windows_changed", False) or changed
+        )
+        return changed
 
     def _axle_is_enabled(self) -> bool:
         return bool(
@@ -669,7 +793,7 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         token = str(self.config_entry.options.get(const.AXLE_API_TOKEN, "")).strip()
         if not token:
-            self._axle_cache["windows"] = []
+            self._axle_set_windows([])
             self._axle_cache["last_error"] = "Axle enabled but API token is not configured"
             self._axle_cache["source_status"] = const.AXLE_SOURCE_STATUS_UNAVAILABLE
             _LOGGER.warning(
@@ -719,38 +843,6 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
                 return window
         return None
 
-    def _axle_gate_state(
-        self, now_utc: datetime
-    ) -> tuple[bool, str | None, AxleWindow | None]:
-        """Return gate decision: (suppress, reason, overlapping_window)."""
-        if not self._axle_is_enabled():
-            return False, None, None
-
-        source_status = self._axle_evaluate_source_status(now_utc)
-        self._axle_cache["source_status"] = source_status
-
-        overlapping_window = self._axle_overlapping_window(now_utc)
-        if source_status in (
-            const.AXLE_SOURCE_STATUS_FRESH,
-            const.AXLE_SOURCE_STATUS_STALE,
-        ):
-            if overlapping_window is not None:
-                return (
-                    True,
-                    const.AXLE_SUPPRESSION_REASON_ACTIVE_WINDOW,
-                    overlapping_window,
-                )
-            return False, None, None
-
-        fail_safe_mode = self.config_entry.options.get(
-            const.AXLE_FAIL_SAFE_MODE,
-            const.DEFAULT_AXLE_FAIL_SAFE_MODE,
-        )
-        if fail_safe_mode == const.AXLE_FAIL_SAFE_MODE_CLOSED:
-            return True, const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED, None
-
-        return False, None, None
-
     """Update the data"""
 
     async def _async_update_data(self):
@@ -761,79 +853,50 @@ class BatteryChargeCoordinator(DataUpdateCoordinator):
 
         if self._axle_is_enabled():
             await self._axle_refresh_source_state(now_utc=now_utc)
+            if self._axle_cache.get("windows_changed", False):
+                self._axle_cache["windows_changed"] = False
+                await self.octopus_state_change_listener(
+                    None,
+                    reason=const.REPLAN_REASON_AXLE_WINDOWS_CHANGED,
+                )
 
-        suppress_dispatch, suppression_reason, active_window = self._axle_gate_state(now_utc)
+        source_status = self._axle_evaluate_source_status(now_utc)
+        self._axle_cache["source_status"] = source_status
+        active_window = self._axle_overlapping_window(now_utc)
+        self._axle_cache["is_active"] = active_window is not None
+        if active_window is not None:
+            self._axle_cache["suppression_reason"] = const.AXLE_SUPPRESSION_REASON_ACTIVE_WINDOW
+        elif source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE and self.config_entry.options.get(
+            const.AXLE_FAIL_SAFE_MODE,
+            const.DEFAULT_AXLE_FAIL_SAFE_MODE,
+        ) == const.AXLE_FAIL_SAFE_MODE_CLOSED:
+            self._axle_cache["suppression_reason"] = (
+                const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED
+            )
+        else:
+            self._axle_cache["suppression_reason"] = None
 
-        was_suppressed = bool(self._axle_cache.get("is_active", False))
-        became_active = suppress_dispatch and not was_suppressed
-        became_inactive = was_suppressed and not suppress_dispatch
-
-        self._axle_cache["is_active"] = suppress_dispatch
-        self._axle_cache["suppression_reason"] = suppression_reason
-
-        source_status = self._axle_cache.get("source_status")
         if source_status == const.AXLE_SOURCE_STATUS_STALE and active_window is not None:
             _LOGGER.info(
-                "Axle dispatch suppression active from stale overlap; window_start=%s window_end=%s",
+                "Axle stale cache overlaps active window; window_start=%s window_end=%s",
                 active_window.start.isoformat(),
                 active_window.end.isoformat(),
             )
-        elif suppression_reason == const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED:
-            _LOGGER.warning(
-                "Axle source unavailable with fail-safe closed; suppressing local dispatch."
+        elif (
+            source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE
+            and self.config_entry.options.get(
+                const.AXLE_FAIL_SAFE_MODE,
+                const.DEFAULT_AXLE_FAIL_SAFE_MODE,
             )
-        elif source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE and not suppress_dispatch:
+            == const.AXLE_FAIL_SAFE_MODE_CLOSED
+        ):
+            _LOGGER.warning(
+                "Axle source unavailable with fail-safe closed; diagnostics only in planning-adjustment mode."
+            )
+        elif source_status == const.AXLE_SOURCE_STATUS_UNAVAILABLE:
             _LOGGER.info(
                 "Axle source unavailable with fail-safe open; allowing local dispatch."
             )
-
-        if became_active:
-            self._axle_cache["last_transition_reason"] = (
-                const.AXLE_TRANSITION_REASON_ACTIVE_ENTRY
-            )
-            _LOGGER.info(
-                "Axle suppression transitioned to active; reason=%s source_status=%s",
-                suppression_reason,
-                source_status,
-            )
-            if active_window is not None:
-                window_key = (active_window.start, active_window.end)
-                neutralize_on_entry = self.config_entry.options.get(
-                    const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
-                    const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY,
-                )
-                should_neutralize = (
-                    neutralize_on_entry
-                    and self._axle_last_neutralized_window_key != window_key
-                )
-                if should_neutralize:
-                    if not simulate:
-                        await self.givenergy.disableCharge(self.hass)
-                        await self.givenergy.disableExport(self.hass)
-                        _LOGGER.info(
-                            "Axle neutralize-on-entry applied; window_start=%s window_end=%s",
-                            active_window.start.isoformat(),
-                            active_window.end.isoformat(),
-                        )
-                    self._axle_last_neutralized_window_key = window_key
-
-        if became_inactive:
-            self._axle_cache["last_transition_reason"] = (
-                const.AXLE_TRANSITION_REASON_ACTIVE_EXIT
-            )
-            _LOGGER.info("Axle suppression transitioned to inactive; resuming local planning.")
-            await self.octopus_state_change_listener(
-                None,
-                reason=const.REPLAN_REASON_AXLE_WINDOW_ENDED,
-            )
-
-        if suppress_dispatch:
-            _LOGGER.debug(
-                "Axle suppression gating active; reason=%s source_status=%s",
-                suppression_reason,
-                source_status,
-            )
-            return self.timeslots
 
         active_slot = self.current_active_slot()
         if active_slot is not None:

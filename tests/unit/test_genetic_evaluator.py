@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+
 from custom_components.battery_charge_calculator.genetic_evaluator import (
     GeneticEvaluator,
     Timeslot,
@@ -136,6 +138,96 @@ class TestGeneticEvaluatorBatteryCapacity(unittest.TestCase):
         )
         battery_after = evaluator._evaluate_single_slot(timeslot, "charge", 5.5)
         self.assertLessEqual(battery_after, capacity)
+
+
+class TestGeneticEvaluatorForcedActions(unittest.TestCase):
+    def test_evaluate_schedule_respects_forced_export(self):
+        evaluator = GeneticEvaluator(battery_start=2.0, standing_charge=0.0)
+        evaluator.add_data(
+            "2026-04-04T12:00:00",
+            import_price=0.20,
+            export_price=0.30,
+            demand_in=0.0,
+            solar_in=0.0,
+        )
+        evaluator.set_forced_actions(["export"])
+
+        cost = evaluator.evaluate_schedule(["charge"])
+
+        self.assertEqual(evaluator.timeslots[0].charge_option, "export")
+        self.assertLess(cost, 0.0)
+
+    def test_create_population_keeps_forced_slots_fixed(self):
+        evaluator = GeneticEvaluator(battery_start=2.0, standing_charge=0.0)
+        evaluator.population_size = 20
+        evaluator.add_data("2026-04-04T00:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T00:30:00", 0.20, 0.30, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T01:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.set_forced_actions([None, "export", None])
+
+        population = evaluator.create_population()
+
+        self.assertTrue(population)
+        self.assertTrue(all(schedule[1] == "export" for schedule in population))
+
+    def test_unconstrained_slots_still_vary_with_forced_constraints(self):
+        evaluator = GeneticEvaluator(battery_start=2.0, standing_charge=0.0)
+        evaluator.population_size = 40
+        evaluator.add_data("2026-04-04T00:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T00:30:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T01:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.set_forced_actions(["export", None, None])
+
+        population = evaluator.create_population()
+        unconstrained_actions = {schedule[1] for schedule in population}
+
+        self.assertTrue(all(schedule[0] == "export" for schedule in population))
+        self.assertGreater(len(unconstrained_actions), 1)
+
+    def test_mutation_avoids_forced_slot(self):
+        evaluator = GeneticEvaluator(battery_start=2.0, standing_charge=0.0)
+        evaluator.population_size = 4
+        evaluator.generations = 1
+        evaluator.add_data("2026-04-04T00:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T00:30:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.add_data("2026-04-04T01:00:00", 0.20, 0.10, 0.3, 0.0)
+        evaluator.set_forced_actions(["export", None, None])
+
+        with (
+            patch.object(
+                evaluator,
+                "create_population",
+                return_value=[
+                    ["discharge", "discharge", "discharge"],
+                    ["discharge", "charge", "discharge"],
+                    ["discharge", "discharge", "charge"],
+                    ["discharge", "charge", "charge"],
+                ],
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.sample",
+                return_value=(
+                    ["discharge", "discharge", "discharge"],
+                    ["discharge", "charge", "charge"],
+                ),
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.randint",
+                return_value=1,
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.random",
+                return_value=0.0,
+            ),
+            patch(
+                "custom_components.battery_charge_calculator.genetic_evaluator.random.choice",
+                side_effect=[1, "charge", 1, "charge", 1, "charge", 1, "charge"],
+            ),
+        ):
+            timeslots, _ = evaluator.evaluate()
+
+        self.assertIsNotNone(timeslots)
+        self.assertEqual(timeslots[0].charge_option, "export")
 
 
 if __name__ == "__main__":

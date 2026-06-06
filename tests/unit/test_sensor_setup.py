@@ -153,6 +153,9 @@ def test_axle_remote_control_diagnostics_schema_unavailable() -> None:
         "suppression_reason",
         "last_transition_reason",
         "last_error",
+        "planning_adjustment_active",
+        "slot_adjustment_kwh_total",
+        "required_export_energy_next_24h_kwh",
         "active_window_start",
         "active_window_end",
         "cache_age_seconds",
@@ -164,6 +167,9 @@ def test_axle_remote_control_diagnostics_schema_unavailable() -> None:
     assert attrs["active_window_start"] is None
     assert attrs["active_window_end"] is None
     assert attrs["cache_age_seconds"] is None
+    assert attrs["planning_adjustment_active"] is False
+    assert attrs["slot_adjustment_kwh_total"] == 0.0
+    assert attrs["required_export_energy_next_24h_kwh"] == 0.0
     assert attrs["source_status"] == const.AXLE_SOURCE_STATUS_UNAVAILABLE
 
 

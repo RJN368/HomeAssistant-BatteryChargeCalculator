@@ -97,12 +97,11 @@ def _set_axle_cache(
 
 class TestCoordinatorAxleAwareness:
     @pytest.mark.asyncio
-    async def test_active_suppresses_enable_dispatch(self):
+    async def test_active_window_does_not_block_enable_dispatch(self):
         coordinator = _make_coordinator(
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
         )
-        coordinator.config_entry.options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY] = False
 
         now_utc = datetime.now(timezone.utc)
         coordinator.timeslots = [_make_timeslot(now_utc - timedelta(minutes=5), "charge")]
@@ -120,13 +119,14 @@ class TestCoordinatorAxleAwareness:
 
         await coordinator._async_update_data()
 
-        coordinator.givenergy.enableCharge.assert_not_called()
+        coordinator.givenergy.enableCharge.assert_called_once_with(coordinator.hass)
         coordinator.givenergy.enableExport.assert_not_called()
         coordinator.givenergy.disableCharge.assert_not_called()
         coordinator.givenergy.disableExport.assert_not_called()
+        assert coordinator._axle_cache["is_active"] is True
 
     @pytest.mark.asyncio
-    async def test_neutralize_on_entry_only_once_per_window(self):
+    async def test_window_change_triggers_immediate_replan_reason(self):
         coordinator = _make_coordinator(
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
@@ -144,22 +144,23 @@ class TestCoordinatorAxleAwareness:
             age_seconds=5,
             windows=[window],
         )
+        coordinator._axle_set_windows([window])
+        coordinator._axle_cache["windows_changed"] = True
 
         await coordinator._async_update_data()
-        await coordinator._async_update_data()
 
-        coordinator.givenergy.disableCharge.assert_called_once_with(coordinator.hass)
-        coordinator.givenergy.disableExport.assert_called_once_with(coordinator.hass)
-        coordinator.givenergy.enableCharge.assert_not_called()
-        coordinator.givenergy.enableExport.assert_not_called()
+        coordinator.octopus_state_change_listener.assert_called_once_with(
+            None,
+            reason=const.REPLAN_REASON_AXLE_WINDOWS_CHANGED,
+        )
+        assert coordinator._axle_cache["windows_changed"] is False
 
     @pytest.mark.asyncio
-    async def test_stale_with_overlap_still_suppresses_dispatch(self):
+    async def test_stale_with_overlap_does_not_block_dispatch(self):
         coordinator = _make_coordinator(
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
         )
-        coordinator.config_entry.options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY] = False
 
         now_utc = datetime.now(timezone.utc)
         coordinator.timeslots = [_make_timeslot(now_utc - timedelta(minutes=5), "charge")]
@@ -177,7 +178,7 @@ class TestCoordinatorAxleAwareness:
 
         await coordinator._async_update_data()
 
-        coordinator.givenergy.enableCharge.assert_not_called()
+        coordinator.givenergy.enableCharge.assert_called_once_with(coordinator.hass)
         assert coordinator._axle_cache["source_status"] == const.AXLE_SOURCE_STATUS_STALE
         assert (
             coordinator._axle_cache["suppression_reason"]
@@ -193,7 +194,6 @@ class TestCoordinatorAxleAwareness:
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
         )
-        coordinator_open.config_entry.options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY] = False
         coordinator_open.timeslots = [
             _make_timeslot(now_utc - timedelta(minutes=5), "charge")
         ]
@@ -218,7 +218,6 @@ class TestCoordinatorAxleAwareness:
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_CLOSED,
         )
-        coordinator_closed.config_entry.options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY] = False
         coordinator_closed.timeslots = [
             _make_timeslot(now_utc - timedelta(minutes=5), "charge")
         ]
@@ -231,7 +230,7 @@ class TestCoordinatorAxleAwareness:
 
         await coordinator_closed._async_update_data()
 
-        coordinator_closed.givenergy.enableCharge.assert_not_called()
+        coordinator_closed.givenergy.enableCharge.assert_called_once_with(coordinator_closed.hass)
         assert (
             coordinator_closed._axle_cache["source_status"]
             == const.AXLE_SOURCE_STATUS_UNAVAILABLE
@@ -240,7 +239,7 @@ class TestCoordinatorAxleAwareness:
             coordinator_closed._axle_cache["suppression_reason"]
             == const.AXLE_SUPPRESSION_REASON_SOURCE_UNAVAILABLE_CLOSED
         )
-        assert coordinator_closed._axle_cache["is_active"] is True
+        assert coordinator_closed._axle_cache["is_active"] is False
 
     @pytest.mark.asyncio
     async def test_axle_refresh_error_is_redacted_in_cache_and_logs(self, caplog):
@@ -264,39 +263,98 @@ class TestCoordinatorAxleAwareness:
         assert "axle-token" not in caplog.text
 
     @pytest.mark.asyncio
-    async def test_active_to_inactive_triggers_immediate_resume_path(self):
+    async def test_export_window_creates_positive_slot_adjustment(self):
         coordinator = _make_coordinator(
             simulate=False,
             fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
         )
-        coordinator.config_entry.options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY] = False
 
         now_utc = datetime.now(timezone.utc)
-        coordinator.timeslots = [_make_timeslot(now_utc - timedelta(minutes=5), "charge")]
+        coordinator._axle_cache["windows"] = [
+            AxleWindow(
+                start=now_utc,
+                end=now_utc + timedelta(minutes=15),
+                control_intent="ExPoRt",
+            )
+        ]
 
-        _set_axle_cache(
-            coordinator,
-            now_utc=now_utc,
-            age_seconds=5,
-            windows=[
-                AxleWindow(
-                    start=now_utc - timedelta(minutes=10),
-                    end=now_utc + timedelta(minutes=10),
-                )
-            ],
+        adjustment = coordinator._axle_slot_export_adjustment_kwh(
+            slot_start=now_utc,
+            slot_end=now_utc + timedelta(minutes=30),
+            inverter_size_kw=4.0,
         )
-        await coordinator._async_update_data()
 
-        coordinator._axle_cache["windows"] = []
-        coordinator._axle_cache["last_success_utc"] = datetime.now(timezone.utc)
+        assert adjustment == pytest.approx(1.0)
 
-        await coordinator._async_update_data()
-
-        coordinator.octopus_state_change_listener.assert_called_once_with(
-            None,
-            reason=const.REPLAN_REASON_AXLE_WINDOW_ENDED,
+    @pytest.mark.asyncio
+    async def test_non_export_intent_produces_zero_adjustment(self):
+        coordinator = _make_coordinator(
+            simulate=False,
+            fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
         )
-        coordinator.givenergy.enableCharge.assert_called_once_with(coordinator.hass)
+
+        now_utc = datetime.now(timezone.utc)
+        coordinator._axle_cache["windows"] = [
+            AxleWindow(
+                start=now_utc,
+                end=now_utc + timedelta(minutes=30),
+                control_intent="charge",
+            )
+        ]
+
+        adjustment = coordinator._axle_slot_export_adjustment_kwh(
+            slot_start=now_utc,
+            slot_end=now_utc + timedelta(minutes=30),
+            inverter_size_kw=3.6,
+        )
+
+        assert adjustment == 0.0
+
+    @pytest.mark.asyncio
+    async def test_forced_action_marks_export_on_overlap(self):
+        coordinator = _make_coordinator(
+            simulate=False,
+            fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
+        )
+
+        now_utc = datetime.now(timezone.utc)
+        coordinator._axle_cache["windows"] = [
+            AxleWindow(
+                start=now_utc,
+                end=now_utc + timedelta(minutes=10),
+                control_intent="export",
+            )
+        ]
+
+        forced_action = coordinator._axle_slot_forced_action(
+            slot_start=now_utc,
+            slot_end=now_utc + timedelta(minutes=30),
+        )
+
+        assert forced_action == "export"
+
+    @pytest.mark.asyncio
+    async def test_forced_action_is_none_without_export_overlap(self):
+        coordinator = _make_coordinator(
+            simulate=False,
+            fail_safe_mode=const.AXLE_FAIL_SAFE_MODE_OPEN,
+        )
+
+        now_utc = datetime.now(timezone.utc)
+        coordinator._axle_cache["windows"] = [
+            AxleWindow(
+                start=now_utc,
+                end=now_utc + timedelta(minutes=30),
+                control_intent="charge",
+            )
+        ]
+
+        forced_action = coordinator._axle_slot_forced_action(
+            slot_start=now_utc,
+            slot_end=now_utc + timedelta(minutes=30),
+        )
+
+        assert forced_action is None
 
     @pytest.mark.asyncio
     async def test_simulate_only_blocks_neutralize_and_resume_dispatch(self):
