@@ -131,6 +131,43 @@ class GeneticEvaluator:
         self.charge_options = ["charge", "export", "discharge"]
         self.num_slots = 0
         self.timeslots: list[Timeslot] = []
+        self._forced_actions: list[str | None] = []
+
+    def set_forced_actions(self, forced_actions: list[str | None] | None) -> None:
+        """Set optional per-slot action constraints for schedule evaluation."""
+        if not forced_actions:
+            self._forced_actions = []
+            return
+
+        normalized: list[str | None] = []
+        for action in forced_actions:
+            if action is None:
+                normalized.append(None)
+            elif action in self.charge_options:
+                normalized.append(action)
+            else:
+                self._logging.warning(
+                    "Ignoring invalid forced action '%s'; expected one of %s",
+                    action,
+                    self.charge_options,
+                )
+                normalized.append(None)
+        self._forced_actions = normalized
+
+    def _forced_action_for_slot(self, index: int) -> str | None:
+        """Return forced action for slot index, or None when unconstrained."""
+        if index < 0 or index >= len(self._forced_actions):
+            return None
+        return self._forced_actions[index]
+
+    def _apply_forced_actions(self, schedule: list[str]) -> list[str]:
+        """Overlay forced actions on top of a candidate schedule."""
+        constrained = list(schedule)
+        for i in range(min(len(constrained), self.num_slots)):
+            forced_action = self._forced_action_for_slot(i)
+            if forced_action is not None:
+                constrained[i] = forced_action
+        return constrained
 
     def add_data(self, start_datetime, import_price, export_price, demand_in, solar_in):
         """Add a timeslot to the evaluation set."""
@@ -214,8 +251,9 @@ class GeneticEvaluator:
         """Calculate the total cost for a schedule."""
         net_cost = self.standing_charge
         battery = self.battery_start
+        constrained_schedule = self._apply_forced_actions(schedule)
 
-        for i, action in enumerate(schedule):
+        for i, action in enumerate(constrained_schedule):
             battery = self._evaluate_single_slot(self.timeslots[i], action, battery)
             net_cost += self.timeslots[i].cost
 
@@ -242,7 +280,10 @@ class GeneticEvaluator:
         while len(population) < self.population_size:
             schedule = []
             for i in range(self.num_slots):
-                if self.timeslots[i].import_price <= 0:
+                forced_action = self._forced_action_for_slot(i)
+                if forced_action is not None:
+                    schedule.append(forced_action)
+                elif self.timeslots[i].import_price <= 0:
                     schedule.append("charge")
                 else:
                     schedule.append(random.choice(self.charge_options))
@@ -276,7 +317,7 @@ class GeneticEvaluator:
             elif slot.export_price > slot.import_price:
                 schedule[i] = "export"
 
-        return schedule
+        return self._apply_forced_actions(schedule)
 
     def evaluate(self):
         """Run the genetic algorithm and return the best schedule and cost."""
@@ -297,8 +338,16 @@ class GeneticEvaluator:
                 child = parent1[:crossover_point] + parent2[crossover_point:]
 
                 if random.random() < 0.1:
-                    mutation_point = random.randint(0, self.num_slots - 1)
-                    child[mutation_point] = random.choice(self.charge_options)
+                    unconstrained_slots = [
+                        i
+                        for i in range(self.num_slots)
+                        if self._forced_action_for_slot(i) is None
+                    ]
+                    if unconstrained_slots:
+                        mutation_point = random.choice(unconstrained_slots)
+                        child[mutation_point] = random.choice(self.charge_options)
+
+                child = self._apply_forced_actions(child)
 
                 children.append(child)
 
@@ -360,7 +409,10 @@ class GeneticEvaluator:
 
         for i, _ in enumerate(self.timeslots):
             schedule[i] = "discharge"
-            if self.timeslots[i].import_price <= 0:
+            forced_action = self._forced_action_for_slot(i)
+            if forced_action is not None:
+                schedule[i] = forced_action
+            elif self.timeslots[i].import_price <= 0:
                 schedule[i] = "charge"
             elif self.timeslots[i].initial_power <= 0:
                 charge_index = self._reverse_find_slot_with_headroom(i, schedule)
@@ -373,7 +425,7 @@ class GeneticEvaluator:
 
                 schedule[charge_index] = "charge"
 
-        return schedule
+        return self._apply_forced_actions(schedule)
 
     def _calculate_batterystate_from_index(self, index, battery):
         """Calculate battery state from a given index and battery value."""

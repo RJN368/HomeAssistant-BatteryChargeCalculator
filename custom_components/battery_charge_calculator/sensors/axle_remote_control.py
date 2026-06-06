@@ -71,6 +71,15 @@ class AxleRemoteControlSensor(CoordinatorEntity, SensorEntity):
             "suppression_reason": cache.get("suppression_reason"),
             "last_transition_reason": cache.get("last_transition_reason"),
             "last_error": cache.get("last_error"),
+            "planning_adjustment_active": bool(
+                cache.get("planning_adjustment_active", False)
+            ),
+            "slot_adjustment_kwh_total": float(
+                cache.get("slot_adjustment_kwh_total", 0.0)
+            ),
+            "required_export_energy_next_24h_kwh": float(
+                cache.get("required_export_energy_next_24h_kwh", 0.0)
+            ),
             "active_window_start": active_window.start.isoformat()
             if active_window is not None
             else None,

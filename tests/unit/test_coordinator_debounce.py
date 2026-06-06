@@ -148,7 +148,13 @@ class TestDebounceReentrancyFix:
 
         coord.async_refresh = _track_refresh
 
-        with patch(_GENETIC_EVALUATOR_PATH) as MockEvaluator:
+        with (
+            patch(_GENETIC_EVALUATOR_PATH) as MockEvaluator,
+            patch(
+                "custom_components.battery_charge_calculator.coordinators.async_get_clientsession",
+                return_value=MagicMock(),
+            ),
+        ):
             MockEvaluator.return_value.evaluate.return_value = ([], 0.0)
             await coord.octopus_state_change_listener(None)
 
@@ -168,7 +174,13 @@ class TestDebounceReentrancyFix:
         _add_listener_mocks(coord)
         coord.async_set_updated_data = MagicMock()
 
-        with patch(_GENETIC_EVALUATOR_PATH) as MockEvaluator:
+        with (
+            patch(_GENETIC_EVALUATOR_PATH) as MockEvaluator,
+            patch(
+                "custom_components.battery_charge_calculator.coordinators.async_get_clientsession",
+                return_value=MagicMock(),
+            ),
+        ):
             MockEvaluator.return_value.evaluate.return_value = ([], 0.0)
             await coord.octopus_state_change_listener(None)
 

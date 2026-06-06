@@ -8,7 +8,7 @@ from custom_components.battery_charge_calculator import const
 
 
 @pytest.mark.asyncio
-async def test_full_config_flow(hass: HomeAssistant):
+async def test_full_config_flow(hass: HomeAssistant, enable_custom_integrations):
     # Register the integration (simulate manifest)
     assert await async_setup_component(hass, "persistent_notification", {})
     assert await async_setup_component(hass, "battery_charge_calculator", {})
@@ -40,7 +40,26 @@ async def test_full_config_flow(hass: HomeAssistant):
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {const.HEATING_TYPE: const.HEATING_TYPE_NONE}
     )
+    assert result["type"] == "form"
+    assert result["step_id"] == "ml_settings"
+
+    # Step 3: ML settings (accept defaults)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] == "form"
+    assert result["step_id"] == "axle_settings"
+
+    # Step 4: Axle settings (accept defaults)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] == "form"
+    assert result["step_id"] == "tariff_comparison"
+
+    # Step 5: Tariff comparison disabled -> create entry
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {const.TARIFF_COMPARISON_ENABLED: False}
+    )
+
     # Should complete the flow and create the entry
     assert result["type"] == "create_entry"
     assert result["title"]
-    assert result["data"]
+    assert result["data"] == {}
+    assert result["options"]
