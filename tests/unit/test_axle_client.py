@@ -9,8 +9,10 @@ from unittest.mock import patch
 import aiohttp
 import pytest
 
-from custom_components.battery_charge_calculator.axle_client import (
+from custom_components.battery_charge_calculator.planning.providers.axle.axle_client import (
     AxleClient,
+)
+from custom_components.battery_charge_calculator.planning.providers.axle.axle_client_error import (
     AxleClientError,
 )
 
@@ -117,7 +119,7 @@ async def test_fetch_event_retries_on_timeout_then_succeeds() -> None:
     )
     client = AxleClient("abc", sleep_fn=_sleep)
 
-    with patch("custom_components.battery_charge_calculator.axle_client.random.uniform", return_value=0.0):
+    with patch("custom_components.battery_charge_calculator.planning.providers.axle.axle_client.random.uniform", return_value=0.0):
         event = await client.async_fetch_event(session)
 
     assert event is not None

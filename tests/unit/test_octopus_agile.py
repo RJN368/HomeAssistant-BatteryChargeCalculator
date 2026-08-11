@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.battery_charge_calculator.octopus_agile import (
+from custom_components.battery_charge_calculator.planning.providers.tariff.octopus_agile import (
     OctopusAgileRatesClient,
     _active_agreement_at,
 )

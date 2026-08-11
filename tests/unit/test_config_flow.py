@@ -214,11 +214,11 @@ class TestConfigFlowAsyncStepUser:
 
     @pytest.mark.asyncio
     async def test_stores_main_data_and_transitions_to_heating(self):
-        """Step 1 saves main data to _main_data and transitions to heating step."""
+        """Step 1 saves main data then transitions to provider-selection step."""
         flow = self._make_flow()
-        # Mock async_step_heating so we don't need to drive the full chain
-        flow.async_step_heating = AsyncMock(
-            return_value={"type": "form", "step_id": "heating"}
+        # Mock provider-selection so we don't need to drive the full chain
+        flow.async_step_provider_selection = AsyncMock(
+            return_value={"type": "form", "step_id": "provider_selection"}
         )
         user_input = {
             const.GIVENERGY_SERIAL_NUMBER: "SN123",
@@ -232,7 +232,7 @@ class TestConfigFlowAsyncStepUser:
         await flow.async_step_user(user_input=user_input)
         assert flow._main_data[const.GIVENERGY_SERIAL_NUMBER] == "SN123"
         assert flow._main_data[const.INVERTER_SIZE_KW] == 5.0
-        flow.async_step_heating.assert_called_once()
+        flow.async_step_provider_selection.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_unique_id_set_to_domain(self):
@@ -347,6 +347,26 @@ class TestConfigFlowHeatingSteps:
         assert (
             options[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY]
             is const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY
+        )
+        assert (
+            options[const.PLANNING_TARIFF_PROVIDER]
+            == const.DEFAULT_PLANNING_TARIFF_PROVIDER
+        )
+        assert (
+            options[const.PLANNING_BATTERY_PROVIDER]
+            == const.DEFAULT_PLANNING_BATTERY_PROVIDER
+        )
+        assert (
+            options[const.PLANNING_SOLAR_PROVIDER]
+            == const.DEFAULT_PLANNING_SOLAR_PROVIDER
+        )
+        assert (
+            options[const.PLANNING_AXLE_PROVIDER]
+            == const.DEFAULT_PLANNING_AXLE_PROVIDER
+        )
+        assert (
+            options[const.PLANNING_TEMPERATURE_PROVIDER]
+            == const.DEFAULT_PLANNING_TEMPERATURE_PROVIDER
         )
 
     @pytest.mark.asyncio
@@ -533,9 +553,11 @@ class TestOptionsFlow:
 
     @pytest.mark.asyncio
     async def test_saves_new_options_and_transitions_to_heating(self):
-        """async_step_init stores options and moves to heating step."""
+        """async_step_init stores options and moves to provider selection."""
         handler, config_entry = self._make_options_flow()
-        handler.async_step_heating = AsyncMock(return_value={"type": "form"})
+        handler.async_step_provider_selection = AsyncMock(
+            return_value={"type": "form"}
+        )
         new_input = {
             const.GIVENERGY_SERIAL_NUMBER: "SN_NEW",
             const.GIVENERGY_API_TOKEN: "TOKEN_NEW",
@@ -546,7 +568,7 @@ class TestOptionsFlow:
             const.INVERTER_EFFICIENCY: 0.95,
         }
         await handler.async_step_init(user_input=new_input)
-        handler.async_step_heating.assert_called_once()
+        handler.async_step_provider_selection.assert_called_once()
         assert handler.options[const.GIVENERGY_SERIAL_NUMBER] == "SN_NEW"
         assert handler.options[const.SIMULATE_ONLY] is True
         assert handler.options[const.INVERTER_SIZE_KW] == 6.0
@@ -565,7 +587,9 @@ class TestOptionsFlow:
                 const.OCTOPUS_EXPORT_MPN: "legacy_export_mpn",
             }
         )
-        handler.async_step_heating = AsyncMock(return_value={"type": "form"})
+        handler.async_step_provider_selection = AsyncMock(
+            return_value={"type": "form"}
+        )
         new_input = {
             const.GIVENERGY_SERIAL_NUMBER: "SN",
             const.GIVENERGY_API_TOKEN: "TOK",
@@ -665,6 +689,26 @@ class TestOptionsFlow:
         assert (
             data[const.AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY]
             is const.DEFAULT_AXLE_NEUTRALIZE_ON_ACTIVE_ENTRY
+        )
+        assert (
+            data[const.PLANNING_TARIFF_PROVIDER]
+            == const.DEFAULT_PLANNING_TARIFF_PROVIDER
+        )
+        assert (
+            data[const.PLANNING_BATTERY_PROVIDER]
+            == const.DEFAULT_PLANNING_BATTERY_PROVIDER
+        )
+        assert (
+            data[const.PLANNING_SOLAR_PROVIDER]
+            == const.DEFAULT_PLANNING_SOLAR_PROVIDER
+        )
+        assert (
+            data[const.PLANNING_AXLE_PROVIDER]
+            == const.DEFAULT_PLANNING_AXLE_PROVIDER
+        )
+        assert (
+            data[const.PLANNING_TEMPERATURE_PROVIDER]
+            == const.DEFAULT_PLANNING_TEMPERATURE_PROVIDER
         )
 
     @pytest.mark.asyncio

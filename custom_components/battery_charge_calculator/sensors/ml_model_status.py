@@ -6,7 +6,6 @@ Only registered when ML_ENABLED = True in config options (D-16).
 
 from __future__ import annotations
 from typing import Any
-from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory

@@ -425,7 +425,6 @@ def compute_power_surface(
     week_dts: list[datetime] = []
     for w in weeks:
         try:
-            ref_date = datetime(ref_year, 1, 1, tzinfo=timezone.utc)
             # isoweekday: 1=Mon … 7=Sun; Wednesday = 3
             iso_wed = datetime.fromisocalendar(ref_year, w, 3).replace(
                 hour=12, tzinfo=timezone.utc
@@ -435,12 +434,8 @@ def compute_power_surface(
             iso_wed = datetime(ref_year, 12, 31, 12, 0, tzinfo=timezone.utc)
         week_dts.append(iso_wed)
 
-    # Build half-hour slot offsets relative to each week's reference noon
-    slot_offsets: list[int] = list(range(n_slots))  # 0..47 (30-min slots)
-
     # Pre-compute slot datetimes for all weeks: shape (n_weeks, n_slots)
     # We'll iterate temp × week × slot to fill rows, then batch-predict.
-    total_rows = n_temps * n_weeks * n_slots
     row_data: list[dict] = []
     physics_matrix = np.zeros((n_weeks, n_temps, n_slots), dtype=float)
 

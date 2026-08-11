@@ -316,7 +316,6 @@ class BccMlEstimator:
         givenergy_api_key: str = config.get("givenergy_api_key", "")
         givenergy_inverter_serial: str = config.get("givenergy_inverter_serial", "")
         octopus_api_key: str = config.get("octopus_api_key", "")
-        octopus_account_id: str = config.get("octopus_account_id", "")
         octopus_mpan: str = config.get("octopus_mpan", "")
         octopus_meter_serial: str = config.get("octopus_meter_serial", "")
         consumption_source: str = config.get("consumption_source", "givenergy")

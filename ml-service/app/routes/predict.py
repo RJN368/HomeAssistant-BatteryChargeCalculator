@@ -5,26 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 
 from app.auth import verify_bearer
 from app.estimator import estimator
+from .predict_request import PredictRequest
+from .predict_response import PredictResponse
 
 router = APIRouter()
-
-
-class PredictSlot(BaseModel):
-    slot_time: str
-    temp_c: float | None = None
-    physics_kwh: float
-
-
-class PredictRequest(BaseModel):
-    slots: list[PredictSlot]
-
-
-class PredictResponse(BaseModel):
-    corrected_kwh: list[float]
 
 
 @router.post(

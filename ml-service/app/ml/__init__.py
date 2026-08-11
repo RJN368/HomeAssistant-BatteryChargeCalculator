@@ -13,6 +13,7 @@ from .model_trainer import TrainedModel, train_power_model, compute_power_surfac
 from .power_calculator import PowerCalulator
 
 __all__ = [
+    "compute_power_surface",
     "InsufficientDataError",
     "PowerCalulator",
     "TrainedModel",

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 import joblib
 
-from .model_trainer import TrainedModel, _RETRAIN_RMSE_TRIGGER
+from .model_trainer import TrainedModel
 
 _LOGGER = logging.getLogger(__name__)
 

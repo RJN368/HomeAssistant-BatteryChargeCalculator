@@ -64,6 +64,7 @@ Example Plotly Graph Card config (ML vs physics comparison)::
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -95,9 +96,20 @@ class DailyPowerForecastSensor(CoordinatorEntity, SensorEntity):
 
     def _update_attributes(self) -> None:
         slots: list[dict] = getattr(self.coordinator, "daily_power_forecast", [])
+
+        today = date.today()
+        today_slots = [
+            s for s in slots
+            if datetime.fromisoformat(s["time"]).astimezone().date() == today
+        ]
+
         total = round(sum(s["kwh"] for s in slots), 3)
         total_physics = round(sum(s.get("physics_kwh", s["kwh"]) for s in slots), 3)
-        self._attr_native_value = total if slots else None
+        today_physics = round(
+            sum(s.get("physics_kwh", s["kwh"]) for s in today_slots), 3
+        )
+
+        self._attr_native_value = today_physics if today_slots else None
         self._attr_extra_state_attributes = {
             "slots": slots,
             "slot_count": len(slots),

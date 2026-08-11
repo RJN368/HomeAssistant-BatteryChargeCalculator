@@ -22,7 +22,6 @@ def _product_code_from_tariff_code(tariff_code: str) -> str:
     E-1R-AGILE-FLEX-22-11-25-B → product code is AGILE-FLEX-22-11-25.
     """
     parts = tariff_code.split("-")
-    # parts[0] = E, parts[1] = 1R (or 2R), parts[-1] = region letter
     return "-".join(parts[2:-1])
 
 
@@ -32,14 +31,7 @@ def _active_agreement(agreements: list[dict]) -> dict | None:
 
 
 def _active_agreement_at(agreements: list[dict], now: datetime) -> dict | None:
-    """Return the active agreement at ``now``, or None.
-
-    An agreement is active when its date range contains ``now``:
-      valid_from <= now  AND  (valid_to is null  OR  valid_to > now)
-
-    ``valid_to: null`` means the agreement is open-ended (still running).
-    Returns the first matching agreement in the order provided by the API.
-    """
+    """Return the active agreement at now, or None."""
     for agreement in agreements:
         valid_from_str = agreement.get("valid_from")
         valid_to_str = agreement.get("valid_to")
@@ -63,17 +55,11 @@ def _active_agreement_at(agreements: list[dict], now: datetime) -> dict | None:
 
 
 def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
-    """Expand rate bands into a contiguous 30-minute slot grid.
-
-    Works for both Agile (already 30-min slots) and TOU tariffs like
-    Intelligent Go where each rate covers a multi-hour band that repeats
-    daily (e.g. 10p 23:30-05:30, 32p 05:30-23:30).
-    """
+    """Expand rate bands into a contiguous 30-minute slot grid."""
     if not raw_rates:
         return []
 
     now = datetime.now(UTC)
-    # Round down to the current 30-min boundary
     slot_start = now.replace(
         minute=0 if now.minute < 30 else 30, second=0, microsecond=0
     )
@@ -83,39 +69,32 @@ def _expand_to_30min_slots(raw_rates: list[dict], days: int = 2) -> list[dict]:
     current = slot_start
     last_value = raw_rates[0]["value_inc_vat"]
 
-    # Ensure all rate datetimes are timezone-aware and convert to Europe/London for slot matching
     for r in raw_rates:
         for k in ("start", "end"):
             dt = r[k]
             if dt.tzinfo is None:
                 _LOGGER.warning("Naive datetime detected in rate %s; assuming UTC.", k)
                 r[k] = dt.replace(tzinfo=UTC)
-            # Always convert to Europe/London for slot logic
             r[k] = r[k].astimezone(ZoneInfo("Europe/London"))
     current = current.astimezone(ZoneInfo("Europe/London"))
     end_time = end_time.astimezone(ZoneInfo("Europe/London"))
 
     while current < end_time:
-        # Find a rate whose window directly covers this slot
         rate_value = next(
             (r["value_inc_vat"] for r in raw_rates if r["start"] <= current < r["end"]),
             None,
         )
 
         if rate_value is None:
-            # For daily-repeating TOU tariffs (e.g. Intelligent Go), the API
-            # only returns today's bands. Match by time-of-day instead.
             current_tod = current.hour * 60 + current.minute
             for r in raw_rates:
                 r_start_tod = r["start"].hour * 60 + r["start"].minute
                 r_end_tod = r["end"].hour * 60 + r["end"].minute
                 if r_end_tod > r_start_tod:
-                    # Normal window (e.g. 05:30 → 23:30)
                     if r_start_tod <= current_tod < r_end_tod:
                         rate_value = r["value_inc_vat"]
                         break
                 else:
-                    # Overnight window crossing midnight (e.g. 23:30 → 05:30)
                     if current_tod >= r_start_tod or current_tod < r_end_tod:
                         rate_value = r["value_inc_vat"]
                         break
@@ -146,7 +125,6 @@ class OctopusAgileRatesClient:
         account_number: str,
         tariff_cache_ttl: timedelta = timedelta(minutes=30),
     ) -> None:
-        """Initialise the client with API credentials."""
         self.api_key = api_key
         self.account_number = account_number
         self.import_tariff_code: str | None = None
@@ -158,11 +136,9 @@ class OctopusAgileRatesClient:
         self._tariffs_refresh_after: datetime | None = None
 
     def _auth(self) -> aiohttp.BasicAuth:
-        """Return basic auth for API requests."""
         return aiohttp.BasicAuth(self.api_key, "")
 
     async def _get_electricity_meters(self, session: aiohttp.ClientSession) -> list:
-        """Fetch all electricity meter points for the account."""
         url = f"{OCTOPUS_API_BASE}/accounts/{self.account_number}/"
         async with session.get(url, auth=self._auth()) as resp:
             resp.raise_for_status()
@@ -176,11 +152,6 @@ class OctopusAgileRatesClient:
         now: datetime | None = None,
         force_refresh: bool = False,
     ) -> None:
-        """Public wrapper around current-tariff resolution.
-
-        Keeps internal caching behavior while allowing callers and tests to
-        request deterministic re-resolution points.
-        """
         await self._find_current_tariffs(session, now=now, force_refresh=force_refresh)
 
     async def _find_current_tariffs(
@@ -190,12 +161,6 @@ class OctopusAgileRatesClient:
         now: datetime | None = None,
         force_refresh: bool = False,
     ) -> None:
-        """Resolve current import and export tariff codes from active agreements.
-
-        Uses the is_export flag on each meter point to distinguish import from
-        export. Selects the active agreement based on valid_from/valid_to dates,
-        with no tariff-name string matching.
-        """
         now_dt = now or datetime.now(UTC)
         has_cached_tariffs = (
             self.import_tariff_code is not None
@@ -216,7 +181,6 @@ class OctopusAgileRatesClient:
         meters = await self._get_electricity_meters(session)
         next_boundary_candidates: list[datetime] = []
 
-        # Reset cache before rebuilding so stale values don't survive if account state changes.
         self.import_tariff_code = None
         self.export_tariff_code = None
         self.import_product_code = None
@@ -260,7 +224,6 @@ class OctopusAgileRatesClient:
         )
 
     async def fetch_standing_charge(self, session: aiohttp.ClientSession) -> float:
-        """Fetch the current standing charge (p/day) for the import tariff."""
         await self.refresh_current_tariffs(session)
         url = (
             f"{OCTOPUS_API_BASE}/products/{self.import_product_code}"
@@ -277,16 +240,6 @@ class OctopusAgileRatesClient:
     async def fetch_rates(
         self, session: aiohttp.ClientSession, export: bool, days: int = 2
     ) -> list[dict]:
-        """Fetch 30-minute unit rate slots for the current import or export tariff.
-
-        Args:
-            session: aiohttp client session.
-            export: If True, fetch export tariff rates; otherwise import.
-            days: Number of days ahead to request (unused currently, reserved).
-
-        Returns:
-            List of dicts with keys: start, end, value_inc_vat (£/kWh).
-        """
         await self.refresh_current_tariffs(session)
         product_code = self.export_product_code if export else self.import_product_code
         tariff_code = self.export_tariff_code if export else self.import_tariff_code
@@ -334,16 +287,6 @@ class OctopusAgileRatesClient:
         mpan: str,
         meter_serial: str,
     ) -> list[dict]:
-        """Fetch today's half-hourly electricity consumption from the Octopus API.
-
-        Returns a list of dicts with keys:
-          - ``interval_start`` (datetime, UTC-aware)
-          - ``interval_end``   (datetime, UTC-aware)
-          - ``consumption_kwh`` (float)
-
-        Returns an empty list when MPAN or meter serial is absent, or when the
-        API call fails (the caller can then fall back to fully-predicted costs).
-        """
         if not mpan or not meter_serial:
             _LOGGER.warning(
                 "MPAN or meter serial not configured — skipping today's consumption fetch"
@@ -352,7 +295,6 @@ class OctopusAgileRatesClient:
 
         london = ZoneInfo("Europe/London")
         now_utc = datetime.now(UTC)
-        # Start of today in London time, converted back to UTC for the API query
         today_london_midnight = now_utc.astimezone(london).replace(
             hour=0, minute=0, second=0, microsecond=0
         )

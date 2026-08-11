@@ -14,7 +14,7 @@ from typing import Any
 
 import aiohttp
 
-from ..octopus_agile import _active_agreement
+from ..planning.providers.tariff.octopus_agile import _active_agreement
 
 _LOGGER = logging.getLogger(__name__)
 

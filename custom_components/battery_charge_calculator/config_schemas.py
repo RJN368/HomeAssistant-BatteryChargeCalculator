@@ -242,6 +242,59 @@ def _axle_settings_schema(
     )
 
 
+def _planning_providers_schema(
+    tariff_provider=const.DEFAULT_PLANNING_TARIFF_PROVIDER,
+    battery_provider=const.DEFAULT_PLANNING_BATTERY_PROVIDER,
+    solar_provider=const.DEFAULT_PLANNING_SOLAR_PROVIDER,
+    axle_provider=const.DEFAULT_PLANNING_AXLE_PROVIDER,
+    temperature_provider=const.DEFAULT_PLANNING_TEMPERATURE_PROVIDER,
+):
+    return vol.Schema(
+        {
+            vol.Required(
+                const.PLANNING_TARIFF_PROVIDER,
+                default=tariff_provider,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=const.PLANNING_TARIFF_PROVIDERS,
+                )
+            ),
+            vol.Required(
+                const.PLANNING_BATTERY_PROVIDER,
+                default=battery_provider,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=const.PLANNING_BATTERY_PROVIDERS,
+                )
+            ),
+            vol.Required(
+                const.PLANNING_SOLAR_PROVIDER,
+                default=solar_provider,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=const.PLANNING_SOLAR_PROVIDERS,
+                )
+            ),
+            vol.Required(
+                const.PLANNING_AXLE_PROVIDER,
+                default=axle_provider,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=const.PLANNING_AXLE_PROVIDERS,
+                )
+            ),
+            vol.Required(
+                const.PLANNING_TEMPERATURE_PROVIDER,
+                default=temperature_provider,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=const.PLANNING_TEMPERATURE_PROVIDERS,
+                )
+            ),
+        }
+    )
+
+
 def _tariff_comparison_enable_schema(enabled=False):
     return vol.Schema(
         {

@@ -1,17 +1,11 @@
 import logging
-from datetime import datetime, timedelta
 import json
-import requests
 from . import const
 
 # Publish MQTT message using async_publish
 from homeassistant.components.mqtt import async_publish, async_subscribe
 from homeassistant.core import HomeAssistant, callback as ha_callback
 import asyncio
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from homeassistant.components.mqtt.models import ReceiveMessage
 
 _LOGGER = logging.getLogger(__name__)
 

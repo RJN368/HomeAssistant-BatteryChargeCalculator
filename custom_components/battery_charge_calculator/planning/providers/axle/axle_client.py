@@ -6,31 +6,18 @@ import asyncio
 import logging
 import random
 import re
-from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 import aiohttp
 
-from . import const
+from .... import const
+from .axle_client_error import AxleClientError
+from .axle_event import AxleEvent
 
 _LOGGER = logging.getLogger(__name__)
 
 _REDACTED_TOKEN = "***REDACTED***"
 _BEARER_PATTERN = re.compile(r"(Bearer\s+)([^\s]+)", flags=re.IGNORECASE)
-
-
-@dataclass(slots=True)
-class AxleEvent:
-    """Normalized event payload returned by Axle endpoint."""
-
-    start_time: str
-    end_time: str | None
-    control_intent: str | None
-    source_updated_at: str | None
-
-
-class AxleClientError(RuntimeError):
-    """Raised when Axle event retrieval fails after retries."""
 
 
 class AxleClient:

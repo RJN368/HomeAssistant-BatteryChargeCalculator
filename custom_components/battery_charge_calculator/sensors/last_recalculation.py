@@ -53,7 +53,7 @@ class LastRecalculationSensor(CoordinatorEntity, SensorEntity):
         reason_label = REASON_TRANSLATION_KEYS.get(reason, reason)
         self._attr_extra_state_attributes = {
             "reason": reason,
-            "reason_label": reason,
+            "reason_label": reason_label,
         }
 
     @callback

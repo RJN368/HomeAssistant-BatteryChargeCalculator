@@ -1,11 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 import numpy as np
-import pandas as pd
 from scipy.interpolate import interp1d
-
-# Default known points used when no custom points are supplied
-known_points_new = np.array([[-6, 60], [0, 45], [6, 20], [15, 0]])
 
 
 class PowerCalulator:
@@ -150,7 +146,6 @@ class PowerCalulator:
         kwh_total uses the midday base load (slot 24, i.e. 12:00) as a representative
         constant so the chart shows a meaningful absolute level without varying by time.
         """
-        midday = datetime(2000, 1, 1, 12, 0)
         base_midday = self._base_consumption_30mins[24]
         result = []
         temp = temp_min

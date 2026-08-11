@@ -14,7 +14,6 @@ Architecture:
 from __future__ import annotations
 
 import asyncio
-import calendar
 import copy
 import json
 import logging
@@ -314,7 +313,7 @@ class TariffComparisonCoordinator(DataUpdateCoordinator):
             # Strategy A: account-based (preferred when account_number is known)
             if account_number:
                 try:
-                    from ..octopus_agile import (
+                    from ..planning.providers.tariff.octopus_agile import (
                         OctopusAgileRatesClient,
                         _active_agreement,
                     )
