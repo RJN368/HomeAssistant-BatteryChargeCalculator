@@ -138,18 +138,16 @@ class GeneticEvaluator:
                 timeslot.cost -= timeslot.export_price * solar_exported
 
         elif action == "export":
-            # Clamp discharge to avoid impossible negative values when demand
-            # exceeds inverter discharge capability.
-            discharge_amount = max(0.0, min(self.max_discharge - net_demand, battery))
-            battery = battery - discharge_amount
-            timeslot.cost = (
-                timeslot.export_price * (discharge_amount - net_demand)
-            ) * -1
-
-            overflow = self.max_discharge - discharge_amount
-
-            if overflow > 0:
-                timeslot.cost = timeslot.cost + (timeslot.import_price * overflow)
+            # Discharge battery at inverter rate; home demand is met from the
+            # discharge first, remainder goes to the grid.
+            discharge_amount = min(self.max_discharge, battery)
+            battery -= discharge_amount
+            grid_export = max(0.0, discharge_amount - net_demand)
+            # Any home demand not covered by battery discharge must be imported.
+            shortfall = max(0.0, net_demand - discharge_amount)
+            timeslot.cost = timeslot.export_price * grid_export * -1
+            if shortfall > 0:
+                timeslot.cost += timeslot.import_price * shortfall
         else:
             import_needed = max(0, net_demand - battery)
             battery -= min(battery, net_demand)
